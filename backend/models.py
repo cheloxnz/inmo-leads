@@ -56,6 +56,12 @@ class FinancingType(str, Enum):
     MIXTO = "mixto"
     NO_SE = "no_se"
 
+class EmailType(str, Enum):
+    HOT_LEAD = "hot_lead"
+    APPOINTMENT_REMINDER = "appointment_reminder"
+    WARM_LEAD_REACTIVATION = "warm_lead_reactivation"
+    TEST = "test"
+
 class Lead(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -76,6 +82,7 @@ class Lead(BaseModel):
     appointment_datetime: Optional[datetime] = None
     assigned_agent: Optional[str] = None
     last_message_at: datetime = Field(default_factory=datetime.utcnow)
+    last_reactivation_email_at: Optional[datetime] = None
     source: str = "whatsapp"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
@@ -119,6 +126,8 @@ class BotConfig(BaseModel):
     saturday_hours_end: int = 14
     timezone: str = "America/Argentina/Buenos_Aires"
     auto_handoff_score: int = 7
+    warm_lead_reactivation_days: int = 3
+    appointment_reminder_hours: int = 24
     welcome_message: str = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy acá para ayudarte a encontrar tu propiedad ideal 🏡"
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -129,4 +138,27 @@ class ConversationWindow(BaseModel):
     last_message_timestamp: datetime
     window_expires_at: datetime
     is_within_window: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class EmailLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    email_type: EmailType
+    recipient_emails: List[str]
+    lead_phone: Optional[str] = None
+    subject: str
+    success: bool
+    error_message: Optional[str] = None
+    sent_at: datetime = Field(default_factory=datetime.utcnow)
+
+class WhatsAppTemplate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    name: str
+    category: str
+    language: str = "es"
+    status: str = "pending"
+    content: str
+    variables: List[str] = Field(default_factory=list)
+    use_case: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
