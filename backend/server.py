@@ -372,6 +372,16 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Inicia tareas programadas al arrancar el servidor"""
+    logger.info("Iniciando tareas programadas...")
+    await scheduler.start()
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    """Detiene tareas y cierra conexiones al apagar el servidor"""
+    logger.info("Deteniendo tareas programadas...")
+    await scheduler.stop()
     client.close()
