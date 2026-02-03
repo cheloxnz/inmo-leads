@@ -313,13 +313,51 @@ async def create_agent(agent: Agent):
 async def test_email():
     """Envía email de prueba para verificar configuración"""
     try:
-        success = email_service.test_email()
+        success = await email_service.test_email()
         if success:
             return {"success": True, "message": "Email de prueba enviado exitosamente"}
         else:
             raise HTTPException(status_code=500, detail="Error enviando email de prueba")
     except Exception as e:
         logger.error(f"Error en test de email: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/email-stats")
+async def get_email_stats():
+    """Obtiene estadísticas de emails enviados"""
+    try:
+        total = await db.email_logs.count_documents({})
+        successful = await db.email_logs.count_documents({"success": True})
+        failed = await db.email_logs.count_documents({"success": False})
+        
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = await db.email_logs.count_documents({
+            "sent_at": {"$gte": today.isoformat()}
+        })
+        
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_count = await db.email_logs.count_documents({
+            "sent_at": {"$gte": week_ago.isoformat()}
+        })
+        
+        by_type_pipeline = [
+            {"$group": {"_id": "$email_type", "count": {"$sum": 1}}}
+        ]
+        by_type = await db.email_logs.aggregate(by_type_pipeline).to_list(10)
+        by_type_dict = {item["_id"]: item["count"] for item in by_type}
+        
+        return {
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+            "success_rate": round((successful / total * 100) if total > 0 else 0, 2),
+            "today": today_count,
+            "this_week": week_count,
+            "by_type": by_type_dict
+        }
+    except Exception as e:
+        logger.error(f"Error obteniendo estadísticas de email: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
