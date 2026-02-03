@@ -21,6 +21,7 @@ from bot_flow import BotFlowManager
 from scoring import ScoringEngine
 from google_services import GoogleSheetsService, GoogleCalendarService
 from email_service import EmailService
+from scheduler import ScheduledTasks
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
