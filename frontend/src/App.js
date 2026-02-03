@@ -1,52 +1,104 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { Toaster } from 'sonner';
+import Dashboard from './pages/Dashboard';
+import Leads from './pages/Leads';
+import LeadDetail from './pages/LeadDetail';
+import FlowVisualization from './pages/FlowVisualization';
+import Configuration from './pages/Configuration';
+import Documentation from './pages/Documentation';
+import '@/App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+export const API = `${BACKEND_URL}/api`;
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
+function Navigation() {
+  const location = useLocation();
+  
+  const isActive = (path) => location.pathname === path;
+  
   return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
+    <nav className="nav-sidebar">
+      <div className="nav-logo">
+        <div className="logo-icon">🏠</div>
+        <h1>InmoBot AI</h1>
+      </div>
+      
+      <div className="nav-links">
+        <Link 
+          to="/" 
+          className={`nav-link ${isActive('/') ? 'active' : ''}`}
+          data-testid="nav-dashboard"
         >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
+          <span className="icon">📊</span>
+          <span>Dashboard</span>
+        </Link>
+        
+        <Link 
+          to="/leads" 
+          className={`nav-link ${isActive('/leads') ? 'active' : ''}`}
+          data-testid="nav-leads"
+        >
+          <span className="icon">👥</span>
+          <span>Leads</span>
+        </Link>
+        
+        <Link 
+          to="/flow" 
+          className={`nav-link ${isActive('/flow') ? 'active' : ''}`}
+          data-testid="nav-flow"
+        >
+          <span className="icon">🔄</span>
+          <span>Flujo Bot</span>
+        </Link>
+        
+        <Link 
+          to="/config" 
+          className={`nav-link ${isActive('/config') ? 'active' : ''}`}
+          data-testid="nav-config"
+        >
+          <span className="icon">⚙️</span>
+          <span>Configuración</span>
+        </Link>
+        
+        <Link 
+          to="/docs" 
+          className={`nav-link ${isActive('/docs') ? 'active' : ''}`}
+          data-testid="nav-docs"
+        >
+          <span className="icon">📚</span>
+          <span>Documentación</span>
+        </Link>
+      </div>
+      
+      <div className="nav-footer">
+        <div className="status-indicator">
+          <div className="status-dot"></div>
+          <span>Bot Activo</span>
+        </div>
+      </div>
+    </nav>
   );
-};
+}
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <Navigation />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/leads" element={<Leads />} />
+            <Route path="/leads/:phone" element={<LeadDetail />} />
+            <Route path="/flow" element={<FlowVisualization />} />
+            <Route path="/config" element={<Configuration />} />
+            <Route path="/docs" element={<Documentation />} />
+          </Routes>
+        </main>
       </BrowserRouter>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
