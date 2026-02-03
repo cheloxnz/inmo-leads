@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [emailStats, setEmailStats] = useState(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     fetchStats();
+    fetchEmailStats();
   }, []);
   
   const fetchStats = async () => {
@@ -19,6 +21,15 @@ export default function Dashboard() {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchEmailStats = async () => {
+    try {
+      const response = await axios.get(`${API}/email-stats`);
+      setEmailStats(response.data);
+    } catch (error) {
+      console.error('Error fetching email stats:', error);
     }
   };
   
