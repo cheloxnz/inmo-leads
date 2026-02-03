@@ -339,6 +339,14 @@ class BotFlowManager:
         """Dispara notificación a asesor humano"""
         logger.info(f"HANDOFF: Lead {lead.phone} debe pasar a humano")
         lead.flow_stage = FlowStage.HANDOFF
+        
+        # Enviar notificación por email
+        try:
+            lead_dict = lead.model_dump()
+            self.email.send_hot_lead_notification(lead_dict)
+            logger.info(f"Email de notificación enviado para lead {lead.phone}")
+        except Exception as e:
+            logger.error(f"Error enviando email de notificación: {str(e)}")
     
     async def save_lead(self, lead: Lead, db):
         """Guarda lead en base de datos"""
