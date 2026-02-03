@@ -181,6 +181,34 @@ export default function Configuration() {
             </div>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Notificaciones por Email</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="integration-status">
+              <div className="status-item">
+                <span>SMTP Gmail:</span>
+                <span className="value">✅ Configurado</span>
+              </div>
+              <div className="status-item">
+                <span>Email destino:</span>
+                <span className="value">cheloxnz@gmail.com</span>
+              </div>
+              <p className="help-text">Los emails se envían automáticamente cuando hay leads calientes (Score ≥ 7)</p>
+              <Button 
+                onClick={handleTestEmail} 
+                disabled={testingEmail}
+                variant="outline"
+                className="mt-4"
+                data-testid="btn-test-email"
+              >
+                {testingEmail ? '📧 Enviando...' : '📧 Enviar Email de Prueba'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
       <div className="actions-bar">
