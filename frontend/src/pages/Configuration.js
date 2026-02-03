@@ -45,6 +45,19 @@ export default function Configuration() {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
   
+  const handleTestEmail = async () => {
+    setTestingEmail(true);
+    try {
+      const response = await axios.post(`${API}/test-email`);
+      toast.success('Email de prueba enviado! Revisa tu bandeja de entrada');
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      toast.error('Error enviando email de prueba');
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+  
   if (loading) {
     return <div className="loading-container">Cargando...</div>;
   }
