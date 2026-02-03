@@ -10,6 +10,7 @@ export default function Configuration() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
   
   useEffect(() => {
     fetchConfig();
