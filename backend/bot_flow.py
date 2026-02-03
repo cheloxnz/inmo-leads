@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 class BotFlowManager:
     """Gestiona el flujo conversacional del bot"""
     
-    def __init__(self, whatsapp_service: WhatsAppService, llm_service: LLMService):
+    def __init__(self, whatsapp_service: WhatsAppService, llm_service: LLMService, email_service: EmailService):
         self.wa = whatsapp_service
         self.llm = llm_service
+        self.email = email_service
     
     async def process_message(self, lead: Lead, message_text: str, db) -> Lead:
         """Procesa mensaje según el estado del flujo"""
