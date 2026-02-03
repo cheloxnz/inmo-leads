@@ -5,13 +5,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 from datetime import datetime
+from models import EmailType, EmailLog
 
 logger = logging.getLogger(__name__)
 
 class EmailService:
     """Servicio para envío de notificaciones por email usando Gmail SMTP"""
     
-    def __init__(self):
+    def __init__(self, db=None):
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_username = os.getenv("SMTP_USERNAME")
@@ -19,6 +20,7 @@ class EmailService:
         self.from_email = os.getenv("SMTP_FROM_EMAIL")
         self.from_name = os.getenv("SMTP_FROM_NAME", "InmoBot AI")
         self.notification_emails = os.getenv("NOTIFICATION_EMAILS", "").split(",")
+        self.db = db
         
         if not self.smtp_username or not self.smtp_password:
             logger.warning("Credenciales SMTP no configuradas. Emails deshabilitados.")
