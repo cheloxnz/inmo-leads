@@ -25,7 +25,7 @@ class EmailService:
         if not self.smtp_username or not self.smtp_password:
             logger.warning("Credenciales SMTP no configuradas. Emails deshabilitados.")
     
-    def send_email(self, to_emails: List[str], subject: str, html_body: str, text_body: Optional[str] = None, email_type: EmailType = EmailType.TEST, lead_phone: Optional[str] = None) -> bool:
+    async def send_email(self, to_emails: List[str], subject: str, html_body: str, text_body: Optional[str] = None, email_type: EmailType = EmailType.TEST, lead_phone: Optional[str] = None) -> bool:
         """Envía email usando Gmail SMTP y registra en log"""
         if not self.smtp_username or not self.smtp_password:
             logger.warning("No se puede enviar email: credenciales no configuradas")
@@ -80,7 +80,7 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error logging email: {str(e)}")
     
-    def send_hot_lead_notification(self, lead_data: dict) -> bool:
+    async def send_hot_lead_notification(self, lead_data: dict) -> bool:
         """Envía notificación de lead caliente a los asesores"""
         if not self.notification_emails or not self.notification_emails[0]:
             logger.warning("No hay emails configurados para notificaciones")
@@ -190,14 +190,16 @@ Score: {score}/12
 </body>
 </html>"""
         
-        return self.send_email(
+        return await self.send_email(
             to_emails=[email.strip() for email in self.notification_emails if email.strip()],
             subject=subject,
             html_body=html_body,
-            text_body=text_body
+            text_body=text_body,
+            email_type=EmailType.HOT_LEAD,
+            lead_phone=phone
         )
     
-    def send_appointment_reminder(self, lead_data: dict, hours_before: int = 24) -> bool:
+    async def send_appointment_reminder(self, lead_data: dict, hours_before: int = 24) -> bool:
         """Envía recordatorio de cita programada"""
         if not self.notification_emails or not self.notification_emails[0]:
             return False
@@ -255,14 +257,76 @@ La cita es en {hours_before} horas.
 </body>
 </html>"""
         
-        return self.send_email(
+        return await self.send_email(
             to_emails=[email.strip() for email in self.notification_emails if email.strip()],
             subject=subject,
             html_body=html_body,
-            text_body=text_body
+            text_body=text_body,
+            email_type=EmailType.APPOINTMENT_REMINDER,
+            lead_phone=phone
         )
     
-    def test_email(self) -> bool:
+    async def send_warm_lead_reactivation(self, lead_data: dict) -> bool:
+        """Envía email para reactivar lead tibio sin actividad"""
+        if not self.notification_emails or not self.notification_emails[0]:
+            return False
+        
+        phone = lead_data.get('phone', 'N/A')
+        name = lead_data.get('name') or 'Cliente'
+        zone = lead_data.get('zone', '')
+        property_type = lead_data.get('property_type', 'propiedad')
+        
+        subject = f"🟡 Lead Tibio sin actividad - {name}"
+        
+        text_body = f"""REACTIVACIÓN DE LEAD TIBIO
+
+Cliente: {name}
+Teléfono: {phone}
+Zona: {zone}
+Tipo: {property_type}
+
+Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsApp con novedades.
+"""
+        
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+        .content {{ background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }}
+        .lead-box {{ background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🟡 LEAD TIBIO - REACTIVACIÓN</h1>
+        </div>
+        <div class="content">
+            <div class="lead-box">
+                <p><strong>Cliente:</strong> {name}</p>
+                <p><strong>Teléfono:</strong> {phone}</p>
+                <p><strong>Zona:</strong> {zone}</p>
+                <p><strong>Tipo:</strong> {property_type}</p>
+            </div>
+            <p style="text-align: center; color: #6b7280;">Este lead lleva <strong>3 días sin actividad</strong>. Considera contactarlo con novedades.</p>
+        </div>
+    </div>
+</body>
+</html>"""
+        
+        return await self.send_email(
+            to_emails=[email.strip() for email in self.notification_emails if email.strip()],
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            email_type=EmailType.WARM_LEAD_REACTIVATION,
+            lead_phone=phone
+        )
+    
+    async def test_email(self) -> bool:
         """Envía email de prueba para verificar configuración"""
         if not self.notification_emails or not self.notification_emails[0]:
             logger.error("No hay emails configurados para notificaciones")
@@ -291,7 +355,8 @@ La cita es en {hours_before} horas.
             <ul>
                 <li>🔥 Se detecte un lead caliente (Score ≥ 7)</li>
                 <li>📅 Se agende una cita</li>
-                <li>🎯 Un lead complete el flujo conversacional</li>
+                <li>🟡 Leads tibios necesiten reactivación (3 días sin actividad)</li>
+                <li>⏰ Recordatorios de citas 24hs antes</li>
             </ul>
             <p><strong>InmoBot AI</strong> - Sistema de Calificación Automática</p>
         </div>
@@ -303,14 +368,15 @@ La cita es en {hours_before} horas.
 
 El sistema de notificaciones por email está funcionando correctamente.
 
-Recibirás alertas automáticas cuando se detecten leads calientes.
+Recibirás alertas automáticas cuando se detecten leads calientes, citas agendadas y leads tibios.
 
 InmoBot AI - Sistema de Calificación Automática
 """
         
-        return self.send_email(
+        return await self.send_email(
             to_emails=[email.strip() for email in self.notification_emails if email.strip()],
             subject=subject,
             html_body=html_body,
-            text_body=text_body
+            text_body=text_body,
+            email_type=EmailType.TEST
         )
