@@ -136,6 +136,37 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        
+        {emailStats && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>📧 Notificaciones por Email</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="email-stats-grid">
+                <div className="email-stat-item">
+                  <div className="email-stat-label">Emails Enviados</div>
+                  <div className="email-stat-value">{emailStats.total || 0}</div>
+                  <div className="email-stat-change">+{emailStats.today || 0} hoy</div>
+                </div>
+                
+                <div className="email-stat-item">
+                  <div className="email-stat-label">Tasa de Éxito</div>
+                  <div className="email-stat-value">{emailStats.success_rate || 0}%</div>
+                  <div className="email-stat-change">{emailStats.successful || 0} exitosos</div>
+                </div>
+                
+                <div className="email-stat-item">
+                  <div className="email-stat-label">Esta Semana</div>
+                  <div className="email-stat-value">{emailStats.this_week || 0}</div>
+                  <div className="email-stat-change">
+                    {emailStats.by_type?.hot_lead || 0} leads calientes
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
