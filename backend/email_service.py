@@ -25,10 +25,11 @@ class EmailService:
         if not self.smtp_username or not self.smtp_password:
             logger.warning("Credenciales SMTP no configuradas. Emails deshabilitados.")
     
-    def send_email(self, to_emails: List[str], subject: str, html_body: str, text_body: Optional[str] = None) -> bool:
-        """Envía email usando Gmail SMTP"""
+    def send_email(self, to_emails: List[str], subject: str, html_body: str, text_body: Optional[str] = None, email_type: EmailType = EmailType.TEST, lead_phone: Optional[str] = None) -> bool:
+        """Envía email usando Gmail SMTP y registra en log"""
         if not self.smtp_username or not self.smtp_password:
             logger.warning("No se puede enviar email: credenciales no configuradas")
+            await self._log_email(email_type, to_emails, subject, False, "Credenciales no configuradas", lead_phone)
             return False
         
         try:
@@ -50,11 +51,34 @@ class EmailService:
                 server.send_message(msg)
             
             logger.info(f"Email enviado exitosamente a {to_emails}")
+            await self._log_email(email_type, to_emails, subject, True, None, lead_phone)
             return True
         
         except Exception as e:
             logger.error(f"Error enviando email: {str(e)}")
+            await self._log_email(email_type, to_emails, subject, False, str(e), lead_phone)
             return False
+    
+    async def _log_email(self, email_type: EmailType, recipients: List[str], subject: str, success: bool, error: Optional[str], lead_phone: Optional[str]):
+        """Registra envío de email en base de datos"""
+        if not self.db:
+            return
+        
+        try:
+            log = EmailLog(
+                email_type=email_type,
+                recipient_emails=recipients,
+                lead_phone=lead_phone,
+                subject=subject,
+                success=success,
+                error_message=error
+            )
+            log_dict = log.model_dump()
+            log_dict["sent_at"] = log.sent_at.isoformat()
+            
+            await self.db.email_logs.insert_one(log_dict)
+        except Exception as e:
+            logger.error(f"Error logging email: {str(e)}")
     
     def send_hot_lead_notification(self, lead_data: dict) -> bool:
         """Envía notificación de lead caliente a los asesores"""
