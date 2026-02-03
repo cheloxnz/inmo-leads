@@ -307,6 +307,20 @@ async def create_agent(agent: Agent):
     return agent
 
 
+@api_router.post("/test-email")
+async def test_email():
+    """Envía email de prueba para verificar configuración"""
+    try:
+        success = email_service.test_email()
+        if success:
+            return {"success": True, "message": "Email de prueba enviado exitosamente"}
+        else:
+            raise HTTPException(status_code=500, detail="Error enviando email de prueba")
+    except Exception as e:
+        logger.error(f"Error en test de email: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 app.include_router(api_router)
 
 app.add_middleware(
