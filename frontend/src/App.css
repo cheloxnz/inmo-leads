@@ -1408,11 +1408,63 @@ body {
   max-width: 560px;
 }
 
+/* Estilos generales para modales/dialogs */
+[role="dialog"] {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+[role="dialog"] [data-testid="edit-modal"],
+[role="dialog"] [data-testid="agent-modal"] {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Fix para textarea en modales */
+.textarea-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  resize: vertical;
+}
+
+.textarea-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Estilos para form-group en modales */
+.edit-form,
 .agent-form {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
   padding-top: 1rem;
+}
+
+.edit-form .form-group,
+.agent-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.edit-form .form-group label,
+.agent-form .form-group label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.help-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
 }
 
 .checkbox-group {
