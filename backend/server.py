@@ -181,6 +181,7 @@ async def handle_incoming_message(message: dict):
         await wa_service.record_customer_message(sender)
         
         lead = await db.leads.find_one({"phone": sender}, {"_id": 0})
+        previous_status = lead.get("status") if lead else None
         
         if not lead:
             lead = Lead(phone=sender)
@@ -213,8 +214,46 @@ async def handle_incoming_message(message: dict):
         if message_text:
             updated_lead = await bot_flow.process_message(lead, message_text, db)
             
-            if updated_lead.status == LeadStatus.HOT:
+            # Asignación automática cuando lead se vuelve HOT
+            if updated_lead.status == LeadStatus.HOT and previous_status != "hot":
+                if assignment_engine and not updated_lead.assigned_agent:
+                    assigned_email = await assignment_engine.assign_lead_to_agent(
+                        updated_lead.phone,
+                        updated_lead.model_dump()
+                    )
+                    
+                    if assigned_email:
+                        # Notificar al asesor asignado
+                        await notification_manager.send_to_user(assigned_email, {
+                            "type": "new_lead_assigned",
+                            "title": "🔥 Nuevo Lead Asignado",
+                            "message": f"Lead caliente asignado: {updated_lead.name or 'Sin nombre'} ({updated_lead.zone or 'Sin zona'})",
+                            "lead_phone": updated_lead.phone,
+                            "timestamp": datetime.utcnow().isoformat()
+                        })
+                        
+                        # Si presupuesto alto, notificar a admins
+                        budget = updated_lead.budget_text or ""
+                        if "500" in budget or "1000" in budget or "millón" in budget.lower():
+                            await notification_manager.send_to_admins({
+                                "type": "high_value_lead",
+                                "title": "🎯 Lead de Alto Valor",
+                                "message": f"Lead con presupuesto >$500k detectado: {updated_lead.name}",
+                                "lead_phone": updated_lead.phone,
+                                "timestamp": datetime.utcnow().isoformat()
+                            })
+                
                 await sheets_service.sync_lead_to_sheet(updated_lead.model_dump())
+            
+            # Notificar cuando cliente responde
+            if updated_lead.assigned_agent and previous_status:
+                await notification_manager.send_to_user(updated_lead.assigned_agent, {
+                    "type": "customer_replied",
+                    "title": "💬 Cliente Respondió",
+                    "message": f"{updated_lead.name or 'Cliente'} respondió en WhatsApp",
+                    "lead_phone": updated_lead.phone,
+                    "timestamp": datetime.utcnow().isoformat()
+                })
             
             if updated_lead.appointment_datetime:
                 await calendar_service.create_appointment(
