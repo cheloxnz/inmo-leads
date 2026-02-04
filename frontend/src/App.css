@@ -1544,6 +1544,33 @@ body {
   margin-bottom: 0.75rem;
 }
 
+/* Data Deletion Form */
+.deletion-form {
+  margin-top: 1rem;
+}
+
+.deletion-form .form-row {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.deletion-form .form-row input {
+  flex: 1;
+}
+
+.success-message {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.success-message p {
+  margin-bottom: 0.5rem;
+}
+
 .privacy-content li {
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
