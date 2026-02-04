@@ -140,12 +140,38 @@ class BotFlowManager:
             self.wa.send_text_message(lead.phone, response)
     
     async def handle_budget(self, lead: Lead, message: str):
-        """Maneja presupuesto"""
+        """Maneja presupuesto con validación de mínimo"""
         budget = await self.llm.extract_budget(message)
         
         if budget or "no" in message.lower() or "sin" in message.lower():
             lead.budget_text = budget if budget else "A definir"
             
+            # Validar presupuesto mínimo según intención
+            if budget and lead.intent == LeadIntent.COMPRAR:
+                # Extraer número del presupuesto para validar
+                import re
+                numbers = re.findall(r'\d+', budget.replace('.', '').replace(',', ''))
+                if numbers:
+                    amount = int(numbers[0])
+                    
+                    # Si es menor a 50,000 USD, descalificar educadamente
+                    if amount < 50000:
+                        response = f"Gracias por tu interés, {lead.name}. "
+                        response += f"Actualmente nuestras propiedades en venta tienen un valor desde USD 50.000. "
+                        response += f"Con un presupuesto de {budget}, te recomendaría:\n\n"
+                        response += "• Considerar alquilar mientras ahorrás\n"
+                        response += "• Buscar zonas más económicas\n"
+                        response += "• Consultar opciones de financiamiento\n\n"
+                        response += "¿Te gustaría que te asesore sobre alguna de estas opciones?\n\n"
+                        response += "Si preferís, puedo contactarte cuando tengamos opciones en tu rango de presupuesto."
+                        
+                        self.wa.send_text_message(lead.phone, response)
+                        lead.flow_stage = FlowStage.DISQUALIFIED
+                        lead.status = LeadStatus.COLD
+                        lead.score = 0
+                        return
+            
+            # Si pasa la validación, continuar
             response = "¿Qué tipo de propiedad te interesa?"
             buttons = [
                 {"type": "reply", "reply": {"id": "departamento", "title": "Departamento"}},
@@ -156,7 +182,7 @@ class BotFlowManager:
             self.wa.send_interactive_buttons(lead.phone, response, buttons)
             lead.flow_stage = FlowStage.PROPERTY_TYPE
         else:
-            response = "No pude identificar el presupuesto. ¿Podés indicarlo de nuevo?\n\nEjemplo: 200.000 USD"
+            response = "No pude identificar el presupuesto. ¿Podés indicarlo de nuevo?\n\nEjemplo: 200.000 USD o 150k"
             self.wa.send_text_message(lead.phone, response)
     
     async def handle_property_type(self, lead: Lead, message: str):
