@@ -9,9 +9,20 @@ from auth import verify_password, get_password_hash, create_access_token, decode
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# Conexión a DB
+from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+mongo_url = os.environ['MONGO_URL']
+_client = AsyncIOMotorClient(mongo_url)
+_db = _client[os.environ['DB_NAME']]
+
 def get_db():
-    from server import db
-    return db
+    return _db
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> User:
     """Obtiene usuario actual desde token JWT"""
