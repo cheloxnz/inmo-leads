@@ -127,5 +127,3 @@ class AssignmentEngine:
         except Exception as e:
             logger.error(f"Error obteniendo métricas de asesor: {str(e)}")
             return {}
-
-from datetime import datetime
