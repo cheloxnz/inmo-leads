@@ -14,6 +14,8 @@ import Login from './pages/Login';
 import AgentManagement from './pages/AgentManagement';
 import MyDashboard from './pages/MyDashboard';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import DataDeletion from './pages/DataDeletion';
 import '@/App.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
