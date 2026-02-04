@@ -130,6 +130,14 @@ export default function LeadDetail() {
           <h1>{lead.name || 'Sin nombre'}</h1>
           {getStatusBadge(lead.status)}
         </div>
+        <div className="header-actions">
+          <Button onClick={handleEdit} variant="outline" data-testid="btn-edit-lead">
+            ✏️ Editar
+          </Button>
+          <Button onClick={handleDelete} variant="destructive" data-testid="btn-delete-lead">
+            🗑️ Eliminar
+          </Button>
+        </div>
       </header>
       
       <div className="lead-detail-grid">
