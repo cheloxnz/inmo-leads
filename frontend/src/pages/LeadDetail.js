@@ -29,10 +29,64 @@ export default function LeadDetail() {
     try {
       const response = await axios.get(`${API}/leads/${phone}`);
       setLead(response.data);
+      setEditName(response.data.name || '');
+      
+      if (response.data.appointment_datetime) {
+        const date = new Date(response.data.appointment_datetime);
+        const dateStr = date.toISOString().split('T')[0];
+        const timeStr = date.toTimeString().slice(0, 5);
+        setEditDate(dateStr);
+        setEditTime(timeStr);
+      }
     } catch (error) {
       console.error('Error fetching lead:', error);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handleEdit = () => {
+    setShowEditModal(true);
+  };
+  
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      const updateData = {
+        name: editName
+      };
+      
+      if (editDate && editTime) {
+        const appointmentDatetime = new Date(`${editDate}T${editTime}`);
+        updateData.appointment_datetime = appointmentDatetime.toISOString();
+      }
+      
+      await axios.put(`${API}/leads/${phone}`, updateData);
+      toast.success('Lead actualizado exitosamente');
+      setShowEditModal(false);
+      fetchLead();
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      toast.error('Error actualizando lead');
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  const handleDelete = () => {
+    setShowDeleteModal(true);
+  };
+  
+  const confirmDelete = async () => {
+    setSaving(true);
+    try {
+      await axios.delete(`${API}/leads/${phone}`);
+      toast.success('Lead eliminado exitosamente');
+      navigate('/leads');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      toast.error('Error eliminando lead');
+      setSaving(false);
     }
   };
   
