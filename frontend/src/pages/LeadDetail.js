@@ -273,6 +273,23 @@ export default function LeadDetail() {
             </CardContent>
           </Card>
         )}
+        
+        <Card className="notes-card">
+          <CardHeader>
+            <CardTitle>📝 Notas Internas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lead.notes ? (
+              <div className="notes-content">
+                {lead.notes}
+              </div>
+            ) : (
+              <div className="notes-empty">
+                Sin notas. Click en "Editar" para agregar observaciones.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
