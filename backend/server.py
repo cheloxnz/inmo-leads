@@ -227,6 +227,17 @@ async def update_lead(phone: str, lead_update: LeadUpdate):
     return {"message": "Lead actualizado"}
 
 
+@api_router.delete("/leads/{phone}")
+async def delete_lead(phone: str):
+    """Elimina un lead permanentemente"""
+    result = await db.leads.delete_one({"phone": phone})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+    
+    return {"message": "Lead eliminado exitosamente"}
+
+
 @api_router.get("/leads/stats/summary")
 async def get_stats():
     """Obtiene estadísticas de leads"""
