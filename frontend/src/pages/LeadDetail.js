@@ -55,7 +55,8 @@ export default function LeadDetail() {
     setSaving(true);
     try {
       const updateData = {
-        name: editName
+        name: editName,
+        notes: editNotes
       };
       
       if (editDate && editTime) {
