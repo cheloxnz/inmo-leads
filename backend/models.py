@@ -116,8 +116,33 @@ class Agent(BaseModel):
     name: str
     email: str
     phone: str
+    password_hash: Optional[str] = None
+    role: str = "asesor"
+    specialties: List[str] = Field(default_factory=list)
+    zones: List[str] = Field(default_factory=list)
+    max_concurrent_leads: int = 15
     active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class AgentCreate(BaseModel):
+    name: str
+    email: str
+    phone: str
+    password: str
+    specialties: List[str] = Field(default_factory=list)
+    zones: List[str] = Field(default_factory=list)
+
+class AgentLogin(BaseModel):
+    email: str
+    password: str
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    email: str
+    name: str
+    role: str
+    agent_data: Optional[dict] = None
 
 class BotConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
