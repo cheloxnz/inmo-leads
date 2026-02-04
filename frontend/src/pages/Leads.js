@@ -5,12 +5,19 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [searchName, setSearchName] = useState('');
+  const [searchZone, setSearchZone] = useState('');
+  const [searchDateFrom, setSearchDateFrom] = useState('');
+  const [searchDateTo, setSearchDateTo] = useState('');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -19,7 +26,7 @@ export default function Leads() {
   
   useEffect(() => {
     filterLeads();
-  }, [activeTab, leads]);
+  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo]);
   
   const fetchLeads = async () => {
     try {
@@ -33,10 +40,93 @@ export default function Leads() {
   };
   
   const filterLeads = () => {
-    if (activeTab === 'all') {
-      setFilteredLeads(leads);
-    } else {
-      setFilteredLeads(leads.filter(lead => lead.status === activeTab));
+    let filtered = leads;
+    
+    // Filtrar por status (tab)
+    if (activeTab !== 'all') {
+      filtered = filtered.filter(lead => lead.status === activeTab);
+    }
+    
+    // Filtrar por nombre
+    if (searchName) {
+      filtered = filtered.filter(lead => 
+        (lead.name || '').toLowerCase().includes(searchName.toLowerCase())
+      );
+    }
+    
+    // Filtrar por zona
+    if (searchZone) {
+      filtered = filtered.filter(lead => 
+        (lead.zone || '').toLowerCase().includes(searchZone.toLowerCase())
+      );
+    }
+    
+    // Filtrar por fecha
+    if (searchDateFrom) {
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.created_at);
+        const fromDate = new Date(searchDateFrom);
+        return leadDate >= fromDate;
+      });
+    }
+    
+    if (searchDateTo) {
+      filtered = filtered.filter(lead => {
+        const leadDate = new Date(lead.created_at);
+        const toDate = new Date(searchDateTo);
+        toDate.setHours(23, 59, 59);
+        return leadDate <= toDate;
+      });
+    }
+    
+    setFilteredLeads(filtered);
+  };
+  
+  const clearFilters = () => {
+    setSearchName('');
+    setSearchZone('');
+    setSearchDateFrom('');
+    setSearchDateTo('');
+  };
+  
+  const exportToCSV = () => {
+    try {
+      const headers = ['Nombre', 'Teléfono', 'Intención', 'Zona', 'Presupuesto', 'Tipo', 'Dormitorios', 'Urgencia', 'Score', 'Estado', 'Fecha Creación', 'Cita'];
+      
+      const rows = filteredLeads.map(lead => [
+        lead.name || 'Sin nombre',
+        lead.phone,
+        lead.intent || '',
+        lead.zone || '',
+        lead.budget_text || '',
+        lead.property_type || '',
+        lead.bedrooms || '',
+        lead.urgency || '',
+        lead.score,
+        lead.status,
+        new Date(lead.created_at).toLocaleDateString('es-AR'),
+        lead.appointment_datetime ? new Date(lead.appointment_datetime).toLocaleString('es-AR') : 'Sin cita'
+      ]);
+      
+      let csvContent = headers.join(',') + '\n';
+      rows.forEach(row => {
+        csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+      });
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `leads_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(`${filteredLeads.length} leads exportados a CSV`);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Error exportando leads');
     }
   };
   
@@ -69,9 +159,70 @@ export default function Leads() {
   return (
     <div className="page-container" data-testid="leads-page">
       <header className="page-header">
-        <h1>Leads</h1>
-        <p className="subtitle">Gestión y seguimiento de contactos</p>
+        <div>
+          <h1>Leads</h1>
+          <p className="subtitle">Gestión y seguimiento de contactos</p>
+        </div>
+        <Button onClick={exportToCSV} variant="outline" data-testid="btn-export-csv">
+          📥 Exportar CSV ({filteredLeads.length})
+        </Button>
       </header>
+      
+      <Card className="filters-card">
+        <CardContent>
+          <div className="filters-grid">
+            <div className="filter-item">
+              <label>Buscar por nombre</label>
+              <Input 
+                placeholder="Ej: Juan Pérez"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                data-testid="filter-name"
+              />
+            </div>
+            
+            <div className="filter-item">
+              <label>Buscar por zona</label>
+              <Input 
+                placeholder="Ej: Palermo"
+                value={searchZone}
+                onChange={(e) => setSearchZone(e.target.value)}
+                data-testid="filter-zone"
+              />
+            </div>
+            
+            <div className="filter-item">
+              <label>Fecha desde</label>
+              <Input 
+                type="date"
+                value={searchDateFrom}
+                onChange={(e) => setSearchDateFrom(e.target.value)}
+                data-testid="filter-date-from"
+              />
+            </div>
+            
+            <div className="filter-item">
+              <label>Fecha hasta</label>
+              <Input 
+                type="date"
+                value={searchDateTo}
+                onChange={(e) => setSearchDateTo(e.target.value)}
+                data-testid="filter-date-to"
+              />
+            </div>
+            
+            <div className="filter-item filter-actions">
+              <Button onClick={clearFilters} variant="ghost" data-testid="btn-clear-filters">
+                🔄 Limpiar Filtros
+              </Button>
+            </div>
+          </div>
+          
+          <div className="filter-results">
+            Mostrando {filteredLeads.length} de {leads.length} leads
+          </div>
+        </CardContent>
+      </Card>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
         <TabsList>
