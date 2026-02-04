@@ -1498,6 +1498,56 @@ body {
 }
 
 .checkbox-label:hover {
+
+/* =============================================
+   PRIVACY POLICY PAGE
+   ============================================= */
+.privacy-page {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+  padding: 2rem;
+}
+
+.privacy-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.privacy-content {
+  line-height: 1.8;
+}
+
+.privacy-content .last-updated {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 2rem;
+}
+
+.privacy-content section {
+  margin-bottom: 2rem;
+}
+
+.privacy-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.privacy-content p {
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.privacy-content ul {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.privacy-content li {
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
   background: var(--bg-secondary);
 }
 
