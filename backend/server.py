@@ -508,7 +508,6 @@ async def get_email_stats():
 # ==============================================
 # MÉTRICAS POR ASESOR
 # ==============================================
-from models import User
 
 @api_router.get("/metrics/agent/{email}")
 async def get_agent_metrics(email: str, current_user: User = Depends(get_current_user)):
