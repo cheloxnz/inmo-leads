@@ -477,7 +477,250 @@ async def get_email_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==============================================
+# MÉTRICAS POR ASESOR
+# ==============================================
+from models import User
+
+@api_router.get("/metrics/agent/{email}")
+async def get_agent_metrics(email: str, current_user: User = Depends(get_current_user)):
+    """Obtiene métricas de un asesor específico"""
+    # Asesores solo pueden ver sus propias métricas
+    if current_user.role != "admin" and current_user.email != email:
+        raise HTTPException(status_code=403, detail="No autorizado")
+    
+    if not assignment_engine:
+        raise HTTPException(status_code=500, detail="Motor de asignación no inicializado")
+    
+    metrics = await assignment_engine.get_agent_metrics(email)
+    
+    # Agregar datos del asesor
+    agent = await db.agents.find_one({"email": email}, {"_id": 0, "password_hash": 0})
+    if agent:
+        metrics["agent_name"] = agent.get("name")
+        metrics["specialties"] = agent.get("specialties", [])
+        metrics["zones"] = agent.get("zones", [])
+        metrics["max_concurrent_leads"] = agent.get("max_concurrent_leads", 15)
+    
+    return metrics
+
+
+@api_router.get("/metrics/all-agents")
+async def get_all_agents_metrics(current_user: User = Depends(require_admin)):
+    """Obtiene métricas de todos los asesores (solo admin)"""
+    agents = await db.agents.find({"role": {"$ne": "admin"}}, {"_id": 0, "password_hash": 0}).to_list(100)
+    
+    results = []
+    for agent in agents:
+        metrics = await assignment_engine.get_agent_metrics(agent["email"])
+        metrics["agent_name"] = agent.get("name")
+        metrics["email"] = agent.get("email")
+        metrics["specialties"] = agent.get("specialties", [])
+        metrics["zones"] = agent.get("zones", [])
+        metrics["active"] = agent.get("active", True)
+        metrics["max_concurrent_leads"] = agent.get("max_concurrent_leads", 15)
+        
+        # Verificar si está sobrecargado
+        if metrics.get("active_leads", 0) >= metrics["max_concurrent_leads"]:
+            metrics["is_overloaded"] = True
+        else:
+            metrics["is_overloaded"] = False
+        
+        results.append(metrics)
+    
+    return results
+
+
+@api_router.get("/metrics/daily-goals")
+async def get_daily_goals(current_user: User = Depends(get_current_user)):
+    """Obtiene progreso de metas diarias"""
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Leads de hoy por status
+    hot_today = await db.leads.count_documents({
+        "created_at": {"$gte": today.isoformat()},
+        "status": "hot"
+    })
+    
+    total_today = await db.leads.count_documents({
+        "created_at": {"$gte": today.isoformat()}
+    })
+    
+    appointments_today = await db.leads.count_documents({
+        "appointment_datetime": {
+            "$gte": today.isoformat(),
+            "$lt": (today + timedelta(days=1)).isoformat()
+        }
+    })
+    
+    return {
+        "hot_leads_today": hot_today,
+        "total_leads_today": total_today,
+        "appointments_today": appointments_today,
+        "hot_lead_goal": 10,  # Meta configurable
+        "goal_reached": hot_today >= 10
+    }
+
+
+@api_router.get("/leads/assigned-to-me")
+async def get_my_leads(
+    current_user: User = Depends(get_current_user),
+    status: Optional[str] = None,
+    limit: int = 100
+):
+    """Obtiene leads asignados al asesor actual"""
+    query = {"assigned_agent": current_user.email}
+    if status:
+        query["status"] = status
+    
+    leads = await db.leads.find(query, {
+        "_id": 0,
+        "conversation_history": 0
+    }).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    for lead in leads:
+        if isinstance(lead.get("created_at"), str):
+            lead["created_at"] = datetime.fromisoformat(lead["created_at"])
+        if isinstance(lead.get("last_message_at"), str):
+            lead["last_message_at"] = datetime.fromisoformat(lead["last_message_at"])
+        if lead.get("appointment_datetime") and isinstance(lead["appointment_datetime"], str):
+            lead["appointment_datetime"] = datetime.fromisoformat(lead["appointment_datetime"])
+    
+    return leads
+
+
+@api_router.get("/notifications/upcoming-appointments")
+async def get_upcoming_appointments(current_user: User = Depends(get_current_user)):
+    """Obtiene citas próximas (1 hora)"""
+    now = datetime.utcnow()
+    one_hour_later = now + timedelta(hours=1)
+    
+    query = {
+        "appointment_datetime": {
+            "$gte": now.isoformat(),
+            "$lte": one_hour_later.isoformat()
+        },
+        "appointment_reminder_sent": False
+    }
+    
+    # Si es asesor, filtrar por sus leads
+    if current_user.role != "admin":
+        query["assigned_agent"] = current_user.email
+    
+    appointments = await db.leads.find(query, {"_id": 0}).to_list(20)
+    return appointments
+
+
+@api_router.get("/notifications/inactive-leads")
+async def get_inactive_leads(current_user: User = Depends(get_current_user)):
+    """Obtiene leads tibios sin actividad en 3+ días"""
+    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    
+    query = {
+        "status": "warm",
+        "last_message_at": {"$lte": three_days_ago.isoformat()}
+    }
+    
+    # Si es asesor, filtrar por sus leads
+    if current_user.role != "admin":
+        query["assigned_agent"] = current_user.email
+    
+    inactive = await db.leads.find(query, {"_id": 0}).to_list(20)
+    return inactive
+
+
+# ==============================================
+# WEBSOCKET ENDPOINT
+# ==============================================
+@app.websocket("/ws/notifications")
+async def websocket_notifications(
+    websocket: WebSocket,
+    token: Optional[str] = None
+):
+    """Endpoint WebSocket para notificaciones en tiempo real"""
+    try:
+        # Verificar token
+        if not token:
+            await websocket.close(code=4001)
+            return
+        
+        payload = decode_access_token(token)
+        if not payload:
+            await websocket.close(code=4001)
+            return
+        
+        user_email = payload.get("sub")
+        user_role = payload.get("role", "asesor")
+        
+        await notification_manager.connect(websocket, user_email)
+        
+        # Enviar confirmación de conexión
+        await websocket.send_json({
+            "type": "connected",
+            "message": "Conectado al sistema de notificaciones",
+            "user": user_email,
+            "role": user_role
+        })
+        
+        # Mantener conexión abierta
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                # Ping/pong para mantener conexión viva
+                if data == "ping":
+                    await websocket.send_text("pong")
+            except asyncio.TimeoutError:
+                # Enviar heartbeat
+                try:
+                    await websocket.send_json({"type": "heartbeat"})
+                except:
+                    break
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"Error en WebSocket: {e}")
+    finally:
+        notification_manager.disconnect(websocket)
+
+
+# ==============================================
+# ADMIN: CREAR USUARIO INICIAL
+# ==============================================
+@api_router.post("/setup/create-admin")
+async def create_initial_admin():
+    """Crea usuario admin inicial (solo si no existe ninguno)"""
+    from auth import get_password_hash
+    
+    existing_admin = await db.agents.find_one({"role": "admin"})
+    if existing_admin:
+        raise HTTPException(status_code=400, detail="Ya existe un administrador")
+    
+    admin = {
+        "name": "Administrador",
+        "email": "admin@inmobot.com",
+        "phone": "+5491100000000",
+        "password_hash": get_password_hash("Admin123!"),
+        "role": "admin",
+        "specialties": [],
+        "zones": [],
+        "max_concurrent_leads": 999,
+        "active": True,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    await db.agents.insert_one(admin)
+    
+    return {
+        "message": "Admin creado exitosamente",
+        "email": "admin@inmobot.com",
+        "password": "Admin123!",
+        "note": "¡Cambia la contraseña después del primer login!"
+    }
+
+
+# Incluir routers
 app.include_router(api_router)
+app.include_router(auth_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -491,7 +734,9 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     """Inicia tareas programadas al arrancar el servidor"""
+    global assignment_engine
     logger.info("Iniciando tareas programadas...")
+    assignment_engine = AssignmentEngine(db)
     await scheduler.start()
 
 
