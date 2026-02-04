@@ -271,6 +271,88 @@ export default function LeadDetail() {
           </Card>
         )}
       </div>
+      
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent data-testid="edit-modal">
+          <DialogHeader>
+            <DialogTitle>Editar Lead</DialogTitle>
+            <DialogDescription>
+              Modifica el nombre o fecha de cita del lead
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="edit-form">
+            <div className="form-group">
+              <label>Nombre completo</label>
+              <Input 
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Nombre y apellido"
+                data-testid="input-edit-name"
+              />
+            </div>
+            
+            {lead?.appointment_datetime && (
+              <>
+                <div className="form-group">
+                  <label>Fecha de cita</label>
+                  <Input 
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    data-testid="input-edit-date"
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Hora de cita</label>
+                  <Input 
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    data-testid="input-edit-time"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving} data-testid="btn-save-edit">
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent data-testid="delete-modal">
+          <DialogHeader>
+            <DialogTitle>¿Eliminar Lead?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El lead será eliminado permanentemente de la base de datos.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="delete-warning">
+            <p><strong>Lead a eliminar:</strong></p>
+            <p>{lead?.name || 'Sin nombre'}</p>
+            <p>{lead?.phone}</p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={saving} data-testid="btn-confirm-delete">
+              {saving ? 'Eliminando...' : 'Sí, Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
