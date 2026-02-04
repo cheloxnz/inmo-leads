@@ -43,6 +43,65 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==============================================
+# WEBSOCKET NOTIFICATION MANAGER
+# ==============================================
+class NotificationManager:
+    """Gestiona conexiones WebSocket y notificaciones en tiempo real"""
+    
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+        self.user_emails: Dict[str, str] = {}  # websocket_id -> email
+    
+    async def connect(self, websocket: WebSocket, user_email: str):
+        """Conecta usuario al sistema de notificaciones"""
+        await websocket.accept()
+        ws_id = str(id(websocket))
+        self.active_connections[ws_id] = websocket
+        self.user_emails[ws_id] = user_email
+        logger.info(f"WebSocket conectado: {user_email}")
+    
+    def disconnect(self, websocket: WebSocket):
+        """Desconecta usuario"""
+        ws_id = str(id(websocket))
+        if ws_id in self.active_connections:
+            del self.active_connections[ws_id]
+            email = self.user_emails.pop(ws_id, "unknown")
+            logger.info(f"WebSocket desconectado: {email}")
+    
+    async def send_to_user(self, email: str, notification: dict):
+        """Envía notificación a usuario específico"""
+        for ws_id, websocket in list(self.active_connections.items()):
+            if self.user_emails.get(ws_id) == email:
+                try:
+                    await websocket.send_json(notification)
+                except Exception as e:
+                    logger.error(f"Error enviando notificación: {e}")
+    
+    async def send_to_admins(self, notification: dict):
+        """Envía notificación a todos los admins conectados"""
+        admin_emails = []
+        async for agent in db.agents.find({"role": "admin"}, {"email": 1}):
+            admin_emails.append(agent["email"])
+        
+        for ws_id, websocket in list(self.active_connections.items()):
+            if self.user_emails.get(ws_id) in admin_emails:
+                try:
+                    await websocket.send_json(notification)
+                except Exception as e:
+                    logger.error(f"Error enviando a admin: {e}")
+    
+    async def broadcast(self, notification: dict):
+        """Envía notificación a todos los usuarios conectados"""
+        for ws_id, websocket in list(self.active_connections.items()):
+            try:
+                await websocket.send_json(notification)
+            except Exception as e:
+                logger.error(f"Error en broadcast: {e}")
+
+notification_manager = NotificationManager()
+assignment_engine = None  # Se inicializa en startup
+
 wa_service = WhatsAppService(db)
 llm_service = LLMService()
 email_service = EmailService(db)
