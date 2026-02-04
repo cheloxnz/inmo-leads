@@ -19,6 +19,7 @@ export default function LeadDetail() {
   const [editName, setEditName] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
   
   useEffect(() => {
