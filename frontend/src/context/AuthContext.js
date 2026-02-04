@@ -10,6 +10,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    delete axios.defaults.headers.common['Authorization'];
+  }, []);
+
   // Configurar axios con token
   useEffect(() => {
     if (token) {
@@ -34,7 +41,7 @@ export function AuthProvider({ children }) {
       setLoading(false);
     };
     checkAuth();
-  }, [token]);
+  }, [token, logout]);
 
   const login = async (email, password) => {
     try {
@@ -51,13 +58,6 @@ export function AuthProvider({ children }) {
       return { success: false, error: message };
     }
   };
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
-    delete axios.defaults.headers.common['Authorization'];
-  }, []);
 
   const isAdmin = user?.role === 'admin';
   const isAsesor = user?.role === 'asesor';
