@@ -194,7 +194,7 @@ export default function Configuration() {
               </div>
               <div className="status-item">
                 <span>Email destino:</span>
-                <span className="value">cheloxnz@gmail.com</span>
+                <span className="value">Configurado en .env</span>
               </div>
               <p className="help-text">Los emails se envían automáticamente cuando hay leads calientes (Score ≥ 7)</p>
               <Button 
