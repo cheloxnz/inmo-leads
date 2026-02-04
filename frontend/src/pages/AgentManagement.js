@@ -9,8 +9,70 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
-const ZONAS_DISPONIBLES = ['Palermo', 'Recoleta', 'Belgrano', 'Caballito', 'Núñez', 'Puerto Madero', 'San Telmo', 'Microcentro'];
-const ESPECIALIDADES = ['comprar', 'alquilar', 'inversion', 'ambos'];
+const ZONAS = ['Palermo', 'Recoleta', 'Belgrano', 'Caballito', 'Núñez', 'Puerto Madero', 'San Telmo'];
+const SPECS = ['comprar', 'alquilar', 'inversion', 'ambos'];
+
+function AgentCard({ agent, agentMetrics, onEdit, onDelete, onToggle }) {
+  const isOverloaded = agentMetrics?.is_overloaded;
+  
+  return (
+    <Card className={`agent-card ${!agent.active ? 'inactive' : ''}`} data-testid={`agent-card-${agent.email}`}>
+      <CardHeader>
+        <div className="agent-header">
+          <div>
+            <CardTitle>{agent.name}</CardTitle>
+            <p className="agent-email">{agent.email}</p>
+          </div>
+          <div className="agent-status">
+            <Badge className={agent.active ? "badge-active" : ""}>{agent.active ? 'Activo' : 'Inactivo'}</Badge>
+            {isOverloaded && <Badge className="badge-overloaded">Sobrecargado</Badge>}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="agent-info">
+          <div className="info-row">
+            <span className="label">Tel:</span>
+            <span className="value">{agent.phone}</span>
+          </div>
+          <div className="info-row">
+            <span className="label">Especialidades:</span>
+            <div className="tags">
+              {(agent.specialties || []).map(s => <Badge key={s} variant="outline">{s}</Badge>)}
+            </div>
+          </div>
+          <div className="info-row">
+            <span className="label">Zonas:</span>
+            <div className="tags">
+              {(agent.zones || []).map(z => <Badge key={z} variant="outline">{z}</Badge>)}
+            </div>
+          </div>
+          <div className="metrics-row">
+            <div className="metric">
+              <span className="metric-value">{agentMetrics?.active_leads || 0}</span>
+              <span className="metric-label">Activos</span>
+            </div>
+            <div className="metric">
+              <span className="metric-value">{agentMetrics?.with_appointment || 0}</span>
+              <span className="metric-label">Con Cita</span>
+            </div>
+            <div className="metric">
+              <span className="metric-value">{agentMetrics?.conversion_rate || 0}%</span>
+              <span className="metric-label">Conv.</span>
+            </div>
+          </div>
+        </div>
+        <div className="agent-actions">
+          <Button variant="outline" size="sm" onClick={() => onEdit(agent)}>Editar</Button>
+          <Button variant="ghost" size="sm" onClick={() => onToggle(agent)}>
+            {agent.active ? 'Desactivar' : 'Activar'}
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => onDelete(agent.email)}>Eliminar</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AgentManagement() {
   const { isAdmin } = useAuth();
@@ -20,67 +82,41 @@ export default function AgentManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    specialties: [],
-    zones: [],
-    max_concurrent_leads: 15
+    name: '', email: '', phone: '', password: '',
+    specialties: [], zones: [], max_concurrent_leads: 15
   });
 
   useEffect(() => {
-    fetchAgents();
-    fetchMetrics();
+    const loadData = async () => {
+      try {
+        const [agentsRes, metricsRes] = await Promise.all([
+          axios.get(`${API}/auth/agents`),
+          axios.get(`${API}/metrics/all-agents`)
+        ]);
+        setAgents(agentsRes.data);
+        setMetrics(metricsRes.data);
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error('Error cargando datos');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
-
-  const fetchAgents = async () => {
-    try {
-      const response = await axios.get(`${API}/auth/agents`);
-      setAgents(response.data);
-    } catch (error) {
-      console.error('Error fetching agents:', error);
-      toast.error('Error cargando asesores');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMetrics = async () => {
-    try {
-      const response = await axios.get(`${API}/metrics/all-agents`);
-      setMetrics(response.data);
-    } catch (error) {
-      console.error('Error fetching metrics:', error);
-    }
-  };
 
   const handleCreate = () => {
     setEditingAgent(null);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      password: '',
-      specialties: [],
-      zones: [],
-      max_concurrent_leads: 15
-    });
+    setFormData({ name: '', email: '', phone: '', password: '', specialties: [], zones: [], max_concurrent_leads: 15 });
     setShowModal(true);
   };
 
   const handleEdit = (agent) => {
     setEditingAgent(agent);
     setFormData({
-      name: agent.name,
-      email: agent.email,
-      phone: agent.phone,
-      password: '',
-      specialties: agent.specialties || [],
-      zones: agent.zones || [],
+      name: agent.name, email: agent.email, phone: agent.phone, password: '',
+      specialties: agent.specialties || [], zones: agent.zones || [],
       max_concurrent_leads: agent.max_concurrent_leads || 15
     });
     setShowModal(true);
@@ -89,312 +125,149 @@ export default function AgentManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-
     try {
       if (editingAgent) {
-        // Actualizar
-        const updateData = { ...formData };
-        if (!updateData.password) delete updateData.password;
-        delete updateData.email; // No se puede cambiar email
-        
-        await axios.put(`${API}/auth/agents/${editingAgent.email}`, updateData);
+        const data = { ...formData };
+        if (!data.password) delete data.password;
+        delete data.email;
+        await axios.put(`${API}/auth/agents/${editingAgent.email}`, data);
         toast.success('Asesor actualizado');
       } else {
-        // Crear nuevo
         await axios.post(`${API}/auth/register`, formData);
-        toast.success('Asesor creado exitosamente');
+        toast.success('Asesor creado');
       }
-      
       setShowModal(false);
-      fetchAgents();
-      fetchMetrics();
+      const res = await axios.get(`${API}/auth/agents`);
+      setAgents(res.data);
     } catch (error) {
-      console.error('Error saving agent:', error);
-      toast.error(error.response?.data?.detail || 'Error guardando asesor');
+      toast.error(error.response?.data?.detail || 'Error');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (email) => {
-    if (!window.confirm('¿Estás seguro de eliminar este asesor?')) return;
-
+    if (!window.confirm('¿Eliminar asesor?')) return;
     try {
       await axios.delete(`${API}/auth/agents/${email}`);
-      toast.success('Asesor eliminado');
-      fetchAgents();
+      toast.success('Eliminado');
+      setAgents(agents.filter(a => a.email !== email));
     } catch (error) {
-      console.error('Error deleting agent:', error);
-      toast.error('Error eliminando asesor');
+      toast.error('Error');
     }
   };
 
   const toggleActive = async (agent) => {
     try {
-      await axios.put(`${API}/auth/agents/${agent.email}`, {
-        active: !agent.active
-      });
-      toast.success(agent.active ? 'Asesor desactivado' : 'Asesor activado');
-      fetchAgents();
+      await axios.put(`${API}/auth/agents/${agent.email}`, { active: !agent.active });
+      setAgents(agents.map(a => a.email === agent.email ? { ...a, active: !a.active } : a));
     } catch (error) {
-      toast.error('Error actualizando estado');
+      toast.error('Error');
     }
   };
 
-  const toggleSpecialty = (specialty) => {
+  const toggleSpec = (s) => {
     setFormData(prev => ({
-      ...prev,
-      specialties: prev.specialties.includes(specialty)
-        ? prev.specialties.filter(s => s !== specialty)
-        : [...prev.specialties, specialty]
+      ...prev, specialties: prev.specialties.includes(s) 
+        ? prev.specialties.filter(x => x !== s) : [...prev.specialties, s]
     }));
   };
 
-  const toggleZone = (zone) => {
+  const toggleZone = (z) => {
     setFormData(prev => ({
-      ...prev,
-      zones: prev.zones.includes(zone)
-        ? prev.zones.filter(z => z !== zone)
-        : [...prev.zones, zone]
+      ...prev, zones: prev.zones.includes(z) 
+        ? prev.zones.filter(x => x !== z) : [...prev.zones, z]
     }));
   };
 
-  const getAgentMetrics = (email) => {
-    return metrics.find(m => m.email === email) || {};
-  };
+  const getMetrics = (email) => metrics.find(m => m.email === email);
 
   if (!isAdmin) {
-    return (
-      <div className="page-container">
-        <div className="access-denied">
-          <h2>Acceso Denegado</h2>
-          <p>Solo los administradores pueden acceder a esta sección.</p>
-        </div>
-      </div>
-    );
+    return <div className="page-container"><div className="access-denied"><h2>Acceso Denegado</h2></div></div>;
   }
 
-  if (loading) {
-    return <div className="loading-container">Cargando asesores...</div>;
-  }
+  if (loading) return <div className="loading-container">Cargando...</div>;
+
+  const filteredAgents = agents.filter(a => a.role !== 'admin');
 
   return (
     <div className="page-container" data-testid="agents-page">
       <header className="page-header">
         <div>
           <h1>Gestión de Asesores</h1>
-          <p className="subtitle">Administra el equipo y asigna zonas/especialidades</p>
+          <p className="subtitle">Administra el equipo</p>
         </div>
-        <Button onClick={handleCreate} data-testid="btn-create-agent">
-          + Nuevo Asesor
-        </Button>
+        <Button onClick={handleCreate} data-testid="btn-create-agent">+ Nuevo Asesor</Button>
       </header>
 
       <div className="agents-grid">
-        {agents.filter(a => a.role !== 'admin').map(agent => {
-          const agentMetrics = getAgentMetrics(agent.email);
-          const isOverloaded = agentMetrics.is_overloaded;
-
-          return (
-            <Card key={agent.email} className={`agent-card ${!agent.active ? 'inactive' : ''}`} data-testid={`agent-card-${agent.email}`}>
-              <CardHeader>
-                <div className="agent-header">
-                  <div>
-                    <CardTitle>{agent.name}</CardTitle>
-                    <p className="agent-email">{agent.email}</p>
-                  </div>
-                  <div className="agent-status">
-                    {agent.active ? (
-                      <Badge className="badge-active">Activo</Badge>
-                    ) : (
-                      <Badge variant="secondary">Inactivo</Badge>
-                    )}
-                    {isOverloaded && <Badge className="badge-overloaded">⚠️ Sobrecargado</Badge>}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="agent-info">
-                  <div className="info-row">
-                    <span className="label">Teléfono:</span>
-                    <span className="value">{agent.phone}</span>
-                  </div>
-                  
-                  <div className="info-row">
-                    <span className="label">Especialidades:</span>
-                    <div className="tags">
-                      {(agent.specialties || []).length > 0 ? (
-                        agent.specialties.map(s => (
-                          <Badge key={s} variant="outline">{s}</Badge>
-                        ))
-                      ) : (
-                        <span className="no-data">Sin definir</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="info-row">
-                    <span className="label">Zonas:</span>
-                    <div className="tags">
-                      {(agent.zones || []).length > 0 ? (
-                        agent.zones.map(z => (
-                          <Badge key={z} variant="outline">{z}</Badge>
-                        ))
-                      ) : (
-                        <span className="no-data">Todas</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="metrics-row">
-                    <div className="metric">
-                      <span className="metric-value">{agentMetrics.active_leads || 0}</span>
-                      <span className="metric-label">Leads Activos</span>
-                    </div>
-                    <div className="metric">
-                      <span className="metric-value">{agentMetrics.with_appointment || 0}</span>
-                      <span className="metric-label">Con Cita</span>
-                    </div>
-                    <div className="metric">
-                      <span className="metric-value">{agentMetrics.conversion_rate || 0}%</span>
-                      <span className="metric-label">Conversión</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="agent-actions">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(agent)} data-testid={`btn-edit-${agent.email}`}>
-                    ✏️ Editar
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => toggleActive(agent)}>
-                    {agent.active ? '🔴 Desactivar' : '🟢 Activar'}
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(agent.email)} data-testid={`btn-delete-${agent.email}`}>
-                    🗑️
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {agents.filter(a => a.role !== 'admin').length === 0 && (
+        {filteredAgents.map(agent => (
+          <AgentCard 
+            key={agent.email} 
+            agent={agent} 
+            agentMetrics={getMetrics(agent.email)}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggle={toggleActive}
+          />
+        ))}
+        {filteredAgents.length === 0 && (
           <div className="empty-state">
-            <p>No hay asesores registrados</p>
-            <Button onClick={handleCreate}>Crear primer asesor</Button>
+            <p>No hay asesores</p>
+            <Button onClick={handleCreate}>Crear asesor</Button>
           </div>
         )}
       </div>
 
-      {/* Modal crear/editar */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="agent-modal" data-testid="agent-modal">
           <DialogHeader>
-            <DialogTitle>{editingAgent ? 'Editar Asesor' : 'Nuevo Asesor'}</DialogTitle>
-            <DialogDescription>
-              {editingAgent ? 'Modifica los datos del asesor' : 'Completa los datos para crear un nuevo asesor'}
-            </DialogDescription>
+            <DialogTitle>{editingAgent ? 'Editar' : 'Nuevo'} Asesor</DialogTitle>
+            <DialogDescription>Completa los datos del asesor</DialogDescription>
           </DialogHeader>
-
           <form onSubmit={handleSubmit} className="agent-form">
             <div className="form-group">
-              <label>Nombre completo *</label>
-              <Input
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nombre y apellido"
-                required
-                data-testid="input-agent-name"
-              />
+              <label>Nombre *</label>
+              <Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required data-testid="input-agent-name" />
             </div>
-
             <div className="form-group">
               <label>Email *</label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@ejemplo.com"
-                required
-                disabled={!!editingAgent}
-                data-testid="input-agent-email"
-              />
+              <Input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required disabled={!!editingAgent} data-testid="input-agent-email" />
             </div>
-
             <div className="form-group">
               <label>Teléfono *</label>
-              <Input
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+5491123456789"
-                required
-                data-testid="input-agent-phone"
-              />
+              <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required data-testid="input-agent-phone" />
             </div>
-
             <div className="form-group">
-              <label>{editingAgent ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña *'}</label>
-              <Input
-                type="password"
-                value={formData.password}
-                onChange={e => setFormData({ ...formData, password: e.target.value })}
-                placeholder="••••••••"
-                required={!editingAgent}
-                data-testid="input-agent-password"
-              />
+              <label>{editingAgent ? 'Nueva contraseña' : 'Contraseña *'}</label>
+              <Input type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required={!editingAgent} data-testid="input-agent-password" />
             </div>
-
-            <div className="form-group">
-              <label>Máximo de leads concurrentes</label>
-              <Input
-                type="number"
-                min="1"
-                max="50"
-                value={formData.max_concurrent_leads}
-                onChange={e => setFormData({ ...formData, max_concurrent_leads: parseInt(e.target.value) || 15 })}
-                data-testid="input-max-leads"
-              />
-            </div>
-
             <div className="form-group">
               <label>Especialidades</label>
               <div className="checkbox-group">
-                {ESPECIALIDADES.map(spec => (
-                  <label key={spec} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.specialties.includes(spec)}
-                      onChange={() => toggleSpecialty(spec)}
-                    />
-                    <span>{spec.charAt(0).toUpperCase() + spec.slice(1)}</span>
+                {SPECS.map(s => (
+                  <label key={s} className="checkbox-label">
+                    <input type="checkbox" checked={formData.specialties.includes(s)} onChange={() => toggleSpec(s)} />
+                    <span>{s}</span>
                   </label>
                 ))}
               </div>
             </div>
-
             <div className="form-group">
-              <label>Zonas asignadas</label>
+              <label>Zonas</label>
               <div className="checkbox-group zones">
-                {ZONAS_DISPONIBLES.map(zone => (
-                  <label key={zone} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={formData.zones.includes(zone)}
-                      onChange={() => toggleZone(zone)}
-                    />
-                    <span>{zone}</span>
+                {ZONAS.map(z => (
+                  <label key={z} className="checkbox-label">
+                    <input type="checkbox" checked={formData.zones.includes(z)} onChange={() => toggleZone(z)} />
+                    <span>{z}</span>
                   </label>
                 ))}
               </div>
-              <p className="help-text">Si no seleccionas ninguna zona, el asesor recibirá leads de todas las zonas.</p>
             </div>
-
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
-                Cancelar
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving} data-testid="btn-save-agent">
-                {saving ? 'Guardando...' : (editingAgent ? 'Actualizar' : 'Crear Asesor')}
+                {saving ? 'Guardando...' : 'Guardar'}
               </Button>
             </DialogFooter>
           </form>
