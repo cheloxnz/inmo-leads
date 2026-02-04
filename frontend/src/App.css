@@ -959,6 +959,8 @@ body {
   margin-top: 0.5rem;
   padding: 0.875rem;
   font-size: 1rem;
+  background: var(--primary) !important;
+  color: white !important;
 }
 
 .login-footer {
