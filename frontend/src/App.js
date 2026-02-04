@@ -239,6 +239,9 @@ function AppContent() {
             </ProtectedRoute>
           } />
 
+          {/* Política de Privacidad - Pública */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+
           {/* Redirect por defecto */}
           <Route path="*" element={
             <Navigate to={isAuthenticated ? (isAdmin ? "/" : "/mi-dashboard") : "/login"} replace />
