@@ -805,6 +805,63 @@ body {
   color: var(--text-secondary);
 }
 
+.filters-card {
+  margin-bottom: 1.5rem;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-item label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.filter-results {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.notes-card {
+  grid-column: 1 / -1;
+}
+
+.notes-content {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.notes-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+}
+
 @media (max-width: 768px) {
   .nav-sidebar {
     width: 200px;
