@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-export default function Leads() {
+export default function Leads({ filterByAgent = null }) {
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
@@ -22,7 +22,7 @@ export default function Leads() {
   
   useEffect(() => {
     fetchLeads();
-  }, []);
+  }, [filterByAgent]);
   
   useEffect(() => {
     filterLeads();
@@ -30,7 +30,8 @@ export default function Leads() {
   
   const fetchLeads = async () => {
     try {
-      const response = await axios.get(`${API}/leads`);
+      const endpoint = filterByAgent ? `${API}/leads/assigned-to-me` : `${API}/leads`;
+      const response = await axios.get(endpoint);
       setLeads(response.data);
     } catch (error) {
       console.error('Error fetching leads:', error);
