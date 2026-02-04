@@ -39,7 +39,13 @@ class ScheduledTasks:
                         "$lt": tomorrow_plus_1h.isoformat()
                     },
                     "appointment_reminder_sent": {"$ne": True}
-                }, {"_id": 0}).to_list(100)
+                }, {
+                    "_id": 0,
+                    "phone": 1,
+                    "name": 1,
+                    "appointment_datetime": 1,
+                    "appointment_type": 1
+                }).to_list(100)
                 
                 for lead in leads:
                     try:
