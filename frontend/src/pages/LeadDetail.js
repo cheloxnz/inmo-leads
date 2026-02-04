@@ -31,6 +31,7 @@ export default function LeadDetail() {
       const response = await axios.get(`${API}/leads/${phone}`);
       setLead(response.data);
       setEditName(response.data.name || '');
+      setEditNotes(response.data.notes || '');
       
       if (response.data.appointment_datetime) {
         const date = new Date(response.data.appointment_datetime);
