@@ -590,33 +590,6 @@ async def get_daily_goals(current_user: User = Depends(get_current_user)):
     }
 
 
-@api_router.get("/leads/assigned-to-me")
-async def get_my_leads(
-    current_user: User = Depends(get_current_user),
-    status: Optional[str] = None,
-    limit: int = 100
-):
-    """Obtiene leads asignados al asesor actual"""
-    query = {"assigned_agent": current_user.email}
-    if status:
-        query["status"] = status
-    
-    leads = await db.leads.find(query, {
-        "_id": 0,
-        "conversation_history": 0
-    }).sort("created_at", -1).limit(limit).to_list(limit)
-    
-    for lead in leads:
-        if isinstance(lead.get("created_at"), str):
-            lead["created_at"] = datetime.fromisoformat(lead["created_at"])
-        if isinstance(lead.get("last_message_at"), str):
-            lead["last_message_at"] = datetime.fromisoformat(lead["last_message_at"])
-        if lead.get("appointment_datetime") and isinstance(lead["appointment_datetime"], str):
-            lead["appointment_datetime"] = datetime.fromisoformat(lead["appointment_datetime"])
-    
-    return leads
-
-
 @api_router.get("/notifications/upcoming-appointments")
 async def get_upcoming_appointments(current_user: User = Depends(get_current_user)):
     """Obtiene citas próximas (1 hora)"""
