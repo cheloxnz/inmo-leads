@@ -107,7 +107,22 @@ class BotFlowManager:
             else:
                 lead.intent = LeadIntent.SIN_DEFINIR
         
-        response = f"Perfecto, te ayudo a {lead.intent.value}. ¿En qué zona estás buscando?\n\nPodés escribir el barrio o zona que te interesa."
+        response = f"Perfecto. ¿Cuál es tu nombre completo?"
+        self.wa.send_text_message(lead.phone, response)
+        lead.flow_stage = FlowStage.NAME
+    
+    async def handle_name(self, lead: Lead, message: str):
+        """Maneja captura de nombre"""
+        name = message.strip()
+        
+        if len(name) < 2:
+            response = "Por favor, ingresá tu nombre completo."
+            self.wa.send_text_message(lead.phone, response)
+            return
+        
+        lead.name = name
+        
+        response = f"Encantado, {name}. ¿En qué zona estás buscando?\n\nPodés escribir el barrio o zona que te interesa."
         self.wa.send_text_message(lead.phone, response)
         lead.flow_stage = FlowStage.ZONE
     
