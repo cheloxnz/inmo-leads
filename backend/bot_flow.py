@@ -35,6 +35,9 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.INTENT:
             await self.handle_intent(lead, message_text)
         
+        elif lead.flow_stage == FlowStage.NAME:
+            await self.handle_name(lead, message_text)
+        
         elif lead.flow_stage == FlowStage.ZONE:
             await self.handle_zone(lead, message_text)
         
