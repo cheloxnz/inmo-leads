@@ -174,7 +174,10 @@ async def get_leads(
     if status:
         query["status"] = status
     
-    leads = await db.leads.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    leads = await db.leads.find(query, {
+        "_id": 0,
+        "conversation_history": 0
+    }).sort("created_at", -1).limit(limit).to_list(limit)
     
     for lead in leads:
         if isinstance(lead.get("created_at"), str):
