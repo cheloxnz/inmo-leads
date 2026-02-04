@@ -14,7 +14,7 @@ import asyncio
 
 from models import (
     Lead, LeadCreate, LeadUpdate, Agent, BotConfig,
-    LeadStatus, FlowStage
+    LeadStatus, FlowStage, User
 )
 from whatsapp_service import WhatsAppService
 from llm_service import LLMService
