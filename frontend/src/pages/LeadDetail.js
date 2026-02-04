@@ -335,6 +335,19 @@ export default function LeadDetail() {
                 </div>
               </>
             )}
+            
+            <div className="form-group">
+              <label>Notas internas</label>
+              <textarea 
+                className="textarea-input"
+                rows="4"
+                placeholder="Observaciones, comentarios internos..."
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                data-testid="input-edit-notes"
+              />
+              <p className="help-text">Estas notas solo son visibles para el equipo interno</p>
+            </div>
           </div>
           
           <DialogFooter>
