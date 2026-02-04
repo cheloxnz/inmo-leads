@@ -12,7 +12,49 @@ export function NotificationProvider({ children }) {
   const wsRef = useRef(null);
   const reconnectTimeout = useRef(null);
 
-  const connectWebSocket = useCallback(() => {
+  const handleNotification = useCallback((data) => {
+    if (data.type === 'heartbeat' || data.type === 'connected') {
+      return;
+    }
+
+    const notification = {
+      id: Date.now(),
+      ...data,
+      read: false,
+      receivedAt: new Date().toISOString()
+    };
+
+    setNotifications(prev => [notification, ...prev].slice(0, 50));
+    setUnreadCount(prev => prev + 1);
+
+    switch (data.type) {
+      case 'new_lead_assigned':
+        toast.success(data.title, { description: data.message });
+        break;
+      case 'customer_replied':
+        toast.info(data.title, { description: data.message });
+        break;
+      case 'high_value_lead':
+        toast.warning(data.title, { description: data.message });
+        break;
+      case 'appointment_reminder':
+        toast(data.title, { description: data.message, icon: '⏰' });
+        break;
+      case 'inactive_lead':
+        toast(data.title, { description: data.message, icon: '🟡' });
+        break;
+      case 'agent_overloaded':
+        toast.error(data.title, { description: data.message });
+        break;
+      case 'daily_goal_reached':
+        toast.success(data.title, { description: data.message, icon: '🎉' });
+        break;
+      default:
+        toast(data.title || 'Nueva notificación', { description: data.message });
+    }
+  }, []);
+
+  useEffect(() => {
     if (!token || !isAuthenticated) return;
 
     const wsUrl = process.env.REACT_APP_BACKEND_URL
@@ -29,48 +71,7 @@ export function NotificationProvider({ children }) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
-        if (data.type === 'heartbeat' || data.type === 'connected') {
-          return;
-        }
-
-        // Agregar notificación
-        const notification = {
-          id: Date.now(),
-          ...data,
-          read: false,
-          receivedAt: new Date().toISOString()
-        };
-
-        setNotifications(prev => [notification, ...prev].slice(0, 50));
-        setUnreadCount(prev => prev + 1);
-
-        // Mostrar toast según tipo
-        switch (data.type) {
-          case 'new_lead_assigned':
-            toast.success(data.title, { description: data.message });
-            break;
-          case 'customer_replied':
-            toast.info(data.title, { description: data.message });
-            break;
-          case 'high_value_lead':
-            toast.warning(data.title, { description: data.message });
-            break;
-          case 'appointment_reminder':
-            toast(data.title, { description: data.message, icon: '⏰' });
-            break;
-          case 'inactive_lead':
-            toast(data.title, { description: data.message, icon: '🟡' });
-            break;
-          case 'agent_overloaded':
-            toast.error(data.title, { description: data.message });
-            break;
-          case 'daily_goal_reached':
-            toast.success(data.title, { description: data.message, icon: '🎉' });
-            break;
-          default:
-            toast(data.title || 'Nueva notificación', { description: data.message });
-        }
+        handleNotification(data);
       } catch (e) {
         console.error('Error parsing notification:', e);
       }
@@ -80,11 +81,8 @@ export function NotificationProvider({ children }) {
       console.log('WebSocket desconectado');
       setConnected(false);
       
-      // Reconectar después de 5 segundos
       reconnectTimeout.current = setTimeout(() => {
-        if (token && isAuthenticated) {
-          connectWebSocket();
-        }
+        // Will reconnect on next effect run
       }, 5000);
     };
 
@@ -94,7 +92,6 @@ export function NotificationProvider({ children }) {
 
     wsRef.current = ws;
 
-    // Ping cada 25 segundos
     const pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send('ping');
@@ -103,23 +100,12 @@ export function NotificationProvider({ children }) {
 
     return () => {
       clearInterval(pingInterval);
-      ws.close();
-    };
-  }, [token, isAuthenticated]);
-
-  useEffect(() => {
-    const cleanup = connectWebSocket();
-    
-    return () => {
-      if (cleanup) cleanup();
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      ws.close();
     };
-  }, [connectWebSocket]);
+  }, [token, isAuthenticated, handleNotification]);
 
   const markAsRead = useCallback((notificationId) => {
     setNotifications(prev => 
