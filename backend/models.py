@@ -96,6 +96,7 @@ class LeadCreate(BaseModel):
 
 class LeadUpdate(BaseModel):
     name: Optional[str] = None
+    appointment_datetime: Optional[datetime] = None
     flow_stage: Optional[FlowStage] = None
     intent: Optional[LeadIntent] = None
     zone: Optional[str] = None
