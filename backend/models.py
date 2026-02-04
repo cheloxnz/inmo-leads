@@ -82,7 +82,10 @@ class Lead(BaseModel):
     status: LeadStatus = LeadStatus.COLD
     appointment_type: Optional[str] = None
     appointment_datetime: Optional[datetime] = None
+    appointment_reminder_sent: bool = False
     assigned_agent: Optional[str] = None
+    assigned_agent_name: Optional[str] = None
+    assigned_at: Optional[datetime] = None
     last_message_at: datetime = Field(default_factory=datetime.utcnow)
     last_reactivation_email_at: Optional[datetime] = None
     source: str = "whatsapp"
