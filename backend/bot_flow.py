@@ -419,3 +419,114 @@ class BotFlowManager:
             {"$set": lead_dict},
             upsert=True
         )
+
+    # ==========================================
+    # FUNCIONALIDAD DE REAGENDAMIENTO
+    # ==========================================
+    
+    def wants_to_reschedule(self, message: str) -> bool:
+        """Detecta si el usuario quiere reagendar su cita"""
+        message_lower = message.lower()
+        
+        # Palabras clave para reagendamiento
+        reschedule_keywords = [
+            "cambiar cita", "cambiar la cita", "modificar cita", "modificar la cita",
+            "reagendar", "re-agendar", "reprogramar", "otra fecha", "otro día", "otro dia",
+            "cambiar fecha", "cambiar la fecha", "cambiar horario", "cambiar el horario",
+            "mover cita", "mover la cita", "postergar", "adelantar",
+            "no puedo ese día", "no puedo ese dia", "no me sirve",
+            "cambiar el día", "cambiar el dia", "otra hora"
+        ]
+        
+        for keyword in reschedule_keywords:
+            if keyword in message_lower:
+                return True
+        
+        return False
+    
+    async def handle_reschedule_request(self, lead: Lead, message: str):
+        """Inicia el flujo de reagendamiento"""
+        current_appointment = lead.appointment_datetime
+        
+        if current_appointment:
+            formatted_date = current_appointment.strftime('%d/%m/%Y a las %H:%M')
+            response = f"Veo que querés cambiar tu cita actual del {formatted_date}.\n\n¿Confirmás que querés reagendar?"
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "si_reagendar", "title": "Sí, reagendar"}},
+                {"type": "reply", "reply": {"id": "no_mantener", "title": "No, mantener cita"}}
+            ]
+            
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            lead.flow_stage = FlowStage.RESCHEDULE_CONFIRM
+        else:
+            response = "No tenés una cita agendada actualmente. ¿Te gustaría agendar una?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "si_agendar", "title": "Sí, agendar"}},
+                {"type": "reply", "reply": {"id": "no_gracias", "title": "No, gracias"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+    
+    async def handle_reschedule_confirm(self, lead: Lead, message: str):
+        """Confirma si el usuario quiere reagendar"""
+        message_lower = message.lower()
+        
+        if "no" in message_lower or "mantener" in message_lower:
+            current = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
+            response = f"Perfecto, tu cita del {current} sigue confirmada. ¡Nos vemos! 👋"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.COMPLETED
+        else:
+            response = "¿Qué nuevo día te viene bien?\n\nEjemplos:\n- Mañana\n- Lunes\n- 15/02"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.RESCHEDULE_DAY
+    
+    async def handle_reschedule_day(self, lead: Lead, message: str):
+        """Maneja selección de nuevo día para reagendamiento"""
+        # Guardar el día seleccionado (podemos parsearlo más adelante)
+        lead.temp_reschedule_day = message
+        
+        response = "¿Qué horario preferís para la nueva cita?"
+        
+        buttons = [
+            {"type": "reply", "reply": {"id": "manana", "title": "Mañana (9-12hs)"}},
+            {"type": "reply", "reply": {"id": "tarde", "title": "Tarde (14-17hs)"}},
+            {"type": "reply", "reply": {"id": "noche", "title": "Noche (17-20hs)"}}
+        ]
+        
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        lead.flow_stage = FlowStage.RESCHEDULE_TIME
+    
+    async def handle_reschedule_time(self, lead: Lead, message: str):
+        """Maneja selección de nuevo horario y confirma reagendamiento"""
+        message_lower = message.lower()
+        
+        # Guardar cita anterior para el mensaje
+        old_appointment = lead.appointment_datetime
+        old_formatted = old_appointment.strftime('%d/%m/%Y a las %H:%M') if old_appointment else "N/A"
+        
+        # Calcular nueva fecha (similar a handle_select_time)
+        now = datetime.now()
+        new_appointment = now + timedelta(days=1)
+        
+        if "manana" in message_lower or "mañana" in message_lower:
+            new_appointment = new_appointment.replace(hour=10, minute=0)
+        elif "tarde" in message_lower:
+            new_appointment = new_appointment.replace(hour=15, minute=0)
+        else:
+            new_appointment = new_appointment.replace(hour=18, minute=0)
+        
+        # Actualizar la cita
+        lead.appointment_datetime = new_appointment
+        new_formatted = new_appointment.strftime('%d/%m/%Y a las %H:%M')
+        
+        response = f"✅ ¡Cita reagendada exitosamente!\n\n"
+        response += f"📅 Cita anterior: {old_formatted}\n"
+        response += f"📅 Nueva cita: {new_formatted}\n\n"
+        response += f"Un asesor se comunicará para confirmar. ¡Gracias por avisar! 🙌"
+        
+        self.wa.send_text_message(lead.phone, response)
+        lead.flow_stage = FlowStage.COMPLETED
+        
+        # Log del reagendamiento
+        logger.info(f"Lead {lead.phone} reagendó cita de {old_formatted} a {new_formatted}")
