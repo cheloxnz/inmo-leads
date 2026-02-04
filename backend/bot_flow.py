@@ -28,8 +28,12 @@ class BotFlowManager:
             "timestamp": datetime.utcnow().isoformat()
         })
         
+        # Detectar intención de reagendar (solo si ya tiene cita)
+        if lead.appointment_datetime and self.wants_to_reschedule(message_text):
+            await self.handle_reschedule_request(lead, message_text)
+        
         # Procesar según etapa del flujo
-        if lead.flow_stage == FlowStage.WELCOME:
+        elif lead.flow_stage == FlowStage.WELCOME:
             await self.handle_welcome(lead, message_text)
         
         elif lead.flow_stage == FlowStage.INTENT:
