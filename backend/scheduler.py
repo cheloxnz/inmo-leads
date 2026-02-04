@@ -82,7 +82,13 @@ class ScheduledTasks:
                         {"last_reactivation_email_at": {"$exists": False}},
                         {"last_reactivation_email_at": {"$lt": cutoff_date}}
                     ]
-                }, {"_id": 0}).to_list(50)
+                }, {
+                    "_id": 0,
+                    "phone": 1,
+                    "name": 1,
+                    "zone": 1,
+                    "property_type": 1
+                }).to_list(50)
                 
                 for lead in leads:
                     try:
