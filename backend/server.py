@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Request, Response, Header, HTTPException
+from fastapi import FastAPI, APIRouter, Request, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -7,9 +7,10 @@ import os
 import logging
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+import asyncio
 
 from models import (
     Lead, LeadCreate, LeadUpdate, Agent, BotConfig,
@@ -22,6 +23,9 @@ from scoring import ScoringEngine
 from google_services import GoogleSheetsService, GoogleCalendarService
 from email_service import EmailService
 from scheduler import ScheduledTasks
+from auth import decode_access_token
+from auth_routes import router as auth_router, get_current_user, require_admin
+from assignment import AssignmentEngine
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
