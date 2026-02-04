@@ -27,6 +27,7 @@ class LeadStatus(str, Enum):
 class FlowStage(str, Enum):
     WELCOME = "welcome"
     INTENT = "intent"
+    NAME = "name"
     ZONE = "zone"
     BUDGET = "budget"
     PROPERTY_TYPE = "property_type"
@@ -41,6 +42,7 @@ class FlowStage(str, Enum):
     CONFIRMATION = "confirmation"
     HANDOFF = "handoff"
     COMPLETED = "completed"
+    DISQUALIFIED = "disqualified"
 
 class UrgencyLevel(str, Enum):
     URGENTE = "urgente"
