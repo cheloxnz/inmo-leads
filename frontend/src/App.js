@@ -243,6 +243,8 @@ function AppContent() {
 
           {/* Política de Privacidad - Pública */}
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
 
           {/* Redirect por defecto */}
           <Route path="*" element={
