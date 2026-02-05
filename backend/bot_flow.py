@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Optional
-from models import Lead, FlowStage, LeadIntent, UrgencyLevel, FinancingType, PropertyType
+from models import Lead, FlowStage, LeadIntent, UrgencyLevel, FinancingType, PropertyType, LeadStatus
 from whatsapp_service import WhatsAppService
 from llm_service import LLMService
 from scoring import ScoringEngine
