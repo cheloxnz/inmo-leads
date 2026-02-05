@@ -162,14 +162,20 @@ export function NotificationProvider({ children }) {
     setUnreadCount(0);
   }, []);
 
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => !prev);
+  }, []);
+
   return (
     <NotificationContext.Provider value={{
       notifications,
       unreadCount,
       connected,
+      soundEnabled,
       markAsRead,
       markAllAsRead,
-      clearNotifications
+      clearNotifications,
+      toggleSound
     }}>
       {children}
     </NotificationContext.Provider>
