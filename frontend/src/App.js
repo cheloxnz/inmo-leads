@@ -78,6 +78,15 @@ function Navigation() {
             </Link>
 
             <Link
+              to="/calendario"
+              className={`nav-link ${isActive('/calendario') ? 'active' : ''}`}
+              data-testid="nav-calendar"
+            >
+              <span className="icon">📅</span>
+              <span>Calendario</span>
+            </Link>
+
+            <Link
               to="/asesores"
               className={`nav-link ${isActive('/asesores') ? 'active' : ''}`}
               data-testid="nav-agents"
