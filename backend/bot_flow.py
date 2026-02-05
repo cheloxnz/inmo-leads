@@ -32,10 +32,21 @@ class BotFlowManager:
         
         # PRIMERO: Procesar estados de flujo activos (tienen prioridad)
         
-        # Estados de cancelación
+        # Estados de cancelación - verificar que el mensaje sea una respuesta válida
         if lead.flow_stage == FlowStage.CANCEL_CONFIRM:
-            logger.info(f"Handling CANCEL_CONFIRM for {lead.phone}")
-            await self.handle_cancel_confirm(lead, message_text)
+            # Si es un saludo o mensaje no relacionado, mostrar opciones de nuevo
+            if message_text.lower() in ["hola", "hi", "hello", "buenas", "buen dia", "buenos dias"]:
+                logger.info(f"Greeting received in CANCEL_CONFIRM, showing options again")
+                response = "¿Qué preferís hacer con tu cita?"
+                buttons = [
+                    {"type": "reply", "reply": {"id": "confirmar_cancelar", "title": "Sí, cancelar"}},
+                    {"type": "reply", "reply": {"id": "mejor_reagendar", "title": "Mejor reagendar"}},
+                    {"type": "reply", "reply": {"id": "no_mantener", "title": "No, mantener"}}
+                ]
+                self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            else:
+                logger.info(f"Handling CANCEL_CONFIRM for {lead.phone}")
+                await self.handle_cancel_confirm(lead, message_text)
         
         # Estados de reagendamiento
         elif lead.flow_stage == FlowStage.RESCHEDULE_CONFIRM:
