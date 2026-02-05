@@ -89,6 +89,7 @@ class Lead(BaseModel):
     appointment_type: Optional[str] = None
     appointment_datetime: Optional[datetime] = None
     appointment_reminder_sent: bool = False
+    is_urgent: bool = False
     assigned_agent: Optional[str] = None
     assigned_agent_name: Optional[str] = None
     assigned_at: Optional[datetime] = None
