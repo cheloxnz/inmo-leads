@@ -291,6 +291,43 @@ export default function LeadDetail() {
             )}
           </CardContent>
         </Card>
+        
+        {/* Historial de Conversación de WhatsApp */}
+        <Card className="conversation-card" data-testid="conversation-history">
+          <CardHeader>
+            <CardTitle>💬 Conversación de WhatsApp</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lead.conversation_history && lead.conversation_history.length > 0 ? (
+              <ScrollArea className="conversation-scroll">
+                <div className="conversation-messages">
+                  {lead.conversation_history.map((msg, index) => (
+                    <div 
+                      key={index} 
+                      className={`message-bubble ${msg.from === 'customer' ? 'message-incoming' : 'message-outgoing'}`}
+                    >
+                      <div className="message-content">
+                        {msg.text}
+                      </div>
+                      <div className="message-time">
+                        {msg.timestamp ? new Date(msg.timestamp).toLocaleString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="notes-empty">
+                No hay mensajes registrados en esta conversación.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
       
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
