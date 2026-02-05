@@ -18,7 +18,8 @@ import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import '@/App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Usar la URL actual del navegador como backend (mismo dominio)
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 export const API = `${BACKEND_URL}/api`;
 
 function ProtectedRoute({ children, adminOnly = false }) {
