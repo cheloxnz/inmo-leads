@@ -232,7 +232,7 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/calendario" element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute>
               <Calendar />
             </ProtectedRoute>
           } />
