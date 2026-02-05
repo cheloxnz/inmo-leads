@@ -139,8 +139,14 @@ async def verify_webhook(
 @api_router.get("/debug-token")
 async def debug_token():
     """Debug: verificar token configurado"""
-    token = os.getenv("WHATSAPP_ACCESS_TOKEN", "NO_TOKEN")
-    return {"token_start": token[:50] + "...", "token_length": len(token)}
+    from whatsapp_service import WhatsAppService
+    # Crear instancia temporal para ver el token que usaría
+    ws = WhatsAppService(db)
+    return {
+        "token_start": ws.access_token[:50] + "..." if ws.access_token else "NO_TOKEN",
+        "token_length": len(ws.access_token) if ws.access_token else 0,
+        "token_from": "hardcoded" if "EAAMSvSefVHQBQv05eAfa5NrQ8" in (ws.access_token or "") else "env_or_old"
+    }
 
 
 @api_router.post("/webhook")
