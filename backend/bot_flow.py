@@ -524,25 +524,48 @@ class BotFlowManager:
         lead.flow_stage = FlowStage.SELECT_TIME
     
     async def handle_select_time(self, lead: Lead, message: str):
-        """Maneja selección de horario y confirma"""
+        """Maneja selección de horario y confirma cita"""
         message_lower = message.lower()
         
-        now = datetime.now()
-        appointment_date = now + timedelta(days=1)
+        # Intentar extraer fecha del ID del botón (formato hora_HH_YYYYMMDD)
+        appointment_date = None
+        match = re.search(r'hora_(\d+)_(\d{8})', message_lower)
+        if match:
+            hour = int(match.group(1))
+            date_str = match.group(2)
+            try:
+                appointment_date = datetime.strptime(date_str, '%Y%m%d')
+                appointment_date = appointment_date.replace(hour=hour, minute=0, second=0, microsecond=0)
+            except:
+                pass
         
-        if "manana" in message_lower or "mañana" in message_lower:
-            appointment_date = appointment_date.replace(hour=10, minute=0)
-        elif "tarde" in message_lower:
-            appointment_date = appointment_date.replace(hour=15, minute=0)
+        # Si no, intentar desde notes
+        if appointment_date is None and lead.notes and "Fecha_cita:" in lead.notes:
+            try:
+                date_part = lead.notes.split("Fecha_cita:")[1].strip()[:8]
+                appointment_date = datetime.strptime(date_part, '%Y%m%d')
+            except:
+                pass
+        
+        # Fallback: mañana
+        if appointment_date is None:
+            appointment_date = datetime.now() + timedelta(days=1)
+        
+        # Determinar hora según selección
+        if "mañana" in message_lower or "manana" in message_lower or "10" in message_lower or "9" in message_lower:
+            appointment_date = appointment_date.replace(hour=10, minute=0, second=0, microsecond=0)
+        elif "tarde" in message_lower or "15" in message_lower or "14" in message_lower:
+            appointment_date = appointment_date.replace(hour=15, minute=0, second=0, microsecond=0)
         else:
-            appointment_date = appointment_date.replace(hour=18, minute=0)
+            appointment_date = appointment_date.replace(hour=18, minute=0, second=0, microsecond=0)
         
         lead.appointment_datetime = appointment_date
+        lead.notes = None  # Limpiar notes temporal
         
-        response = f"¡Perfecto! ✅\n\nTu {lead.appointment_type} quedó agendada para:\n{appointment_date.strftime('%d/%m/%Y a las %H:%M')}\n\nUn asesor se va a comunicar con vos para confirmar. ¡Gracias! 🙌"
+        response = f"¡Perfecto! ✅\n\nTu {lead.appointment_type or 'cita'} quedó agendada para:\n{appointment_date.strftime('%d/%m/%Y a las %H:%M')}\n\nUn asesor se va a comunicar con vos para confirmar. ¡Gracias! 🙌"
         
         self.wa.send_text_message(lead.phone, response)
-        lead.flow_stage = FlowStage.CONFIRMATION
+        lead.flow_stage = FlowStage.COMPLETED
         
         if ScoringEngine.should_handoff_to_human(lead):
             await self.trigger_handoff(lead)
