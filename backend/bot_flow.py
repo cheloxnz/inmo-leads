@@ -683,20 +683,22 @@ class BotFlowManager:
     async def handle_cancel_confirm(self, lead: Lead, message: str):
         """Confirma la cancelación o redirige a reagendamiento"""
         message_lower = message.lower()
+        logger.info(f"handle_cancel_confirm for {lead.phone}: '{message_lower}'")
         
-        if "mantener" in message_lower:
+        if "mantener" in message_lower or "no_mantener" in message_lower or "no," in message_lower:
             current = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
             response = f"Perfecto, tu cita del {current} sigue confirmada. ¡Te esperamos! 👋"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.COMPLETED
         
-        elif "reagendar" in message_lower:
+        elif "reagendar" in message_lower or "mejor_reagendar" in message_lower:
+            lead.flow_stage = FlowStage.COMPLETED  # Reset antes de reagendar
             await self.handle_reschedule_request(lead, message)
         
-        else:  # Cancelar
+        elif "confirmar_cancelar" in message_lower or "sí" in message_lower or "si," in message_lower or "cancelar" in message_lower:
             old_appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
             lead.appointment_datetime = None
-            lead.status = LeadStatus.WARM  # Bajar a tibio
+            lead.status = LeadStatus.WARM
             
             response = f"✅ Tu cita del {old_appointment} ha sido cancelada.\n\n"
             response += "Si en el futuro querés agendar una nueva cita, escribinos. ¡Éxitos! 🙌"
@@ -705,6 +707,16 @@ class BotFlowManager:
             lead.flow_stage = FlowStage.COMPLETED
             
             logger.info(f"Lead {lead.phone} canceló su cita del {old_appointment}")
+        
+        else:
+            # No entendió la respuesta, volver a preguntar
+            response = "No entendí tu respuesta. ¿Qué preferís hacer con tu cita?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "confirmar_cancelar", "title": "Sí, cancelar"}},
+                {"type": "reply", "reply": {"id": "mejor_reagendar", "title": "Mejor reagendar"}},
+                {"type": "reply", "reply": {"id": "no_mantener", "title": "No, mantener"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
 
     # ==========================================
     # MANEJO DE LEADS COMPLETADOS
