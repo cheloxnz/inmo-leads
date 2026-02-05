@@ -634,3 +634,179 @@ class BotFlowManager:
         
         # Log del reagendamiento
         logger.info(f"Lead {lead.phone} reagendó cita de {old_formatted} a {new_formatted}")
+
+    # ==========================================
+    # FUNCIONALIDAD DE CANCELACIÓN
+    # ==========================================
+    
+    def wants_to_cancel(self, message: str) -> bool:
+        """Detecta si el usuario quiere cancelar su cita"""
+        message_lower = message.lower()
+        
+        cancel_keywords = [
+            "cancelar", "anular", "no puedo ir", "no voy a poder",
+            "cancelo", "anulo", "dar de baja", "eliminar cita",
+            "no quiero la cita", "borrar cita"
+        ]
+        
+        for keyword in cancel_keywords:
+            if keyword in message_lower:
+                return True
+        
+        return False
+    
+    async def handle_cancel_request(self, lead: Lead, message: str):
+        """Inicia el flujo de cancelación"""
+        current_appointment = lead.appointment_datetime
+        formatted_date = current_appointment.strftime('%d/%m/%Y a las %H:%M')
+        
+        response = f"Veo que querés cancelar tu cita del {formatted_date}.\n\n¿Qué preferís hacer?"
+        
+        buttons = [
+            {"type": "reply", "reply": {"id": "cancelar_si", "title": "Cancelar cita"}},
+            {"type": "reply", "reply": {"id": "reagendar_mejor", "title": "Reagendar mejor"}},
+            {"type": "reply", "reply": {"id": "mantener_cita", "title": "Mantener cita"}}
+        ]
+        
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        lead.flow_stage = FlowStage.CANCEL_CONFIRM
+    
+    async def handle_cancel_confirm(self, lead: Lead, message: str):
+        """Confirma la cancelación o redirige a reagendamiento"""
+        message_lower = message.lower()
+        
+        if "mantener" in message_lower:
+            current = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
+            response = f"Perfecto, tu cita del {current} sigue confirmada. ¡Te esperamos! 👋"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.COMPLETED
+        
+        elif "reagendar" in message_lower:
+            await self.handle_reschedule_request(lead, message)
+        
+        else:  # Cancelar
+            old_appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
+            lead.appointment_datetime = None
+            lead.status = LeadStatus.WARM  # Bajar a tibio
+            
+            response = f"✅ Tu cita del {old_appointment} ha sido cancelada.\n\n"
+            response += "Si en el futuro querés agendar una nueva cita, escribinos. ¡Éxitos! 🙌"
+            
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.COMPLETED
+            
+            logger.info(f"Lead {lead.phone} canceló su cita del {old_appointment}")
+
+    # ==========================================
+    # MANEJO DE LEADS COMPLETADOS
+    # ==========================================
+    
+    async def handle_completed_lead(self, lead: Lead, message: str):
+        """Responde a leads que ya tienen cita y vuelven a escribir"""
+        appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
+        
+        response = f"¡Hola {lead.name or ''}! 👋\n\n"
+        response += f"Ya tenés tu cita agendada para el {appointment}.\n\n"
+        response += "¿En qué puedo ayudarte?"
+        
+        buttons = [
+            {"type": "reply", "reply": {"id": "reagendar_cita", "title": "Reagendar cita"}},
+            {"type": "reply", "reply": {"id": "cancelar_cita", "title": "Cancelar cita"}},
+            {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}}
+        ]
+        
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+
+    # ==========================================
+    # PREGUNTAS FRECUENTES (FAQ)
+    # ==========================================
+    
+    def is_faq_question(self, message: str) -> bool:
+        """Detecta si es una pregunta frecuente"""
+        message_lower = message.lower()
+        
+        faq_keywords = [
+            "dirección", "direccion", "donde queda", "dónde queda", "ubicación", "ubicacion",
+            "horario", "horarios", "a qué hora", "a que hora", "qué días", "que dias",
+            "formas de pago", "medios de pago", "como pago", "cómo pago", "efectivo", "tarjeta",
+            "teléfono", "telefono", "contacto", "llamar", "whatsapp",
+            "requisitos", "que necesito", "qué necesito", "documentos", "documentación",
+            "precio", "precios", "cuánto cuesta", "cuanto cuesta", "valor", "costos"
+        ]
+        
+        for keyword in faq_keywords:
+            if keyword in message_lower:
+                return True
+        
+        return False
+    
+    async def handle_faq(self, lead: Lead, message: str):
+        """Responde preguntas frecuentes"""
+        message_lower = message.lower()
+        
+        # Dirección/Ubicación
+        if any(k in message_lower for k in ["dirección", "direccion", "donde queda", "dónde queda", "ubicación", "ubicacion"]):
+            response = "📍 *Nuestra oficina*\n\n"
+            response += "Av. Corrientes 1234, Piso 5\n"
+            response += "CABA, Buenos Aires\n\n"
+            response += "📌 Cerca del subte B - Estación Callao"
+        
+        # Horarios
+        elif any(k in message_lower for k in ["horario", "horarios", "a qué hora", "a que hora", "qué días", "que dias"]):
+            response = "🕐 *Horarios de atención*\n\n"
+            response += "Lunes a Viernes: 9:00 - 18:00\n"
+            response += "Sábados: 10:00 - 14:00\n"
+            response += "Domingos y feriados: Cerrado\n\n"
+            response += "💡 También podés agendar una cita fuera de horario con previa coordinación."
+        
+        # Formas de pago
+        elif any(k in message_lower for k in ["formas de pago", "medios de pago", "como pago", "cómo pago", "efectivo", "tarjeta"]):
+            response = "💳 *Formas de pago*\n\n"
+            response += "• Efectivo\n"
+            response += "• Transferencia bancaria\n"
+            response += "• Tarjeta de débito/crédito\n"
+            response += "• Financiación (consultar)\n\n"
+            response += "📝 Para reservas y señas, consultá con tu asesor las opciones disponibles."
+        
+        # Contacto
+        elif any(k in message_lower for k in ["teléfono", "telefono", "contacto", "llamar"]):
+            response = "📞 *Contacto*\n\n"
+            response += "WhatsApp: +54 9 11 5943-4074\n"
+            response += "Email: info@inmobiliaria.com\n"
+            response += "Web: www.inmobiliaria.com\n\n"
+            response += "💬 ¡Estamos para ayudarte!"
+        
+        # Requisitos
+        elif any(k in message_lower for k in ["requisitos", "que necesito", "qué necesito", "documentos", "documentación"]):
+            response = "📋 *Requisitos para alquilar/comprar*\n\n"
+            response += "*Para alquilar:*\n"
+            response += "• DNI\n"
+            response += "• Recibos de sueldo (últimos 3)\n"
+            response += "• Garantía propietaria o seguro de caución\n\n"
+            response += "*Para comprar:*\n"
+            response += "• DNI\n"
+            response += "• Constancia de CUIL/CUIT\n"
+            response += "• Comprobante de ingresos\n\n"
+            response += "📌 Cada caso se evalúa individualmente. Tu asesor te dará más detalles."
+        
+        # Precios
+        elif any(k in message_lower for k in ["precio", "precios", "cuánto cuesta", "cuanto cuesta", "valor", "costos"]):
+            response = "💰 *Sobre precios*\n\n"
+            response += "Los precios varían según:\n"
+            response += "• Zona\n"
+            response += "• Tipo de propiedad\n"
+            response += "• Metros cuadrados\n"
+            response += "• Amenities\n\n"
+            response += "📊 Contanos tus preferencias y te enviamos opciones dentro de tu presupuesto."
+        
+        else:
+            response = "🤔 No encontré información sobre eso.\n\n"
+            response += "Podés preguntarme sobre:\n"
+            response += "• 📍 Dirección\n"
+            response += "• 🕐 Horarios\n"
+            response += "• 💳 Formas de pago\n"
+            response += "• 📋 Requisitos\n"
+            response += "• 📞 Contacto\n\n"
+            response += "O si preferís, un asesor puede ayudarte. ¿Querés que te contacte uno?"
+        
+        self.wa.send_text_message(lead.phone, response)
