@@ -10,6 +10,15 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Palabras clave de urgencia
+URGENCY_KEYWORDS = [
+    "urgente", "urgencia", "urgentemente",
+    "necesito ya", "lo antes posible", "cuanto antes",
+    "hoy mismo", "ahora mismo", "inmediato", "inmediatamente",
+    "es para hoy", "lo necesito para hoy", "muy urgente",
+    "ayuda urgente", "es urgente", "super urgente"
+]
+
 class BotFlowManager:
     """Gestiona el flujo conversacional del bot"""
     
@@ -18,8 +27,21 @@ class BotFlowManager:
         self.llm = llm_service
         self.email = email_service
     
+    def detect_urgency(self, message: str) -> bool:
+        """Detecta si el mensaje contiene indicadores de urgencia"""
+        message_lower = message.lower()
+        for keyword in URGENCY_KEYWORDS:
+            if keyword in message_lower:
+                return True
+        return False
+    
     async def process_message(self, lead: Lead, message_text: str, db) -> Lead:
         """Procesa mensaje según el estado del flujo"""
+        
+        # Detectar urgencia en el mensaje
+        if self.detect_urgency(message_text):
+            lead.is_urgent = True
+            logger.info(f"🚨 URGENCIA detectada para lead {lead.phone}")
         
         # Guardar mensaje en historial
         lead.conversation_history.append({
