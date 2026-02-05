@@ -215,6 +215,7 @@ async def handle_incoming_message(message: dict):
             lead = Lead(**lead)
         
         message_text = ""
+        button_id = ""
         if message_type == "text":
             message_text = message.get("text", {}).get("body", "")
         elif message_type == "button":
@@ -222,9 +223,11 @@ async def handle_incoming_message(message: dict):
         elif message_type == "interactive":
             interactive = message.get("interactive", {})
             if interactive.get("type") == "button_reply":
-                message_text = interactive.get("button_reply", {}).get("title", "")
+                button_id = interactive.get("button_reply", {}).get("id", "")
+                message_text = button_id  # Usar el ID del botón como mensaje
+                logger.info(f"Button pressed: id={button_id}")
             elif interactive.get("type") == "list_reply":
-                message_text = interactive.get("list_reply", {}).get("title", "")
+                message_text = interactive.get("list_reply", {}).get("id", "")
         
         if message_text:
             updated_lead = await bot_flow.process_message(lead, message_text, db)
