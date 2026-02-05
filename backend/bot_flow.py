@@ -725,19 +725,20 @@ class BotFlowManager:
     async def handle_completed_lead(self, lead: Lead, message: str):
         """Responde a leads que ya tienen cita y vuelven a escribir"""
         message_lower = message.lower()
+        logger.info(f"handle_completed_lead for {lead.phone}: '{message_lower}'")
         
-        # Si seleccionó reagendar
-        if "reagendar" in message_lower:
+        # Si seleccionó reagendar (desde botón o texto)
+        if "opcion_reagendar" in message_lower or ("reagendar" in message_lower and "mejor" not in message_lower):
             await self.handle_reschedule_request(lead, message)
             return
         
-        # Si seleccionó cancelar
-        if "cancelar" in message_lower:
+        # Si seleccionó cancelar (desde botón o texto)
+        if "opcion_cancelar" in message_lower:
             await self.handle_cancel_request(lead, message)
             return
         
-        # Si seleccionó consulta o escribe algo que no es reagendar/cancelar
-        if "consulta" in message_lower or "pregunta" in message_lower:
+        # Si seleccionó consulta
+        if "opcion_consulta" in message_lower or "consulta" in message_lower or "pregunta" in message_lower:
             response = "¡Claro! Decime tu consulta y te ayudo. 😊\n\n"
             response += "También podés preguntarme sobre:\n"
             response += "• 📍 Dirección\n"
@@ -755,9 +756,9 @@ class BotFlowManager:
         response += "¿En qué puedo ayudarte?"
         
         buttons = [
-            {"type": "reply", "reply": {"id": "reagendar_cita", "title": "Reagendar cita"}},
-            {"type": "reply", "reply": {"id": "cancelar_cita", "title": "Cancelar cita"}},
-            {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}}
+            {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "Cambiar fecha/hora"}},
+            {"type": "reply", "reply": {"id": "opcion_cancelar", "title": "Cancelar mi cita"}},
+            {"type": "reply", "reply": {"id": "opcion_consulta", "title": "Tengo una consulta"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
