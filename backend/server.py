@@ -293,6 +293,21 @@ async def handle_incoming_message(message: dict):
                     "timestamp": datetime.utcnow().isoformat()
                 })
             
+            # 🚨 Notificar URGENCIA a todos los admins y asesor asignado
+            if updated_lead.is_urgent:
+                urgent_notification = {
+                    "type": "urgent_lead",
+                    "title": "🚨 URGENTE - Atención Inmediata",
+                    "message": f"Lead URGENTE: {updated_lead.name or 'Sin nombre'} - {updated_lead.phone}",
+                    "lead_phone": updated_lead.phone,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                # Notificar a admins
+                await notification_manager.send_to_admins(urgent_notification)
+                # Notificar al asesor asignado
+                if updated_lead.assigned_agent:
+                    await notification_manager.send_to_user(updated_lead.assigned_agent, urgent_notification)
+            
             if updated_lead.appointment_datetime:
                 await calendar_service.create_appointment(
                     updated_lead.name or f"Lead {updated_lead.phone}",
