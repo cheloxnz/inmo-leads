@@ -131,16 +131,52 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.SELECT_TIME:
             await self.handle_select_time(lead, message_text)
         
-        # Fallback: estado no reconocido - reiniciar conversación
+        # Fallback: estado no reconocido - manejar opciones o reiniciar
         else:
-            logger.warning(f"Estado no manejado para {lead.phone}: {lead.flow_stage}")
-            response = "¡Hola! 👋 ¿En qué puedo ayudarte?"
-            buttons = [
-                {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Buscar propiedad"}},
-                {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}},
-                {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}
-            ]
-            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            message_lower = message_text.lower()
+            
+            # Manejar botones del menú
+            if message_lower == "buscar_propiedad" or "buscar" in message_lower or "propiedad" in message_lower:
+                # Reiniciar flujo de búsqueda
+                lead.flow_stage = FlowStage.WELCOME
+                await self.handle_welcome(lead, message_text)
+            
+            elif message_lower == "tengo_consulta" or message_lower == "nueva_consulta":
+                response = "¡Claro! Decime tu consulta y te ayudo. 😊\n\n"
+                response += "También podés preguntarme sobre:\n"
+                response += "• 📍 Dirección\n"
+                response += "• 🕐 Horarios\n"
+                response += "• 💳 Formas de pago\n"
+                response += "• 📋 Requisitos"
+                self.wa.send_text_message(lead.phone, response)
+            
+            elif message_lower == "ver_info" or message_lower == "ver_direccion":
+                response = "📍 *Nuestra oficina*\n\n"
+                response += "Av. Corrientes 1234, Piso 5\n"
+                response += "CABA, Buenos Aires\n\n"
+                response += "🕐 *Horarios*\n"
+                response += "Lun-Vie: 9:00 - 18:00\n"
+                response += "Sáb: 10:00 - 14:00\n\n"
+                response += "📞 WhatsApp: +54 9 11 5943-4074"
+                self.wa.send_text_message(lead.phone, response)
+            
+            elif message_lower == "ver_horarios":
+                response = "🕐 *Horarios de atención*\n\n"
+                response += "Lunes a Viernes: 9:00 - 18:00\n"
+                response += "Sábados: 10:00 - 14:00\n"
+                response += "Domingos y feriados: Cerrado"
+                self.wa.send_text_message(lead.phone, response)
+            
+            else:
+                # Mostrar menú de opciones
+                logger.warning(f"Estado no manejado para {lead.phone}: {lead.flow_stage}")
+                response = "¡Hola! 👋 ¿En qué puedo ayudarte?"
+                buttons = [
+                    {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Buscar propiedad"}},
+                    {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}},
+                    {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}
+                ]
+                self.wa.send_interactive_buttons(lead.phone, response, buttons)
         
         # Actualizar timestamp
         lead.last_message_at = datetime.utcnow()
