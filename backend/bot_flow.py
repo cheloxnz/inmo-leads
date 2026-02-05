@@ -483,15 +483,15 @@ class BotFlowManager:
     
     async def handle_reschedule_day(self, lead: Lead, message: str):
         """Maneja selección de nuevo día para reagendamiento"""
-        # Guardar el día seleccionado (podemos parsearlo más adelante)
-        lead.temp_reschedule_day = message
+        # Guardamos el día en notes temporalmente
+        lead.notes = f"Reagendar a: {message}"
         
         response = "¿Qué horario preferís para la nueva cita?"
         
         buttons = [
-            {"type": "reply", "reply": {"id": "manana", "title": "Mañana (9-12hs)"}},
-            {"type": "reply", "reply": {"id": "tarde", "title": "Tarde (14-17hs)"}},
-            {"type": "reply", "reply": {"id": "noche", "title": "Noche (17-20hs)"}}
+            {"type": "reply", "reply": {"id": "manana_9", "title": "Mañana (9-12hs)"}},
+            {"type": "reply", "reply": {"id": "tarde_14", "title": "Tarde (14-17hs)"}},
+            {"type": "reply", "reply": {"id": "noche_17", "title": "Noche (17-20hs)"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
