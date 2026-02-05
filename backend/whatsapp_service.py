@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 class WhatsAppService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-        self.access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+        # Token hardcodeado temporalmente hasta resolver el problema de deploy
+        self.access_token = os.getenv("WHATSAPP_ACCESS_TOKEN") or "EAAMSvSefVHQBQv05eAfa5NrQ8IA7HFG1miZBzbmBbjXbfmUJaxL0ZCiEiGlxpeKUvud9RgON9YNZALekz2wt13XuvOGBwO7xTb0tvOhMOhT46n4GvdUddaTOWZAvxlRf1RUiCDwiqOn6xs1WjiHzHul21A55idj6vxZCK2HAllYlMYQpZBXfSmgRApLRHUBvTAsgZDZD"
         self.app_secret = os.getenv("APP_SECRET")
         self.api_version = "v18.0"
         self.base_url = f"https://graph.facebook.com/{self.api_version}"
