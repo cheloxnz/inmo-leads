@@ -74,8 +74,8 @@ class BotFlowManager:
         elif self.is_faq_question(message_text):
             await self.handle_faq(lead, message_text)
         
-        # Lead completado que vuelve a escribir
-        elif lead.flow_stage == FlowStage.COMPLETED and lead.appointment_datetime:
+        # Lead completado o en handoff que vuelve a escribir
+        elif (lead.flow_stage == FlowStage.COMPLETED or lead.flow_stage == FlowStage.HANDOFF or lead.flow_stage == FlowStage.CONFIRMATION) and lead.appointment_datetime:
             await self.handle_completed_lead(lead, message_text)
         
         # TERCERO: Procesar flujo normal de calificación
