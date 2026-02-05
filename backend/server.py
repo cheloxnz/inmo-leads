@@ -26,6 +26,7 @@ from scheduler import ScheduledTasks
 from auth import decode_access_token
 from auth_routes import router as auth_router, get_current_user, require_admin
 from assignment import AssignmentEngine
+from audio_service import AudioTranscriptionService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
