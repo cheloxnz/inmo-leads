@@ -660,72 +660,15 @@ class BotFlowManager:
     
     async def handle_reschedule_day(self, lead: Lead, message: str):
         """Maneja selección de nuevo día para reagendamiento"""
-        message_lower = message.lower().strip()
+        new_date = self._parse_date_from_text(message)
         
-        # Intentar parsear la fecha
-        from datetime import datetime, timedelta
-        import re
-        
-        new_date = None
-        now = datetime.now()
-        
-        # Mañana
-        if "mañana" in message_lower or "manana" in message_lower:
-            new_date = now + timedelta(days=1)
-        # Pasado mañana
-        elif "pasado" in message_lower:
-            new_date = now + timedelta(days=2)
-        # Formato DD/MM o DD-MM
-        elif re.search(r'(\d{1,2})[/\-](\d{1,2})', message_lower):
-            match = re.search(r'(\d{1,2})[/\-](\d{1,2})', message_lower)
-            day, month = int(match.group(1)), int(match.group(2))
-            year = now.year
-            if month < now.month or (month == now.month and day < now.day):
-                year += 1
-            try:
-                new_date = datetime(year, month, day)
-            except:
-                new_date = None
-        # Formato "7 de febrero", "15 de marzo"
-        elif re.search(r'(\d{1,2})\s*de\s*(\w+)', message_lower):
-            match = re.search(r'(\d{1,2})\s*de\s*(\w+)', message_lower)
-            day = int(match.group(1))
-            month_name = match.group(2)
-            months = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
-                     'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12}
-            if month_name in months:
-                month = months[month_name]
-                year = now.year
-                if month < now.month or (month == now.month and day < now.day):
-                    year += 1
-                try:
-                    new_date = datetime(year, month, day)
-                except:
-                    new_date = None
-        # Solo número (asumimos día del mes actual o próximo)
-        elif re.search(r'^(\d{1,2})$', message_lower):
-            day = int(message_lower)
-            if day >= 1 and day <= 31:
-                month = now.month
-                year = now.year
-                if day <= now.day:
-                    month += 1
-                    if month > 12:
-                        month = 1
-                        year += 1
-                try:
-                    new_date = datetime(year, month, day)
-                except:
-                    new_date = None
-        
-        # Si no pudimos parsear la fecha, pedir de nuevo
         if new_date is None:
-            response = "No pude entender la fecha. Por favor indicala así:\n• 7 de febrero\n• 15/02\n• Mañana\n• Pasado mañana"
+            response = "No pude entender la fecha. Por favor indicala así:\n• Mañana\n• Lunes\n• 12 (día del mes)\n• 15/02\n• 7 de febrero"
             self.wa.send_text_message(lead.phone, response)
-            return  # Quedamos en el mismo estado
+            return  # Quedamos en el mismo estado RESCHEDULE_DAY
         
         # Guardar la fecha parseada en notes
-        lead.notes = f"Reagendar a: {new_date.strftime('%d/%m/%Y')}"
+        lead.notes = f"Reagendar:{new_date.strftime('%Y%m%d')}"
         
         response = f"Perfecto, {new_date.strftime('%d/%m/%Y')}. ¿Qué horario te viene mejor?"
         
