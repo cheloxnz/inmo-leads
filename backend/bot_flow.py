@@ -49,12 +49,14 @@ class BotFlowManager:
         
         # SEGUNDO: Detectar intenciones especiales para leads con cita
         
-        # Detectar intención de cancelar cita
-        elif lead.appointment_datetime and self.wants_to_cancel(message_text):
+        # Detectar intención de cancelar cita (solo si NO viene de un botón de opción)
+        elif lead.appointment_datetime and self.wants_to_cancel(message_text) and "opcion_" not in message_text.lower():
+            logger.info(f"Detected cancel intent for {lead.phone}")
             await self.handle_cancel_request(lead, message_text)
         
-        # Detectar intención de reagendar
-        elif lead.appointment_datetime and self.wants_to_reschedule(message_text):
+        # Detectar intención de reagendar (solo si NO viene de un botón de opción)
+        elif lead.appointment_datetime and self.wants_to_reschedule(message_text) and "opcion_" not in message_text.lower():
+            logger.info(f"Detected reschedule intent for {lead.phone}")
             await self.handle_reschedule_request(lead, message_text)
         
         # Detectar preguntas frecuentes
