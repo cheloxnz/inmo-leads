@@ -646,7 +646,7 @@ class BotFlowManager:
         cancel_keywords = [
             "cancelar", "anular", "no puedo ir", "no voy a poder",
             "cancelo", "anulo", "dar de baja", "eliminar cita",
-            "no quiero la cita", "borrar cita"
+            "no quiero la cita", "borrar cita", "cancelar_cita"
         ]
         
         for keyword in cancel_keywords:
