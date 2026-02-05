@@ -136,6 +136,13 @@ async def verify_webhook(
     return Response(content="Unauthorized", status_code=403)
 
 
+@api_router.get("/debug-token")
+async def debug_token():
+    """Debug: verificar token configurado"""
+    token = os.getenv("WHATSAPP_ACCESS_TOKEN", "NO_TOKEN")
+    return {"token_start": token[:50] + "...", "token_length": len(token)}
+
+
 @api_router.post("/webhook")
 async def receive_webhook(
     request: Request,
