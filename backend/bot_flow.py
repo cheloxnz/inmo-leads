@@ -82,16 +82,6 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.SELECT_TIME:
             await self.handle_select_time(lead, message_text)
         
-        # Estados de reagendamiento
-        elif lead.flow_stage == FlowStage.RESCHEDULE_CONFIRM:
-            await self.handle_reschedule_confirm(lead, message_text)
-        
-        elif lead.flow_stage == FlowStage.RESCHEDULE_DAY:
-            await self.handle_reschedule_day(lead, message_text)
-        
-        elif lead.flow_stage == FlowStage.RESCHEDULE_TIME:
-            await self.handle_reschedule_time(lead, message_text)
-        
         # Actualizar timestamp
         lead.last_message_at = datetime.utcnow()
         
