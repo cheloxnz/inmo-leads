@@ -3,7 +3,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function NotificationBell() {
-  const { notifications, unreadCount, connected, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, connected, soundEnabled, markAsRead, markAllAsRead, toggleSound } = useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
 
@@ -19,6 +19,7 @@ export default function NotificationBell() {
 
   const getNotificationIcon = (type) => {
     switch (type) {
+      case 'urgent_lead': return '🚨';
       case 'new_lead_assigned': return '🔥';
       case 'customer_replied': return '💬';
       case 'high_value_lead': return '🎯';
@@ -62,15 +63,25 @@ export default function NotificationBell() {
         <div className="notification-dropdown" data-testid="notification-dropdown">
           <div className="dropdown-header">
             <h4>Notificaciones</h4>
-            {unreadCount > 0 && (
+            <div className="header-actions">
               <button 
-                className="mark-all-btn"
-                onClick={markAllAsRead}
-                data-testid="btn-mark-all-read"
+                className={`sound-toggle ${soundEnabled ? 'enabled' : 'disabled'}`}
+                onClick={toggleSound}
+                title={soundEnabled ? 'Silenciar notificaciones' : 'Activar sonido'}
+                data-testid="btn-toggle-sound"
               >
-                Marcar todas como leídas
+                {soundEnabled ? '🔊' : '🔇'}
               </button>
-            )}
+              {unreadCount > 0 && (
+                <button 
+                  className="mark-all-btn"
+                  onClick={markAllAsRead}
+                  data-testid="btn-mark-all-read"
+                >
+                  Marcar leídas
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="notification-list">
@@ -83,7 +94,7 @@ export default function NotificationBell() {
               notifications.slice(0, 10).map(notification => (
                 <div
                   key={notification.id}
-                  className={`notification-item ${notification.read ? 'read' : 'unread'}`}
+                  className={`notification-item ${notification.read ? 'read' : 'unread'} ${notification.type === 'urgent_lead' ? 'urgent' : ''}`}
                   onClick={() => handleNotificationClick(notification)}
                   data-testid={`notification-${notification.id}`}
                 >
