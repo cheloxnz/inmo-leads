@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 class ScheduledTasks:
     """Gestor de tareas programadas para recordatorios y reactivaciones"""
     
-    def __init__(self, db: AsyncIOMotorDatabase, email_service: EmailService):
+    def __init__(self, db: AsyncIOMotorDatabase, email_service: EmailService, wa_service=None):
         self.db = db
         self.email = email_service
+        self.wa = wa_service
         self.running = False
     
     async def start(self):
@@ -21,6 +22,65 @@ class ScheduledTasks:
         
         asyncio.create_task(self.check_appointment_reminders())
         asyncio.create_task(self.check_warm_lead_reactivation())
+        asyncio.create_task(self.check_whatsapp_appointment_reminders())
+    
+    async def check_whatsapp_appointment_reminders(self):
+        """Envía recordatorios por WhatsApp 24hs antes de la cita"""
+        while self.running:
+            try:
+                if not self.wa:
+                    await asyncio.sleep(3600)
+                    continue
+                
+                now = datetime.utcnow()
+                # Buscar citas en las próximas 24-25 horas
+                reminder_start = now + timedelta(hours=23)
+                reminder_end = now + timedelta(hours=25)
+                
+                leads = await self.db.leads.find({
+                    "appointment_datetime": {
+                        "$gte": reminder_start.isoformat(),
+                        "$lt": reminder_end.isoformat()
+                    },
+                    "whatsapp_reminder_sent": {"$ne": True}
+                }, {"_id": 0}).to_list(100)
+                
+                for lead in leads:
+                    try:
+                        phone = lead.get('phone')
+                        name = lead.get('name', 'Cliente')
+                        appointment = lead.get('appointment_datetime')
+                        
+                        if isinstance(appointment, str):
+                            appointment = datetime.fromisoformat(appointment)
+                        
+                        formatted_date = appointment.strftime('%d/%m/%Y a las %H:%M')
+                        
+                        message = f"¡Hola {name}! 👋\n\n"
+                        message += f"Te recordamos que tenés una cita agendada para *mañana {formatted_date}*.\n\n"
+                        message += "¿Podés confirmar tu asistencia?\n\n"
+                        message += "Si necesitás reagendar o cancelar, escribinos."
+                        
+                        # Enviar mensaje
+                        self.wa.send_text_message(phone, message)
+                        
+                        # Marcar como enviado
+                        await self.db.leads.update_one(
+                            {"phone": phone},
+                            {"$set": {"whatsapp_reminder_sent": True}}
+                        )
+                        
+                        logger.info(f"Recordatorio WhatsApp enviado a {phone}")
+                        
+                    except Exception as e:
+                        logger.error(f"Error enviando recordatorio WhatsApp a {lead.get('phone')}: {str(e)}")
+                
+                # Revisar cada hora
+                await asyncio.sleep(3600)
+                
+            except Exception as e:
+                logger.error(f"Error en check_whatsapp_appointment_reminders: {str(e)}")
+                await asyncio.sleep(3600)
     
     async def check_appointment_reminders(self):
         """Revisa citas próximas y envía recordatorios 24hs antes"""
