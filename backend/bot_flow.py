@@ -698,17 +698,18 @@ class BotFlowManager:
         message_lower = message.lower()
         logger.info(f"handle_cancel_confirm for {lead.phone}: '{message_lower}'")
         
-        if "mantener" in message_lower or "no_mantener" in message_lower or "no," in message_lower:
+        # Detectar por ID del botón o palabras clave
+        if message_lower == "no_mantener" or message_lower == "mantener" or "mantener" in message_lower:
             current = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
             response = f"Perfecto, tu cita del {current} sigue confirmada. ¡Te esperamos! 👋"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.COMPLETED
         
-        elif "reagendar" in message_lower or "mejor_reagendar" in message_lower:
+        elif message_lower == "mejor_reagendar" or "reagendar" in message_lower:
             lead.flow_stage = FlowStage.COMPLETED  # Reset antes de reagendar
             await self.handle_reschedule_request(lead, message)
         
-        elif "confirmar_cancelar" in message_lower or "sí" in message_lower or "si," in message_lower or "cancelar" in message_lower:
+        elif message_lower == "confirmar_cancelar" or "si" in message_lower or "sí" in message_lower:
             old_appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
             lead.appointment_datetime = None
             lead.status = LeadStatus.WARM
@@ -723,7 +724,7 @@ class BotFlowManager:
         
         else:
             # No entendió la respuesta, volver a preguntar
-            response = "No entendí tu respuesta. ¿Qué preferís hacer con tu cita?"
+            response = "¿Qué preferís hacer con tu cita?"
             buttons = [
                 {"type": "reply", "reply": {"id": "confirmar_cancelar", "title": "Sí, cancelar"}},
                 {"type": "reply", "reply": {"id": "mejor_reagendar", "title": "Mejor reagendar"}},
