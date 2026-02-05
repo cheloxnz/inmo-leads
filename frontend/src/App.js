@@ -231,6 +231,11 @@ function AppContent() {
               <Configuration />
             </ProtectedRoute>
           } />
+          <Route path="/calendario" element={
+            <ProtectedRoute adminOnly>
+              <Calendar />
+            </ProtectedRoute>
+          } />
 
           {/* Rutas Asesor */}
           <Route path="/mi-dashboard" element={
