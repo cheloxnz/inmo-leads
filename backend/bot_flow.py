@@ -703,6 +703,30 @@ class BotFlowManager:
     
     async def handle_completed_lead(self, lead: Lead, message: str):
         """Responde a leads que ya tienen cita y vuelven a escribir"""
+        message_lower = message.lower()
+        
+        # Si seleccionó reagendar
+        if "reagendar" in message_lower:
+            await self.handle_reschedule_request(lead, message)
+            return
+        
+        # Si seleccionó cancelar
+        if "cancelar" in message_lower:
+            await self.handle_cancel_request(lead, message)
+            return
+        
+        # Si seleccionó consulta o escribe algo que no es reagendar/cancelar
+        if "consulta" in message_lower or "pregunta" in message_lower:
+            response = "¡Claro! Decime tu consulta y te ayudo. 😊\n\n"
+            response += "También podés preguntarme sobre:\n"
+            response += "• 📍 Dirección\n"
+            response += "• 🕐 Horarios\n"
+            response += "• 💳 Formas de pago\n"
+            response += "• 📋 Requisitos"
+            self.wa.send_text_message(lead.phone, response)
+            return
+        
+        # Mostrar menú de opciones
         appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
         
         response = f"¡Hola {lead.name or ''}! 👋\n\n"
