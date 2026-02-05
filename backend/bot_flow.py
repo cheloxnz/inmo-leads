@@ -28,10 +28,13 @@ class BotFlowManager:
             "timestamp": datetime.utcnow().isoformat()
         })
         
+        logger.info(f"Processing message from {lead.phone}: '{message_text}' - Current stage: {lead.flow_stage}")
+        
         # PRIMERO: Procesar estados de flujo activos (tienen prioridad)
         
         # Estados de cancelación
         if lead.flow_stage == FlowStage.CANCEL_CONFIRM:
+            logger.info(f"Handling CANCEL_CONFIRM for {lead.phone}")
             await self.handle_cancel_confirm(lead, message_text)
         
         # Estados de reagendamiento
