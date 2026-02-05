@@ -392,14 +392,132 @@ class BotFlowManager:
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.SELECT_DAY
     
+    def _parse_date_from_text(self, message: str) -> datetime:
+        """
+        Parsea una fecha desde texto en español.
+        Maneja formatos como:
+        - "mañana", "pasado mañana"
+        - "lunes", "martes", etc.
+        - "Jueves 12" (día de la semana + número de día)
+        - "12" (solo número)
+        - "15/02", "15-02"
+        - "7 de febrero"
+        """
+        message_lower = message.lower().strip()
+        now = datetime.now()
+        
+        # Mapeo de días de la semana (en español)
+        days_of_week = {
+            'lunes': 0, 'martes': 1, 'miercoles': 2, 'miércoles': 2,
+            'jueves': 3, 'viernes': 4, 'sabado': 5, 'sábado': 5, 'domingo': 6
+        }
+        
+        # Mapeo de meses
+        months = {
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+            'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+        }
+        
+        # 1. Mañana / Pasado mañana
+        if "mañana" in message_lower or "manana" in message_lower:
+            if "pasado" in message_lower:
+                return now + timedelta(days=2)
+            return now + timedelta(days=1)
+        
+        # 2. Formato "DíaSemana Número" (ej: "Jueves 12", "Sábado 7")
+        for day_name, day_idx in days_of_week.items():
+            if day_name in message_lower:
+                # Buscar si hay un número de día
+                numbers = re.findall(r'\d{1,2}', message_lower)
+                if numbers:
+                    # Hay un número, usar ese día del mes
+                    day_num = int(numbers[0])
+                    if 1 <= day_num <= 31:
+                        month = now.month
+                        year = now.year
+                        # Si el día ya pasó, ir al mes siguiente
+                        if day_num <= now.day:
+                            month += 1
+                            if month > 12:
+                                month = 1
+                                year += 1
+                        try:
+                            return datetime(year, month, day_num)
+                        except ValueError:
+                            pass
+                else:
+                    # Solo día de la semana, calcular próximo
+                    days_ahead = day_idx - now.weekday()
+                    if days_ahead <= 0:
+                        days_ahead += 7
+                    return now + timedelta(days=days_ahead)
+        
+        # 3. Formato DD/MM o DD-MM
+        match = re.search(r'(\d{1,2})[/\-](\d{1,2})', message_lower)
+        if match:
+            day, month = int(match.group(1)), int(match.group(2))
+            year = now.year
+            if month < now.month or (month == now.month and day < now.day):
+                year += 1
+            try:
+                return datetime(year, month, day)
+            except ValueError:
+                pass
+        
+        # 4. Formato "7 de febrero", "15 de marzo"
+        match = re.search(r'(\d{1,2})\s*de\s*(\w+)', message_lower)
+        if match:
+            day = int(match.group(1))
+            month_name = match.group(2)
+            if month_name in months:
+                month = months[month_name]
+                year = now.year
+                if month < now.month or (month == now.month and day < now.day):
+                    year += 1
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    pass
+        
+        # 5. Solo número (asumimos día del mes actual o próximo)
+        match = re.search(r'^(\d{1,2})$', message_lower)
+        if match:
+            day = int(match.group(1))
+            if 1 <= day <= 31:
+                month = now.month
+                year = now.year
+                if day <= now.day:
+                    month += 1
+                    if month > 12:
+                        month = 1
+                        year += 1
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    pass
+        
+        # No se pudo parsear
+        return None
+
     async def handle_select_day(self, lead: Lead, message: str):
-        """Maneja selección de día"""
-        response = "¿Qué horario preferís?\n\nHorarios disponibles:\nLun-Vie: 9-20hs\nSáb: 10-14hs"
+        """Maneja selección de día para nueva cita"""
+        new_date = self._parse_date_from_text(message)
+        
+        if new_date is None:
+            response = "No pude entender la fecha. Por favor indicala así:\n• Mañana\n• Lunes\n• 12 (día del mes)\n• 15/02\n• 7 de febrero"
+            self.wa.send_text_message(lead.phone, response)
+            return  # Quedamos en el mismo estado SELECT_DAY
+        
+        # Guardar la fecha temporalmente
+        lead.notes = f"Fecha_cita:{new_date.strftime('%Y%m%d')}"
+        
+        formatted = new_date.strftime('%d/%m/%Y')
+        response = f"Perfecto, {formatted}. ¿Qué horario preferís?\n\nHorarios disponibles:\nLun-Vie: 9-20hs\nSáb: 10-14hs"
         
         buttons = [
-            {"type": "reply", "reply": {"id": "manana", "title": "Mañana (9-12hs)"}},
-            {"type": "reply", "reply": {"id": "tarde", "title": "Tarde (14-17hs)"}},
-            {"type": "reply", "reply": {"id": "noche", "title": "Noche (17-20hs)"}}
+            {"type": "reply", "reply": {"id": f"hora_10_{new_date.strftime('%Y%m%d')}", "title": "Mañana (9-12hs)"}},
+            {"type": "reply", "reply": {"id": f"hora_15_{new_date.strftime('%Y%m%d')}", "title": "Tarde (14-17hs)"}},
+            {"type": "reply", "reply": {"id": f"hora_18_{new_date.strftime('%Y%m%d')}", "title": "Noche (17-20hs)"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
