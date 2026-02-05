@@ -230,6 +230,24 @@ async def handle_incoming_message(message: dict):
                 logger.info(f"Button pressed: id={button_id}")
             elif interactive.get("type") == "list_reply":
                 message_text = interactive.get("list_reply", {}).get("id", "")
+        elif message_type == "audio":
+            # Transcribir mensaje de voz
+            audio_info = message.get("audio", {})
+            audio_id = audio_info.get("id")
+            if audio_id:
+                logger.info(f"🎤 Audio recibido de {sender}, transcribiendo...")
+                transcribed_text = await audio_service.transcribe_whatsapp_audio(
+                    audio_id, 
+                    wa_service.access_token
+                )
+                if transcribed_text:
+                    message_text = transcribed_text
+                    logger.info(f"✅ Audio transcrito: '{transcribed_text[:100]}...'")
+                    # Notificar que se recibió audio
+                    wa_service.send_text_message(sender, f"🎤 _Audio recibido: \"{transcribed_text[:100]}{'...' if len(transcribed_text) > 100 else ''}\"_")
+                else:
+                    wa_service.send_text_message(sender, "No pude escuchar el audio. ¿Podés escribirme tu consulta?")
+                    return
         
         if message_text:
             updated_lead = await bot_flow.process_message(lead, message_text, db)
