@@ -131,6 +131,17 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.SELECT_TIME:
             await self.handle_select_time(lead, message_text)
         
+        # Fallback: estado no reconocido - reiniciar conversación
+        else:
+            logger.warning(f"Estado no manejado para {lead.phone}: {lead.flow_stage}")
+            response = "¡Hola! 👋 ¿En qué puedo ayudarte?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Buscar propiedad"}},
+                {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}},
+                {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        
         # Actualizar timestamp
         lead.last_message_at = datetime.utcnow()
         
