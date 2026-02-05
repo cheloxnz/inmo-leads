@@ -78,6 +78,19 @@ class BotFlowManager:
         elif (lead.flow_stage == FlowStage.COMPLETED or lead.flow_stage == FlowStage.HANDOFF or lead.flow_stage == FlowStage.CONFIRMATION) and lead.appointment_datetime:
             await self.handle_completed_lead(lead, message_text)
         
+        # Lead en HANDOFF sin cita - ofrecer ayuda
+        elif lead.flow_stage == FlowStage.HANDOFF or lead.flow_stage == FlowStage.CONFIRMATION:
+            response = f"¡Hola {lead.name or ''}! 👋\n\n"
+            response += "Un asesor ya está al tanto de tu consulta y se comunicará pronto.\n\n"
+            response += "¿Hay algo más en lo que pueda ayudarte mientras tanto?"
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "nueva_consulta", "title": "Nueva consulta"}},
+                {"type": "reply", "reply": {"id": "ver_horarios", "title": "Ver horarios"}},
+                {"type": "reply", "reply": {"id": "ver_direccion", "title": "Ver dirección"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        
         # TERCERO: Procesar flujo normal de calificación
         elif lead.flow_stage == FlowStage.WELCOME:
             await self.handle_welcome(lead, message_text)
