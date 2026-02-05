@@ -114,6 +114,15 @@ function Navigation() {
               <span className="icon">👥</span>
               <span>Mis Leads</span>
             </Link>
+
+            <Link
+              to="/calendario"
+              className={`nav-link ${isActive('/calendario') ? 'active' : ''}`}
+              data-testid="nav-calendar-asesor"
+            >
+              <span className="icon">📅</span>
+              <span>Calendario</span>
+            </Link>
           </>
         )}
 
