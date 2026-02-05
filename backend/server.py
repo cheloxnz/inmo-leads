@@ -108,7 +108,7 @@ email_service = EmailService(db)
 bot_flow = BotFlowManager(wa_service, llm_service, email_service)
 sheets_service = GoogleSheetsService()
 calendar_service = GoogleCalendarService()
-scheduler = ScheduledTasks(db, email_service)
+scheduler = ScheduledTasks(db, email_service, wa_service)
 
 
 @api_router.get("/")
