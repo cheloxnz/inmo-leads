@@ -689,39 +689,39 @@ class BotFlowManager:
         old_appointment = lead.appointment_datetime
         old_formatted = old_appointment.strftime('%d/%m/%Y a las %H:%M') if old_appointment else "N/A"
         
-        # Extraer fecha de notes o del ID del botón
-        import re
-        from datetime import datetime
-        
         new_date = None
         
         # Intentar extraer fecha del ID del botón (formato hora_HH_YYYYMMDD)
-        if re.search(r'hora_\d+_(\d{8})', message_lower):
-            match = re.search(r'hora_\d+_(\d{8})', message_lower)
-            date_str = match.group(1)
+        match = re.search(r'hora_(\d+)_(\d{8})', message_lower)
+        if match:
+            hour = int(match.group(1))
+            date_str = match.group(2)
             try:
                 new_date = datetime.strptime(date_str, '%Y%m%d')
+                new_date = new_date.replace(hour=hour, minute=0, second=0, microsecond=0)
             except:
                 pass
         
-        # Si no hay fecha, intentar parsear de notes
-        if new_date is None and lead.notes and "Reagendar a:" in lead.notes:
+        # Si no hay fecha del botón, intentar parsear de notes
+        if new_date is None and lead.notes and "Reagendar:" in lead.notes:
             try:
-                date_part = lead.notes.split("Reagendar a:")[1].strip()
-                new_date = datetime.strptime(date_part, '%d/%m/%Y')
+                date_part = lead.notes.split("Reagendar:")[1].strip()[:8]
+                new_date = datetime.strptime(date_part, '%Y%m%d')
             except:
-                new_date = datetime.now() + timedelta(days=1)
+                pass
         
+        # Fallback
         if new_date is None:
             new_date = datetime.now() + timedelta(days=1)
         
-        # Determinar hora según selección
-        if "mañana" in message_lower or "9" in message_lower or "10" in message_lower:
-            new_date = new_date.replace(hour=10, minute=0, second=0, microsecond=0)
-        elif "tarde" in message_lower or "14" in message_lower or "15" in message_lower:
-            new_date = new_date.replace(hour=15, minute=0, second=0, microsecond=0)
-        else:
-            new_date = new_date.replace(hour=18, minute=0, second=0, microsecond=0)
+        # Determinar hora según selección si no viene del botón
+        if not match:
+            if "mañana" in message_lower or "manana" in message_lower or "10" in message_lower or "9" in message_lower:
+                new_date = new_date.replace(hour=10, minute=0, second=0, microsecond=0)
+            elif "tarde" in message_lower or "15" in message_lower or "14" in message_lower:
+                new_date = new_date.replace(hour=15, minute=0, second=0, microsecond=0)
+            else:
+                new_date = new_date.replace(hour=18, minute=0, second=0, microsecond=0)
         
         # Actualizar la cita
         lead.appointment_datetime = new_date
@@ -736,7 +736,6 @@ class BotFlowManager:
         lead.flow_stage = FlowStage.COMPLETED
         lead.notes = None  # Limpiar notes temporal
         
-        # Log del reagendamiento
         logger.info(f"Lead {lead.phone} reagendó cita de {old_formatted} a {new_formatted}")
 
     # ==========================================
