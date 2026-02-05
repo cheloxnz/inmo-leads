@@ -28,23 +28,13 @@ class BotFlowManager:
             "timestamp": datetime.utcnow().isoformat()
         })
         
-        # Detectar intención de cancelar cita
-        if lead.appointment_datetime and self.wants_to_cancel(message_text):
-            await self.handle_cancel_request(lead, message_text)
-        
-        # Detectar intención de reagendar (solo si ya tiene cita Y no está en flujo de reagendamiento)
-        elif lead.appointment_datetime and lead.flow_stage not in [FlowStage.RESCHEDULE_CONFIRM, FlowStage.RESCHEDULE_DAY, FlowStage.RESCHEDULE_TIME, FlowStage.CANCEL_CONFIRM] and self.wants_to_reschedule(message_text):
-            await self.handle_reschedule_request(lead, message_text)
-        
-        # Detectar preguntas frecuentes
-        elif self.is_faq_question(message_text):
-            await self.handle_faq(lead, message_text)
+        # PRIMERO: Procesar estados de flujo activos (tienen prioridad)
         
         # Estados de cancelación
-        elif lead.flow_stage == FlowStage.CANCEL_CONFIRM:
+        if lead.flow_stage == FlowStage.CANCEL_CONFIRM:
             await self.handle_cancel_confirm(lead, message_text)
         
-        # Estados de reagendamiento (procesar primero)
+        # Estados de reagendamiento
         elif lead.flow_stage == FlowStage.RESCHEDULE_CONFIRM:
             await self.handle_reschedule_confirm(lead, message_text)
         
@@ -54,11 +44,25 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.RESCHEDULE_TIME:
             await self.handle_reschedule_time(lead, message_text)
         
+        # SEGUNDO: Detectar intenciones especiales para leads con cita
+        
+        # Detectar intención de cancelar cita
+        elif lead.appointment_datetime and self.wants_to_cancel(message_text):
+            await self.handle_cancel_request(lead, message_text)
+        
+        # Detectar intención de reagendar
+        elif lead.appointment_datetime and self.wants_to_reschedule(message_text):
+            await self.handle_reschedule_request(lead, message_text)
+        
+        # Detectar preguntas frecuentes
+        elif self.is_faq_question(message_text):
+            await self.handle_faq(lead, message_text)
+        
         # Lead completado que vuelve a escribir
         elif lead.flow_stage == FlowStage.COMPLETED and lead.appointment_datetime:
             await self.handle_completed_lead(lead, message_text)
         
-        # Procesar según etapa del flujo
+        # TERCERO: Procesar flujo normal de calificación
         elif lead.flow_stage == FlowStage.WELCOME:
             await self.handle_welcome(lead, message_text)
         
