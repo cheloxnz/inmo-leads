@@ -451,7 +451,7 @@ class BotFlowManager:
             "cambiar fecha", "cambiar la fecha", "cambiar horario", "cambiar el horario",
             "mover cita", "mover la cita", "postergar", "adelantar",
             "no puedo ese día", "no puedo ese dia", "no me sirve",
-            "cambiar el día", "cambiar el dia", "otra hora"
+            "cambiar el día", "cambiar el dia", "otra hora", "reagendar_cita"
         ]
         
         for keyword in reschedule_keywords:
