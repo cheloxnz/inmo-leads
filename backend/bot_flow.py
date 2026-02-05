@@ -664,19 +664,21 @@ class BotFlowManager:
     
     async def handle_cancel_request(self, lead: Lead, message: str):
         """Inicia el flujo de cancelación"""
+        logger.info(f"handle_cancel_request called for {lead.phone}")
         current_appointment = lead.appointment_datetime
         formatted_date = current_appointment.strftime('%d/%m/%Y a las %H:%M')
         
         response = f"Veo que querés cancelar tu cita del {formatted_date}.\n\n¿Qué preferís hacer?"
         
         buttons = [
-            {"type": "reply", "reply": {"id": "cancelar_si", "title": "Cancelar cita"}},
-            {"type": "reply", "reply": {"id": "reagendar_mejor", "title": "Reagendar mejor"}},
-            {"type": "reply", "reply": {"id": "mantener_cita", "title": "Mantener cita"}}
+            {"type": "reply", "reply": {"id": "confirmar_cancelar", "title": "Sí, cancelar"}},
+            {"type": "reply", "reply": {"id": "mejor_reagendar", "title": "Mejor reagendar"}},
+            {"type": "reply", "reply": {"id": "no_mantener", "title": "No, mantener"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.CANCEL_CONFIRM
+        logger.info(f"Set flow_stage to CANCEL_CONFIRM for {lead.phone}")
     
     async def handle_cancel_confirm(self, lead: Lead, message: str):
         """Confirma la cancelación o redirige a reagendamiento"""
