@@ -44,7 +44,28 @@ export function NotificationProvider({ children }) {
     setNotifications(prev => [notification, ...prev].slice(0, 50));
     setUnreadCount(prev => prev + 1);
 
+    // Reproducir sonido según tipo de notificación
+    if (soundEnabled) {
+      switch (data.type) {
+        case 'urgent_lead':
+          playSound(SOUND_URGENT, 0.8);
+          break;
+        case 'new_lead_assigned':
+        case 'high_value_lead':
+          playSound(SOUND_HOT, 0.6);
+          break;
+        case 'customer_replied':
+          playSound(SOUND_MESSAGE, 0.4);
+          break;
+        default:
+          playSound(SOUND_MESSAGE, 0.3);
+      }
+    }
+
     switch (data.type) {
+      case 'urgent_lead':
+        toast.error(data.title, { description: data.message, duration: 10000 });
+        break;
       case 'new_lead_assigned':
         toast.success(data.title, { description: data.message });
         break;
@@ -69,7 +90,7 @@ export function NotificationProvider({ children }) {
       default:
         toast(data.title || 'Nueva notificación', { description: data.message });
     }
-  }, []);
+  }, [soundEnabled]);
 
   useEffect(() => {
     if (!token || !isAuthenticated) return;
