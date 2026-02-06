@@ -271,6 +271,7 @@ function AppContent() {
 
           {/* Páginas Públicas */}
           <Route path="/planes" element={<Pricing />} />
+          <Route path="/demo" element={<Demo />} />
           <Route path="/pago-exitoso" element={<PaymentSuccess />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
