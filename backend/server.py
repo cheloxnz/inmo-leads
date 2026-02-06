@@ -684,7 +684,7 @@ async def get_inactive_leads(current_user: User = Depends(get_current_user)):
 # ==============================================
 # WEBSOCKET ENDPOINT
 # ==============================================
-@app.websocket("/ws/notifications")
+@api_router.websocket("/ws/notifications")
 async def websocket_notifications(
     websocket: WebSocket,
     token: Optional[str] = None
