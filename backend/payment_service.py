@@ -16,6 +16,7 @@ SUBSCRIPTION_PLANS = {
     "starter": {
         "name": "Starter",
         "price": 49.00,
+        "setup_price": 99.00,
         "description": "Ideal para empezar",
         "features": [
             "1 número de WhatsApp",
@@ -28,6 +29,7 @@ SUBSCRIPTION_PLANS = {
     "pro": {
         "name": "Profesional",
         "price": 129.00,
+        "setup_price": 149.00,
         "description": "Para inmobiliarias en crecimiento",
         "features": [
             "1 número de WhatsApp",
@@ -41,6 +43,7 @@ SUBSCRIPTION_PLANS = {
     "agency": {
         "name": "Agencia",
         "price": 299.00,
+        "setup_price": 249.00,
         "description": "Para grandes operaciones",
         "features": [
             "Múltiples números WhatsApp",
