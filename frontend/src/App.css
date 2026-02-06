@@ -2102,3 +2102,179 @@ body {
   color: var(--danger);
   font-weight: 700;
 }
+
+/* =============================================
+   METRICS CHARTS STYLES
+   ============================================= */
+.metrics-container {
+  margin-top: 2rem;
+}
+
+.funnel-card {
+  margin-bottom: 1.5rem;
+}
+
+.funnel-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.funnel-step {
+  text-align: center;
+  padding: 1rem 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  min-width: 100px;
+}
+
+.funnel-step.highlight {
+  background: var(--primary);
+  color: white;
+}
+
+.funnel-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.funnel-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.funnel-step.highlight .funnel-label {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.funnel-rate {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-top: 0.25rem;
+}
+
+.funnel-step.highlight .funnel-rate {
+  color: white;
+}
+
+.funnel-arrow {
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.chart-card {
+  background: var(--bg-primary);
+}
+
+/* =============================================
+   TAGS MANAGER STYLES
+   ============================================= */
+.tags-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.tag-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.tags-input-container {
+  position: relative;
+}
+
+.tags-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tags-input {
+  flex: 1;
+}
+
+.tags-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 4px;
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tag-suggestion {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tag-suggestion:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .funnel-metrics {
+    flex-direction: column;
+  }
+  
+  .funnel-arrow {
+    transform: rotate(90deg);
+  }
+  
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
