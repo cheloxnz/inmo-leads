@@ -295,6 +295,7 @@ async def handle_incoming_message(message: dict):
             
             # 🚨 Notificar URGENCIA a todos los admins y asesor asignado
             if updated_lead.is_urgent:
+                logger.info(f"🚨 Enviando notificación de URGENCIA para lead {updated_lead.phone}")
                 urgent_notification = {
                     "type": "urgent_lead",
                     "title": "🚨 URGENTE - Atención Inmediata",
@@ -302,11 +303,9 @@ async def handle_incoming_message(message: dict):
                     "lead_phone": updated_lead.phone,
                     "timestamp": datetime.utcnow().isoformat()
                 }
-                # Notificar a admins
-                await notification_manager.send_to_admins(urgent_notification)
-                # Notificar al asesor asignado
-                if updated_lead.assigned_agent:
-                    await notification_manager.send_to_user(updated_lead.assigned_agent, urgent_notification)
+                # Broadcast a todos los conectados (para asegurar que llegue)
+                await notification_manager.broadcast(urgent_notification)
+                logger.info(f"✅ Notificación de urgencia enviada por broadcast")
             
             if updated_lead.appointment_datetime:
                 await calendar_service.create_appointment(
