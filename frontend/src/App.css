@@ -2747,3 +2747,46 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* =============================================
+   SETUP PRICE STYLES
+   ============================================= */
+.plan-setup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.setup-label {
+  color: var(--text-secondary);
+}
+
+.setup-price {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.checkout-plan-info {
+  text-align: left;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+.checkout-prices {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.checkout-prices span {
+  color: var(--text-secondary);
+}
