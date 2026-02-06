@@ -71,6 +71,11 @@ export default function Pricing() {
     <div className="pricing-page" data-testid="pricing-page">
       {/* Hero Section */}
       <section className="pricing-hero">
+        <img 
+          src="https://customer-assets.emergentagent.com/job_lead-manager-es/artifacts/l1ys0o2g_ChatGPT%20Image%203%20feb%202026%2C%2009_57_44%20p.m..png" 
+          alt="InmoBot Logo" 
+          className="hero-logo"
+        />
         <h1>Automatizá tu Inmobiliaria con IA</h1>
         <p>Bot de WhatsApp + CRM completo para captar y gestionar leads 24/7</p>
       </section>
@@ -140,6 +145,62 @@ export default function Pricing() {
             <span className="feature-icon">👥</span>
             <h3>Gestión de Equipo</h3>
             <p>Asignación automática de leads entre tus asesores</p>
+          </div>
+          <div className="feature-item">
+            <span className="feature-icon">🎤</span>
+            <h3>Transcripción de Audios</h3>
+            <p>El bot entiende mensajes de voz y los procesa automáticamente</p>
+          </div>
+          <div className="feature-item">
+            <span className="feature-icon">📅</span>
+            <h3>Agenda Inteligente</h3>
+            <p>Clientes agendan citas por WhatsApp sin intervención humana</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="pricing-testimonials">
+        <h2>Lo que dicen nuestros clientes</h2>
+        <div className="testimonials-grid">
+          <div className="testimonial-card">
+            <div className="testimonial-content">
+              <p>"Desde que implementamos InmoBot, captamos un 40% más de leads. El bot responde al instante y mis asesores ya reciben los contactos calificados."</p>
+            </div>
+            <div className="testimonial-author">
+              <div className="author-avatar">MR</div>
+              <div className="author-info">
+                <strong>Martín Rodríguez</strong>
+                <span>Director - Inmobiliaria Rodríguez</span>
+              </div>
+            </div>
+            <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
+          </div>
+          <div className="testimonial-card">
+            <div className="testimonial-content">
+              <p>"Antes perdíamos muchas consultas fuera de horario. Ahora el bot agenda citas automáticamente y nos avisa cuando hay un cliente urgente. Excelente inversión."</p>
+            </div>
+            <div className="testimonial-author">
+              <div className="author-avatar">CG</div>
+              <div className="author-info">
+                <strong>Carolina González</strong>
+                <span>Broker - CG Propiedades</span>
+              </div>
+            </div>
+            <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
+          </div>
+          <div className="testimonial-card">
+            <div className="testimonial-content">
+              <p>"El dashboard me permite ver todo en un solo lugar. Las métricas me ayudaron a identificar que estaba perdiendo clientes en la etapa de agendamiento. Ahora mi conversión subió un 25%."</p>
+            </div>
+            <div className="testimonial-author">
+              <div className="author-avatar">LP</div>
+              <div className="author-info">
+                <strong>Luis Peralta</strong>
+                <span>Gerente - Grupo Inmobiliario LP</span>
+              </div>
+            </div>
+            <div className="testimonial-stars">⭐⭐⭐⭐⭐</div>
           </div>
         </div>
       </section>
