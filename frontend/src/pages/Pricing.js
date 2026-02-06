@@ -254,7 +254,13 @@ export default function Pricing() {
             <DialogTitle>Completá tus datos</DialogTitle>
             <DialogDescription>
               {selectedPlan && plans[selectedPlan] && (
-                <>Plan seleccionado: <strong>{plans[selectedPlan].name}</strong> - ${plans[selectedPlan].price}/mes</>
+                <div className="checkout-plan-info">
+                  <div>Plan: <strong>{plans[selectedPlan].name}</strong></div>
+                  <div className="checkout-prices">
+                    <span>Setup único: <strong>${plans[selectedPlan].setup_price}</strong></span>
+                    <span>Luego: <strong>${plans[selectedPlan].price}/mes</strong></span>
+                  </div>
+                </div>
               )}
             </DialogDescription>
           </DialogHeader>
