@@ -14,6 +14,8 @@ import Login from './pages/Login';
 import AgentManagement from './pages/AgentManagement';
 import MyDashboard from './pages/MyDashboard';
 import Calendar from './pages/Calendar';
+import Pricing from './pages/Pricing';
+import PaymentSuccess from './pages/PaymentSuccess';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
