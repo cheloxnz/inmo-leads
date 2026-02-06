@@ -296,7 +296,7 @@ export default function Demo() {
         <div className="results-grid">
           <div className="result-card">
             <Zap className="result-icon" />
-            <div className="result-value">< 1 min</div>
+            <div className="result-value">&lt; 1 min</div>
             <div className="result-label">Tiempo de respuesta</div>
             <div className="result-compare">vs 2-4 horas promedio</div>
           </div>
