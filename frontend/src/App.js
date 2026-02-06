@@ -268,7 +268,9 @@ function AppContent() {
             </ProtectedRoute>
           } />
 
-          {/* Política de Privacidad - Pública */}
+          {/* Páginas Públicas */}
+          <Route path="/planes" element={<Pricing />} />
+          <Route path="/pago-exitoso" element={<PaymentSuccess />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/data-deletion" element={<DataDeletion />} />
