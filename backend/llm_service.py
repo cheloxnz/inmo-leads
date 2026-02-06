@@ -117,3 +117,49 @@ class LLMService:
             return json.loads(response)
         except:
             return {"valid": True, "reason": "Procesando respuesta"}
+    
+    async def generate_smart_response(self, user_message: str, lead_context: Dict = None) -> str:
+        """Genera una respuesta inteligente para consultas generales del usuario"""
+        context_info = ""
+        if lead_context:
+            context_info = f"""
+            Información del cliente:
+            - Nombre: {lead_context.get('name', 'No especificado')}
+            - Intención: {lead_context.get('intent', 'No definida')}
+            - Zona de interés: {lead_context.get('zone', 'No especificada')}
+            - Presupuesto: {lead_context.get('budget_text', 'No especificado')}
+            - Tipo de propiedad: {lead_context.get('property_type', 'No especificado')}
+            """
+        
+        chat = LlmChat(
+            api_key=self.api_key,
+            session_id=f"smart_response_{lead_context.get('phone', 'unknown') if lead_context else 'general'}",
+            system_message=f"""Eres un asistente virtual de una inmobiliaria en Buenos Aires, Argentina.
+            Tu rol es ayudar a clientes con consultas sobre propiedades, el mercado inmobiliario y el proceso de compra/alquiler.
+            
+            {context_info}
+            
+            REGLAS:
+            1. Responde de forma amable y profesional en español argentino (usá "vos" en lugar de "tú")
+            2. Sé conciso pero informativo (máximo 3-4 oraciones)
+            3. Si no sabés algo específico, ofrecé conectar al cliente con un asesor
+            4. No inventes datos de propiedades específicas
+            5. Podés dar información general sobre:
+               - Zonas de Buenos Aires y sus características
+               - Proceso de compra/alquiler
+               - Documentación necesaria
+               - Tendencias del mercado inmobiliario
+               - Consejos para compradores/inquilinos
+            6. Si la consulta es muy específica sobre una propiedad, sugiere agendar una cita
+            7. Usá emojis moderadamente para ser más amigable
+            
+            INFORMACIÓN DE LA INMOBILIARIA:
+            - Dirección: Av. Corrientes 1234, Piso 5, CABA
+            - Horarios: Lun-Vie 9:00-18:00, Sáb 10:00-14:00
+            - WhatsApp: +54 9 11 5943-4074"""
+        ).with_model(self.model_provider, self.model_name)
+        
+        message = UserMessage(text=user_message)
+        response = await chat.send_message(message)
+        
+        return response.strip()
