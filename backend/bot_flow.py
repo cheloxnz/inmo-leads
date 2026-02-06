@@ -1025,13 +1025,27 @@ class BotFlowManager:
             response += "📊 Contanos tus preferencias y te enviamos opciones dentro de tu presupuesto."
         
         else:
-            response = "🤔 No encontré información sobre eso.\n\n"
-            response += "Podés preguntarme sobre:\n"
-            response += "• 📍 Dirección\n"
-            response += "• 🕐 Horarios\n"
-            response += "• 💳 Formas de pago\n"
-            response += "• 📋 Requisitos\n"
-            response += "• 📞 Contacto\n\n"
-            response += "O si preferís, un asesor puede ayudarte. ¿Querés que te contacte uno?"
+            # Usar GPT para respuestas inteligentes
+            try:
+                lead_context = {
+                    "phone": lead.phone,
+                    "name": lead.name,
+                    "intent": lead.intent.value if lead.intent else None,
+                    "zone": lead.zone,
+                    "budget_text": lead.budget_text,
+                    "property_type": lead.property_type.value if lead.property_type else None
+                }
+                response = await self.llm.generate_smart_response(message, lead_context)
+                logger.info(f"GPT response generated for {lead.phone}")
+            except Exception as e:
+                logger.error(f"Error generating GPT response: {e}")
+                response = "🤔 No encontré información sobre eso.\n\n"
+                response += "Podés preguntarme sobre:\n"
+                response += "• 📍 Dirección\n"
+                response += "• 🕐 Horarios\n"
+                response += "• 💳 Formas de pago\n"
+                response += "• 📋 Requisitos\n"
+                response += "• 📞 Contacto\n\n"
+                response += "O si preferís, un asesor puede ayudarte. ¿Querés que te contacte uno?"
         
         self.wa.send_text_message(lead.phone, response)
