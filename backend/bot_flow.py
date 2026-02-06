@@ -171,6 +171,7 @@ class BotFlowManager:
                 response += "• 💳 Formas de pago\n"
                 response += "• 📋 Requisitos"
                 self.wa.send_text_message(lead.phone, response)
+                lead.flow_stage = FlowStage.CONSULTING  # Nuevo estado para consultas
             
             elif message_lower == "ver_info" or message_lower == "ver_direccion":
                 response = "📍 *Nuestra oficina*\n\n"
