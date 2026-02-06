@@ -246,7 +246,27 @@ export default function LeadDetail() {
                 <span className="label">Estado del flujo:</span>
                 <span className="value">{lead.flow_stage}</span>
               </div>
+              {lead.is_urgent && (
+                <div className="info-row">
+                  <span className="label">Urgente:</span>
+                  <Badge className="badge-hot">🚨 URGENTE</Badge>
+                </div>
+              )}
             </div>
+          </CardContent>
+        </Card>
+        
+        {/* Tags del lead */}
+        <Card>
+          <CardHeader>
+            <CardTitle>🏷️ Tags</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TagsManager 
+              leadPhone={lead.phone} 
+              initialTags={lead.tags || []}
+              onTagsChange={(newTags) => setLead({...lead, tags: newTags})}
+            />
           </CardContent>
         </Card>
         
