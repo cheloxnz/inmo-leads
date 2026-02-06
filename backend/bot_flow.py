@@ -153,6 +153,10 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.SELECT_TIME:
             await self.handle_select_time(lead, message_text)
         
+        # Estado de consulta con IA
+        elif lead.flow_stage == FlowStage.CONSULTING:
+            await self.handle_consulting(lead, message_text)
+        
         # Fallback: estado no reconocido - manejar opciones o reiniciar
         else:
             message_lower = message_text.lower()
