@@ -787,6 +787,69 @@ async def get_inactive_leads(current_user: User = Depends(get_current_user)):
 
 
 # ==============================================
+# PAYMENT ENDPOINTS (Stripe)
+# ==============================================
+class CheckoutRequest(BaseModel):
+    plan_id: str
+    customer_email: str
+    customer_name: str
+    origin_url: str
+
+
+@api_router.get("/plans")
+async def get_plans():
+    """Obtiene los planes de suscripción disponibles"""
+    return SUBSCRIPTION_PLANS
+
+
+@api_router.post("/checkout")
+async def create_checkout(request: CheckoutRequest):
+    """Crea una sesión de checkout de Stripe"""
+    try:
+        result = await payment_service.create_checkout_session(
+            plan_id=request.plan_id,
+            customer_email=request.customer_email,
+            customer_name=request.customer_name,
+            origin_url=request.origin_url
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error en checkout: {e}")
+        raise HTTPException(status_code=500, detail="Error creando sesión de pago")
+
+
+@api_router.get("/checkout/status/{session_id}")
+async def get_checkout_status(session_id: str):
+    """Obtiene el estado de una sesión de checkout"""
+    try:
+        return await payment_service.get_checkout_status(session_id)
+    except Exception as e:
+        logger.error(f"Error obteniendo status: {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo estado del pago")
+
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Webhook para eventos de Stripe"""
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature", "")
+        result = await payment_service.handle_webhook(body, signature)
+        return result
+    except Exception as e:
+        logger.error(f"Error en webhook Stripe: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@api_router.get("/transactions")
+async def get_transactions(current_user: User = Depends(require_admin)):
+    """Obtiene todas las transacciones (solo admin)"""
+    return await payment_service.get_all_transactions()
+
+
+# ==============================================
 # WEBSOCKET ENDPOINT
 # ==============================================
 @api_router.websocket("/ws/notifications")
