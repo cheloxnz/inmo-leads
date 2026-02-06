@@ -112,6 +112,7 @@ sheets_service = GoogleSheetsService()
 calendar_service = GoogleCalendarService()
 scheduler = ScheduledTasks(db, email_service, wa_service)
 audio_service = AudioTranscriptionService()
+payment_service = PaymentService(db)
 
 
 @api_router.get("/")
