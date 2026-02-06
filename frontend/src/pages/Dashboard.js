@@ -169,6 +169,9 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
+      
+      {/* Gráficos de métricas */}
+      <MetricsCharts />
     </div>
   );
 }
