@@ -1054,3 +1054,40 @@ class BotFlowManager:
                 response += "O si preferís, un asesor puede ayudarte. ¿Querés que te contacte uno?"
         
         self.wa.send_text_message(lead.phone, response)
+    
+    async def handle_consulting(self, lead: Lead, message: str):
+        """Maneja consultas generales usando IA"""
+        message_lower = message.lower()
+        
+        # Si quiere salir del modo consulta
+        if any(k in message_lower for k in ["buscar", "propiedad", "comprar", "alquilar", "invertir", "agendar", "cita"]):
+            lead.flow_stage = FlowStage.WELCOME
+            await self.handle_welcome(lead, message)
+            return
+        
+        # Primero intentar con FAQs predefinidas
+        if self.is_faq_question(message):
+            await self.handle_faq(lead, message)
+            return
+        
+        # Usar GPT para respuestas inteligentes
+        try:
+            lead_context = {
+                "phone": lead.phone,
+                "name": lead.name,
+                "intent": lead.intent.value if lead.intent else None,
+                "zone": lead.zone,
+                "budget_text": lead.budget_text,
+                "property_type": lead.property_type.value if lead.property_type else None
+            }
+            response = await self.llm.generate_smart_response(message, lead_context)
+            logger.info(f"GPT consulting response for {lead.phone}")
+            
+            # Agregar opciones al final
+            response += "\n\n¿Te puedo ayudar en algo más?"
+            
+        except Exception as e:
+            logger.error(f"Error in consulting GPT: {e}")
+            response = "Disculpá, no pude procesar tu consulta. ¿Querés que te conecte con un asesor?"
+        
+        self.wa.send_text_message(lead.phone, response)
