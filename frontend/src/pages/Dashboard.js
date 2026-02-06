@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import MetricsCharts from '../components/MetricsCharts';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
