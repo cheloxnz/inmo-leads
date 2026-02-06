@@ -2632,3 +2632,118 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* =============================================
+   HERO LOGO
+   ============================================= */
+.hero-logo {
+  width: 180px;
+  height: auto;
+  margin-bottom: 1.5rem;
+}
+
+/* =============================================
+   TESTIMONIALS SECTION
+   ============================================= */
+.pricing-testimonials {
+  padding: 4rem 2rem;
+  background: var(--bg-primary);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pricing-testimonials h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 3rem;
+}
+
+.testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2rem;
+}
+
+.testimonial-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.testimonial-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.testimonial-content {
+  margin-bottom: 1.5rem;
+}
+
+.testimonial-content p {
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
+.testimonial-content p::before {
+  content: '"';
+  font-size: 2rem;
+  color: var(--primary);
+  line-height: 0;
+  vertical-align: -0.4rem;
+  margin-right: 0.25rem;
+}
+
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.author-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.author-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.author-info strong {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.author-info span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.testimonial-stars {
+  font-size: 1rem;
+  letter-spacing: 2px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-logo {
+    width: 140px;
+  }
+  
+  .testimonials-grid {
+    grid-template-columns: 1fr;
+  }
+}
