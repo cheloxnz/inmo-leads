@@ -455,6 +455,109 @@ async def get_stats():
     }
 
 
+# Tags endpoints
+@api_router.post("/leads/{phone}/tags")
+async def add_tag(phone: str, tag_data: dict):
+    """Agrega un tag a un lead"""
+    tag = tag_data.get("tag", "").strip()
+    if not tag:
+        raise HTTPException(status_code=400, detail="Tag vacío")
+    
+    result = await db.leads.update_one(
+        {"phone": phone},
+        {"$addToSet": {"tags": tag}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+    
+    return {"message": "Tag agregado", "tag": tag}
+
+
+@api_router.delete("/leads/{phone}/tags/{tag}")
+async def remove_tag(phone: str, tag: str):
+    """Elimina un tag de un lead"""
+    result = await db.leads.update_one(
+        {"phone": phone},
+        {"$pull": {"tags": tag}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Lead o tag no encontrado")
+    
+    return {"message": "Tag eliminado"}
+
+
+@api_router.get("/tags")
+async def get_all_tags():
+    """Obtiene todos los tags únicos usados"""
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]
+    tags = await db.leads.aggregate(pipeline).to_list(100)
+    return [{"tag": t["_id"], "count": t["count"]} for t in tags]
+
+
+# Métricas para gráficos
+@api_router.get("/metrics/leads-by-day")
+async def get_leads_by_day(days: int = 30):
+    """Obtiene cantidad de leads por día"""
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start_date.isoformat()}}},
+        {"$addFields": {
+            "date": {"$substr": ["$created_at", 0, 10]}
+        }},
+        {"$group": {"_id": "$date", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ]
+    
+    result = await db.leads.aggregate(pipeline).to_list(100)
+    return [{"date": r["_id"], "count": r["count"]} for r in result]
+
+
+@api_router.get("/metrics/leads-by-status")
+async def get_leads_by_status():
+    """Obtiene distribución de leads por estado"""
+    pipeline = [
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]
+    result = await db.leads.aggregate(pipeline).to_list(10)
+    return [{"status": r["_id"] or "unknown", "count": r["count"]} for r in result]
+
+
+@api_router.get("/metrics/leads-by-intent")
+async def get_leads_by_intent():
+    """Obtiene distribución de leads por intención"""
+    pipeline = [
+        {"$group": {"_id": "$intent", "count": {"$sum": 1}}}
+    ]
+    result = await db.leads.aggregate(pipeline).to_list(10)
+    return [{"intent": r["_id"] or "sin_definir", "count": r["count"]} for r in result]
+
+
+@api_router.get("/metrics/conversion-funnel")
+async def get_conversion_funnel():
+    """Obtiene métricas del funnel de conversión"""
+    total = await db.leads.count_documents({})
+    qualified = await db.leads.count_documents({"score": {"$gte": 30}})
+    with_appointment = await db.leads.count_documents({"appointment_datetime": {"$exists": True, "$ne": None}})
+    hot = await db.leads.count_documents({"status": "hot"})
+    
+    return {
+        "total_leads": total,
+        "qualified": qualified,
+        "with_appointment": with_appointment,
+        "hot_leads": hot,
+        "qualification_rate": round((qualified / total * 100) if total > 0 else 0, 1),
+        "appointment_rate": round((with_appointment / total * 100) if total > 0 else 0, 1),
+        "conversion_rate": round((hot / total * 100) if total > 0 else 0, 1)
+    }
+
+
 @api_router.get("/config")
 async def get_config():
     """Obtiene configuración del bot"""
