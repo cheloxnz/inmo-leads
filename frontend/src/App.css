@@ -2790,3 +2790,499 @@ body {
 .checkout-prices span {
   color: var(--text-secondary);
 }
+
+/* =============================================
+   DEMO PAGE STYLES
+   ============================================= */
+.demo-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.demo-hero {
+  text-align: center;
+  padding: 4rem 2rem 3rem;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.demo-badge {
+  margin-bottom: 1rem;
+  background: var(--primary);
+}
+
+.demo-hero h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.demo-hero p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Feature Tabs */
+.demo-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.feature-tabs {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.feature-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.feature-tab:hover {
+  background: var(--bg-tertiary);
+}
+
+.feature-tab.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Feature Display */
+.feature-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+.feature-info h2 {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.feature-subtitle {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.feature-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.feature-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  color: var(--text-secondary);
+}
+
+.feature-points li svg {
+  color: var(--primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Demo Components */
+.feature-demo {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+/* Chat Demo */
+.demo-chat {
+  max-height: 500px;
+}
+
+.chat-header, .stats-header, .notifications-header, .team-header, .calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.chat-messages {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  max-width: 85%;
+}
+
+.chat-message.client {
+  align-self: flex-end;
+}
+
+.chat-message.bot {
+  align-self: flex-start;
+}
+
+.message-bubble {
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.chat-message.client .message-bubble {
+  background: var(--primary);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message.bot .message-bubble {
+  background: var(--bg-tertiary);
+  border-bottom-left-radius: 4px;
+}
+
+/* Stats Demo */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.stat-card {
+  background: var(--bg-tertiary);
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.stat-trend {
+  font-size: 0.75rem;
+  color: #10b981;
+  margin-top: 0.25rem;
+}
+
+/* Notifications Demo */
+.notifications-list {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.notification-item {
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border-left: 3px solid var(--border);
+}
+
+.notification-item.urgent {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.notification-item.hot {
+  border-left-color: #f59e0b;
+}
+
+.notification-item.reply {
+  border-left-color: #3b82f6;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.notification-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.notification-time {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+/* Team Demo */
+.team-list {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.team-member {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.member-status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.member-status.online {
+  background: #10b981;
+}
+
+.member-status.busy {
+  background: #f59e0b;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.member-zone {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.member-leads {
+  font-size: 0.875rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Calendar Demo */
+.calendar-grid-demo {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 1rem;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+}
+
+.calendar-day-demo {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+}
+
+.calendar-day-demo.has-event {
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+/* How it Works */
+.demo-how-it-works {
+  padding: 4rem 2rem;
+  background: var(--bg-secondary);
+}
+
+.demo-how-it-works h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 3rem;
+}
+
+.steps-grid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.step-card {
+  background: var(--bg-primary);
+  padding: 2rem;
+  border-radius: 12px;
+  text-align: center;
+  flex: 1;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.step-number {
+  width: 48px;
+  height: 48px;
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 auto 1rem;
+}
+
+.step-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.step-card p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.step-arrow {
+  color: var(--text-secondary);
+}
+
+/* Results */
+.demo-results {
+  padding: 4rem 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.demo-results h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 3rem;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.result-card {
+  background: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.result-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+.result-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.result-label {
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.result-compare {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+/* Demo CTA */
+.demo-cta {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+  color: white;
+}
+
+.demo-cta h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.demo-cta p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 2rem;
+}
+
+.cta-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cta-buttons button {
+  min-width: 200px;
+}
+
+.cta-buttons button:first-child {
+  background: white;
+  color: var(--primary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .feature-display {
+    grid-template-columns: 1fr;
+  }
+  
+  .steps-grid {
+    flex-direction: column;
+  }
+  
+  .step-arrow {
+    transform: rotate(90deg);
+  }
+  
+  .step-card {
+    max-width: 100%;
+  }
+}
