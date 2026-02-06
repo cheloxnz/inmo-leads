@@ -49,6 +49,8 @@ class FlowStage(str, Enum):
     RESCHEDULE_TIME = "reschedule_time"
     # Cancelación
     CANCEL_CONFIRM = "cancel_confirm"
+    # Consultas con IA
+    CONSULTING = "consulting"
 
 class UrgencyLevel(str, Enum):
     URGENTE = "urgente"
