@@ -95,11 +95,13 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     if (!token || !isAuthenticated) return;
 
+    // WebSocket se conecta directamente sin /api
     const wsUrl = process.env.REACT_APP_BACKEND_URL
       .replace('https://', 'wss://')
       .replace('http://', 'ws://');
     
-    const ws = new WebSocket(`${wsUrl}/ws/notifications?token=${token}`);
+    // Intentar primero con /api/ws y luego sin /api
+    const ws = new WebSocket(`${wsUrl}/api/ws/notifications?token=${token}`);
     
     ws.onopen = () => {
       console.log('WebSocket conectado');
