@@ -99,6 +99,12 @@ export default function Pricing() {
                   <span className="price-amount">${plan.price}</span>
                   <span className="price-period">/mes</span>
                 </div>
+                {plan.setup_price && (
+                  <div className="plan-setup">
+                    <span className="setup-label">Setup único:</span>
+                    <span className="setup-price">${plan.setup_price}</span>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <ul className="plan-features">
