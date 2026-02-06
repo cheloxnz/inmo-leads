@@ -16,6 +16,7 @@ import MyDashboard from './pages/MyDashboard';
 import Calendar from './pages/Calendar';
 import Pricing from './pages/Pricing';
 import PaymentSuccess from './pages/PaymentSuccess';
+import Demo from './pages/Demo';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
