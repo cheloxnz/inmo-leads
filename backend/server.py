@@ -563,42 +563,50 @@ async def get_conversion_funnel():
 @api_router.get("/metrics/messages")
 async def get_messages_metrics(days: int = 30):
     """Obtiene métricas de mensajes procesados"""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
     
-    # Total de mensajes
-    total_messages = await db.messages.count_documents({})
-    
-    # Mensajes en el período
-    recent_messages = await db.messages.count_documents({
-        "timestamp": {"$gte": start_date.isoformat()}
-    })
-    
-    # Mensajes por tipo (entrantes vs salientes)
-    pipeline_by_type = [
-        {"$match": {"timestamp": {"$gte": start_date.isoformat()}}},
-        {"$group": {"_id": "$direction", "count": {"$sum": 1}}}
+    # Contar mensajes desde conversation_history de cada lead
+    pipeline = [
+        {"$unwind": "$conversation_history"},
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": 1},
+            "from_customer": {
+                "$sum": {"$cond": [{"$eq": ["$conversation_history.from", "customer"]}, 1, 0]}
+            },
+            "from_bot": {
+                "$sum": {"$cond": [{"$eq": ["$conversation_history.from", "bot"]}, 1, 0]}
+            }
+        }}
     ]
-    by_type = await db.messages.aggregate(pipeline_by_type).to_list(10)
     
-    # Mensajes por día
+    result = await db.leads.aggregate(pipeline).to_list(1)
+    
+    # Mensajes por día (últimos N días)
     pipeline_by_day = [
-        {"$match": {"timestamp": {"$gte": start_date.isoformat()}}},
-        {"$addFields": {"date": {"$substr": ["$timestamp", 0, 10]}}},
+        {"$unwind": "$conversation_history"},
+        {"$match": {"conversation_history.timestamp": {"$gte": start_date}}},
+        {"$addFields": {"date": {"$substr": ["$conversation_history.timestamp", 0, 10]}}},
         {"$group": {"_id": "$date", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}}
     ]
-    by_day = await db.messages.aggregate(pipeline_by_day).to_list(100)
+    by_day = await db.leads.aggregate(pipeline_by_day).to_list(100)
     
-    incoming = next((t["count"] for t in by_type if t["_id"] == "incoming"), 0)
-    outgoing = next((t["count"] for t in by_type if t["_id"] == "outgoing"), 0)
+    # Total de leads
+    total_leads = await db.leads.count_documents({})
+    
+    stats = result[0] if result else {"total": 0, "from_customer": 0, "from_bot": 0}
+    recent_count = sum(d["count"] for d in by_day)
     
     return {
-        "total_messages": total_messages,
-        "messages_last_period": recent_messages,
-        "incoming_messages": incoming,
-        "outgoing_messages": outgoing,
+        "total_messages": stats.get("total", 0),
+        "incoming_messages": stats.get("from_customer", 0),
+        "outgoing_messages": stats.get("from_bot", 0),
+        "messages_last_period": recent_count,
         "messages_by_day": [{"date": r["_id"], "count": r["count"]} for r in by_day],
-        "avg_per_day": round(recent_messages / days, 1) if days > 0 else 0
+        "avg_per_day": round(recent_count / days, 1) if days > 0 else 0,
+        "total_leads": total_leads,
+        "avg_messages_per_lead": round(stats.get("total", 0) / total_leads, 1) if total_leads > 0 else 0
     }
 
 
