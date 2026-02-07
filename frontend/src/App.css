@@ -2897,6 +2897,16 @@ body {
   outline: none;
 }
 
+.video-cta-button {
+  margin-top: 2rem;
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+.video-cta-button:hover {
+  background: var(--primary-dark) !important;
+}
+
 /* Feature Tabs */
 .demo-content {
   max-width: 1200px;
