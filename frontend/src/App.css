@@ -704,6 +704,7 @@ body {
 
 .actions-bar {
   margin-top: 2rem;
+  margin-bottom: 80px;
   display: flex;
   justify-content: flex-end;
 }
