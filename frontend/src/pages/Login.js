@@ -30,8 +30,12 @@ export default function Login() {
     <div className="login-page" data-testid="login-page">
       <div className="login-container">
         <div className="login-header">
-          <div className="login-logo">🏠</div>
-          <h1>InmoBot AI</h1>
+          <img 
+            src="https://customer-assets.emergentagent.com/job_lead-manager-es/artifacts/l1ys0o2g_ChatGPT%20Image%203%20feb%202026%2C%2009_57_44%20p.m..png" 
+            alt="InmoBot Logo" 
+            className="login-logo-img"
+          />
+          <h1>InmoBot</h1>
           <p>Sistema de Gestión de Leads Inmobiliarios</p>
         </div>
 
