@@ -148,15 +148,6 @@ function Navigation() {
             <span>Configuración</span>
           </Link>
         )}
-
-        <Link
-          to="/docs"
-          className={`nav-link ${isActive('/docs') ? 'active' : ''}`}
-          data-testid="nav-docs"
-        >
-          <span className="icon">📚</span>
-          <span>Documentación</span>
-        </Link>
       </div>
 
       <div className="nav-footer">
