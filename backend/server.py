@@ -944,6 +944,23 @@ async def get_transactions(current_user: User = Depends(require_admin)):
     return await payment_service.get_all_transactions()
 
 
+# Endpoint de prueba para email (solo desarrollo)
+class TestEmailRequest(BaseModel):
+    email: str
+    name: str
+
+@api_router.post("/test-welcome-email")
+async def test_welcome_email(request: TestEmailRequest):
+    """Endpoint de prueba para el email de bienvenida"""
+    result = await send_welcome_email(
+        customer_email=request.email,
+        customer_name=request.name,
+        plan_name="Profesional (Prueba)",
+        amount=129.00
+    )
+    return result
+
+
 # ==============================================
 # WEBSOCKET ENDPOINT
 # ==============================================
