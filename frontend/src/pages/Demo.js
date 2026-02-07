@@ -231,12 +231,14 @@ export default function Demo() {
       {/* Video Demo */}
       <section className="demo-video-section" data-testid="demo-video-section">
         <div className="video-container">
-          <h2><Play className="w-6 h-6 inline mr-2" />Video Demostración</h2>
+          <h2>
+            <Play className="video-play-icon" />
+            Video Demostración
+          </h2>
           <p className="video-subtitle">Mirá en 3 minutos cómo InmoBot puede transformar tu negocio</p>
           <div className="video-wrapper">
             <video 
               controls 
-              poster=""
               className="demo-video"
               data-testid="demo-video"
             >
