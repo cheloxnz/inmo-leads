@@ -314,18 +314,9 @@ function AppContent() {
             </ProtectedRoute>
           } />
 
-          {/* Páginas Públicas */}
-          <Route path="/inicio" element={<LandingPage />} />
-          <Route path="/planes" element={<Pricing />} />
-          <Route path="/demo" element={<Demo />} />
-          <Route path="/pago-exitoso" element={<PaymentSuccess />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route path="/data-deletion" element={<DataDeletion />} />
-
-          {/* Redirect por defecto */}
+          {/* Redirect por defecto para usuarios autenticados */}
           <Route path="*" element={
-            <Navigate to={isAuthenticated ? (isAdmin ? "/" : "/mi-dashboard") : "/login"} replace />
+            <Navigate to={isAdmin ? "/" : "/mi-dashboard"} replace />
           } />
         </Routes>
       </main>
