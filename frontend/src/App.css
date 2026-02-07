@@ -2829,6 +2829,17 @@ body {
   margin: 0 auto;
 }
 
+.hero-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.hero-buttons button {
+  min-width: 180px;
+}
+
 /* Video Demo Section */
 .demo-video-section {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
