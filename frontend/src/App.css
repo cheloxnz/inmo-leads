@@ -951,7 +951,9 @@ body {
 .login-logo-img {
   width: 120px;
   height: auto;
-  margin-bottom: 1rem;
+  margin: 0 auto 1rem auto;
+  display: block;
+  border-radius: 20px;
 }
 
 .login-header h1 {
