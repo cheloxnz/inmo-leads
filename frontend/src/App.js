@@ -218,21 +218,46 @@ function MyLeadsPage() {
 
 function AppContent() {
   const { isAuthenticated, loading, isAdmin } = useAuth();
+  const location = useLocation();
+  
+  // Páginas públicas que no necesitan el layout del dashboard
+  const publicPages = ['/inicio', '/planes', '/demo', '/pago-exitoso', '/privacy', '/terms', '/data-deletion', '/login'];
+  const isPublicPage = publicPages.some(page => location.pathname.startsWith(page)) || location.pathname === '/inicio';
 
   if (loading) {
     return <div className="loading-container">Cargando aplicación...</div>;
   }
 
+  // Si es página pública, mostrar sin navegación lateral
+  if (isPublicPage || !isAuthenticated) {
+    return (
+      <div className="App public-layout">
+        <main className="main-content full-width">
+          <Routes>
+            <Route path="/login" element={
+              isAuthenticated ? <Navigate to={isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
+            } />
+            <Route path="/inicio" element={<LandingPage />} />
+            <Route path="/planes" element={<Pricing />} />
+            <Route path="/demo" element={<Demo />} />
+            <Route path="/pago-exitoso" element={<PaymentSuccess />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="*" element={<Navigate to="/inicio" replace />} />
+          </Routes>
+        </main>
+        <Toaster position="top-right" richColors />
+      </div>
+    );
+  }
+
   return (
     <div className="App">
       <Navigation />
-      <main className={`main-content ${!isAuthenticated ? 'full-width' : ''}`}>
+      <main className="main-content">
         <AppHeader />
         <Routes>
-          <Route path="/login" element={
-            isAuthenticated ? <Navigate to={isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
-          } />
-
           {/* Rutas Admin */}
           <Route path="/" element={
             <ProtectedRoute adminOnly>
