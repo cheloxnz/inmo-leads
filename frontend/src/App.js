@@ -172,6 +172,14 @@ function Navigation() {
       </div>
 
       <div className="nav-footer">
+        <button 
+          className="theme-toggle" 
+          onClick={toggleTheme}
+          data-testid="btn-theme-toggle"
+          title={theme === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'}
+        >
+          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+        </button>
         <div className="user-info">
           <div className="user-avatar">
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
