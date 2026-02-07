@@ -3524,6 +3524,11 @@ body {
   min-width: 180px;
 }
 
+.landing-hero-buttons button:first-child {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
 .landing-features {
   padding: 5rem 2rem;
   max-width: 1200px;
