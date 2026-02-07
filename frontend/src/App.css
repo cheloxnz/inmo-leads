@@ -2824,6 +2824,56 @@ body {
   margin: 0 auto;
 }
 
+/* Video Demo Section */
+.demo-video-section {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  padding: 4rem 2rem;
+}
+
+.video-container {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.video-container h2 {
+  color: white;
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-container h2 svg {
+  color: var(--primary);
+}
+
+.video-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}
+
+.video-wrapper {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  background: #000;
+}
+
+.demo-video {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  border-radius: 16px;
+}
+
+.demo-video:focus {
+  outline: none;
+}
+
 /* Feature Tabs */
 .demo-content {
   max-width: 1200px;
