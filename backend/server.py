@@ -875,7 +875,33 @@ async def create_checkout(request: CheckoutRequest):
 async def get_checkout_status(session_id: str):
     """Obtiene el estado de una sesión de checkout"""
     try:
-        return await payment_service.get_checkout_status(session_id)
+        status = await payment_service.get_checkout_status(session_id)
+        
+        # Si el pago fue exitoso, enviar email de bienvenida
+        if status.get("payment_status") == "paid":
+            transaction = await db.payment_transactions.find_one(
+                {"session_id": session_id},
+                {"_id": 0}
+            )
+            
+            # Solo enviar si no se envió antes
+            if transaction and not transaction.get("welcome_email_sent"):
+                email_result = await send_welcome_email(
+                    customer_email=transaction.get("customer_email"),
+                    customer_name=transaction.get("customer_name"),
+                    plan_name=transaction.get("plan_name"),
+                    amount=transaction.get("amount")
+                )
+                
+                # Marcar como enviado
+                if email_result.get("status") == "success":
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {"$set": {"welcome_email_sent": True}}
+                    )
+                    logger.info(f"Email de bienvenida enviado a {transaction.get('customer_email')}")
+        
+        return status
     except Exception as e:
         logger.error(f"Error obteniendo status: {e}")
         raise HTTPException(status_code=500, detail="Error obteniendo estado del pago")
