@@ -2840,6 +2840,15 @@ body {
   min-width: 180px;
 }
 
+.hero-buttons button:first-child {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+.hero-buttons button:first-child:hover {
+  background: var(--primary-dark) !important;
+}
+
 /* Video Demo Section */
 .demo-video-section {
   background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
