@@ -25,6 +25,36 @@
   --shadow-lg: rgba(0, 0, 0, 0.15);
 }
 
+/* Modo Oscuro */
+[data-theme="dark"] {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border: #334155;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-lg: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .login-box {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: var(--bg-tertiary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .card {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+}
+
 /* Fix para botones primarios en toda la app */
 button[type="submit"]:not([variant]),
 [data-testid*="btn-save"],
