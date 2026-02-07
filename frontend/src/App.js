@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -20,11 +20,31 @@ import Demo from './pages/Demo';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
+import LandingPage from './pages/LandingPage';
+import { Moon, Sun } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
 const BACKEND_URL = window.location.origin;
 export const API = `${BACKEND_URL}/api`;
+
+// Hook para tema oscuro
+function useTheme() {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  return { theme, toggleTheme };
+}
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { isAuthenticated, loading, isAdmin } = useAuth();
@@ -47,6 +67,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
 function Navigation() {
   const location = useLocation();
   const { user, logout, isAdmin, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   if (!isAuthenticated) return null;
 
