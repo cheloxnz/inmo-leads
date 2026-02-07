@@ -228,6 +228,28 @@ export default function Demo() {
         <p>Explorá cada funcionalidad y descubrí cómo puede transformar tu inmobiliaria</p>
       </section>
 
+      {/* Video Demo */}
+      <section className="demo-video-section" data-testid="demo-video-section">
+        <div className="video-container">
+          <h2><Play className="w-6 h-6 inline mr-2" />Video Demostración</h2>
+          <p className="video-subtitle">Mirá en 3 minutos cómo InmoBot puede transformar tu negocio</p>
+          <div className="video-wrapper">
+            <video 
+              controls 
+              poster=""
+              className="demo-video"
+              data-testid="demo-video"
+            >
+              <source 
+                src="https://customer-assets.emergentagent.com/job_lead-manager-es/artifacts/tzee2168_demo-inmobot.mp4" 
+                type="video/mp4" 
+              />
+              Tu navegador no soporta la reproducción de videos.
+            </video>
+          </div>
+        </div>
+      </section>
+
       {/* Feature Selector */}
       <section className="demo-content">
         <div className="feature-tabs">
