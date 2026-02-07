@@ -115,6 +115,44 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Métricas de Mensajes */}
+      {messageStats && (
+        <div className="info-section">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Mensajes Procesados (últimos 30 días)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="message-stats-grid">
+                <div className="message-stat">
+                  <div className="message-stat-value">{messageStats.total_messages || 0}</div>
+                  <div className="message-stat-label">Total mensajes</div>
+                </div>
+                <div className="message-stat">
+                  <div className="message-stat-value">{messageStats.incoming_messages || 0}</div>
+                  <div className="message-stat-label">Recibidos</div>
+                </div>
+                <div className="message-stat">
+                  <div className="message-stat-value">{messageStats.outgoing_messages || 0}</div>
+                  <div className="message-stat-label">Enviados</div>
+                </div>
+                <div className="message-stat">
+                  <div className="message-stat-value">{messageStats.avg_per_day || 0}</div>
+                  <div className="message-stat-label">Promedio/día</div>
+                </div>
+                <div className="message-stat">
+                  <div className="message-stat-value">{messageStats.avg_messages_per_lead || 0}</div>
+                  <div className="message-stat-label">Promedio/lead</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       
       <div className="info-section">
         <Card>
