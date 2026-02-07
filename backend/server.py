@@ -888,6 +888,24 @@ async def stripe_webhook(request: Request):
         body = await request.body()
         signature = request.headers.get("Stripe-Signature", "")
         result = await payment_service.handle_webhook(body, signature)
+        
+        # Enviar email de bienvenida si el pago fue exitoso
+        if result.get("payment_status") == "paid":
+            # Obtener datos del cliente desde la transacción
+            transaction = await db.payment_transactions.find_one(
+                {"session_id": result.get("session_id")},
+                {"_id": 0}
+            )
+            
+            if transaction:
+                await send_welcome_email(
+                    customer_email=transaction.get("customer_email"),
+                    customer_name=transaction.get("customer_name"),
+                    plan_name=transaction.get("plan_name"),
+                    amount=transaction.get("amount")
+                )
+                logger.info(f"Email de bienvenida enviado a {transaction.get('customer_email')}")
+        
         return result
     except Exception as e:
         logger.error(f"Error en webhook Stripe: {e}")
