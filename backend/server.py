@@ -28,6 +28,7 @@ from auth_routes import router as auth_router, get_current_user, require_admin
 from assignment import AssignmentEngine
 from audio_service import AudioTranscriptionService
 from payment_service import PaymentService, SUBSCRIPTION_PLANS
+from resend_service import send_welcome_email
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
