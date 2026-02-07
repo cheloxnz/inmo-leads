@@ -225,6 +225,15 @@ export default function Demo() {
         <Badge className="demo-badge">Demo Interactiva</Badge>
         <h1>Mirá InmoBot en Acción</h1>
         <p>Explorá cada funcionalidad y descubrí cómo puede transformar tu inmobiliaria</p>
+        <div className="hero-buttons">
+          <Button size="lg" onClick={() => navigate('/planes')} data-testid="btn-hero-planes">
+            Ver Planes y Precios
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => window.open('https://wa.me/5491159434074?text=Hola,%20quiero%20una%20demo%20de%20InmoBot', '_blank')}>
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Contactar
+          </Button>
+        </div>
       </section>
 
       {/* Video Demo */}
@@ -248,6 +257,14 @@ export default function Demo() {
               Tu navegador no soporta la reproducción de videos.
             </video>
           </div>
+          <Button 
+            size="lg" 
+            className="video-cta-button"
+            onClick={() => navigate('/planes')} 
+            data-testid="btn-video-planes"
+          >
+            Ver Planes y Precios
+          </Button>
         </div>
       </section>
 
