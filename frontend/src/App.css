@@ -2843,6 +2843,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
+}
+
+.video-play-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--primary);
 }
 
 .video-container h2 svg {
