@@ -560,6 +560,48 @@ async def get_conversion_funnel():
     }
 
 
+@api_router.get("/metrics/messages")
+async def get_messages_metrics(days: int = 30):
+    """Obtiene métricas de mensajes procesados"""
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Total de mensajes
+    total_messages = await db.messages.count_documents({})
+    
+    # Mensajes en el período
+    recent_messages = await db.messages.count_documents({
+        "timestamp": {"$gte": start_date.isoformat()}
+    })
+    
+    # Mensajes por tipo (entrantes vs salientes)
+    pipeline_by_type = [
+        {"$match": {"timestamp": {"$gte": start_date.isoformat()}}},
+        {"$group": {"_id": "$direction", "count": {"$sum": 1}}}
+    ]
+    by_type = await db.messages.aggregate(pipeline_by_type).to_list(10)
+    
+    # Mensajes por día
+    pipeline_by_day = [
+        {"$match": {"timestamp": {"$gte": start_date.isoformat()}}},
+        {"$addFields": {"date": {"$substr": ["$timestamp", 0, 10]}}},
+        {"$group": {"_id": "$date", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}}
+    ]
+    by_day = await db.messages.aggregate(pipeline_by_day).to_list(100)
+    
+    incoming = next((t["count"] for t in by_type if t["_id"] == "incoming"), 0)
+    outgoing = next((t["count"] for t in by_type if t["_id"] == "outgoing"), 0)
+    
+    return {
+        "total_messages": total_messages,
+        "messages_last_period": recent_messages,
+        "incoming_messages": incoming,
+        "outgoing_messages": outgoing,
+        "messages_by_day": [{"date": r["_id"], "count": r["count"]} for r in by_day],
+        "avg_per_day": round(recent_messages / days, 1) if days > 0 else 0
+    }
+
+
 @api_router.get("/config")
 async def get_config():
     """Obtiene configuración del bot"""
