@@ -3,15 +3,18 @@ import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MetricsCharts from '../components/MetricsCharts';
+import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [emailStats, setEmailStats] = useState(null);
+  const [messageStats, setMessageStats] = useState(null);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     fetchStats();
     fetchEmailStats();
+    fetchMessageStats();
   }, []);
   
   const fetchStats = async () => {
@@ -31,6 +34,15 @@ export default function Dashboard() {
       setEmailStats(response.data);
     } catch (error) {
       console.error('Error fetching email stats:', error);
+    }
+  };
+
+  const fetchMessageStats = async () => {
+    try {
+      const response = await axios.get(`${API}/metrics/messages?days=30`);
+      setMessageStats(response.data);
+    } catch (error) {
+      console.error('Error fetching message stats:', error);
     }
   };
   
