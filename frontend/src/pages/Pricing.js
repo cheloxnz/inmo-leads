@@ -16,6 +16,7 @@ export default function Pricing() {
   const [showModal, setShowModal] = useState(false);
   const [customerData, setCustomerData] = useState({ name: '', email: '' });
   const [processing, setProcessing] = useState(false);
+  const [enterpriseNumbers, setEnterpriseNumbers] = useState(8);
 
   useEffect(() => {
     fetchPlans();
@@ -33,6 +34,21 @@ export default function Pricing() {
     }
   };
 
+  // Calcular precio Enterprise basado en cantidad de números
+  const calculateEnterprisePrice = () => {
+    const basePrice = 499;
+    const baseNumbers = 8;
+    const extraNumberPrice = 50;
+    const extraNumbers = Math.max(0, enterpriseNumbers - baseNumbers);
+    return basePrice + (extraNumbers * extraNumberPrice);
+  };
+
+  const calculateEnterpriseSetup = () => {
+    const baseSetup = 399;
+    const extraNumbers = Math.max(0, enterpriseNumbers - 8);
+    return baseSetup + (extraNumbers * 25); // $25 extra setup por número adicional
+  };
+
   const handleSelectPlan = (planId) => {
     setSelectedPlan(planId);
     setShowModal(true);
@@ -47,12 +63,21 @@ export default function Pricing() {
     setProcessing(true);
 
     try {
-      const response = await axios.post(`${API}/checkout`, {
+      const checkoutData = {
         plan_id: selectedPlan,
         customer_email: customerData.email,
         customer_name: customerData.name,
         origin_url: window.location.origin
-      });
+      };
+
+      // Si es enterprise, agregar la cantidad de números y precio calculado
+      if (selectedPlan === 'enterprise') {
+        checkoutData.whatsapp_numbers = enterpriseNumbers;
+        checkoutData.custom_price = calculateEnterprisePrice();
+        checkoutData.custom_setup = calculateEnterpriseSetup();
+      }
+
+      const response = await axios.post(`${API}/checkout`, checkoutData);
 
       // Redirigir a Stripe Checkout
       window.location.href = response.data.checkout_url;
