@@ -96,18 +96,19 @@ export default function Demo() {
       title: "Gestión de Equipo",
       description: "Asignación inteligente de leads",
       points: [
+        "Soporte para múltiples números WhatsApp",
         "Asignación automática según zona/especialidad",
         "Balance de carga entre asesores",
-        "Métricas por asesor",
-        "Reasignación manual si es necesario",
-        "Cada asesor ve solo sus leads"
+        "Métricas por asesor y por sucursal",
+        "Cada asesor ve solo sus leads",
+        "Plan Enterprise: hasta 20+ números"
       ],
       demo: {
         type: "team",
         agents: [
-          { name: "María López", leads: 12, zone: "Palermo", status: "online" },
-          { name: "Carlos García", leads: 8, zone: "Belgrano", status: "online" },
-          { name: "Ana Martínez", leads: 15, zone: "Recoleta", status: "busy" }
+          { name: "Sucursal Centro", leads: 45, zone: "+54 11 1111-1111", status: "online" },
+          { name: "Sucursal Norte", leads: 32, zone: "+54 11 2222-2222", status: "online" },
+          { name: "Sucursal Sur", leads: 28, zone: "+54 11 3333-3333", status: "online" }
         ]
       }
     }
