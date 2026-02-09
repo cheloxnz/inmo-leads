@@ -21,19 +21,18 @@ export default function Demo() {
         "Califica leads según intención, presupuesto y zona",
         "Agenda citas sin intervención humana",
         "Entiende mensajes de voz con IA",
-        "Detecta urgencias y notifica al instante"
+        "Detecta urgencias y notifica al instante",
+        "Respuestas inteligentes con GPT para consultas complejas"
       ],
       demo: {
         type: "chat",
         messages: [
           { from: "client", text: "Hola, busco un depto de 2 ambientes en Palermo" },
           { from: "bot", text: "¡Hola! 👋 Soy el asistente de la inmobiliaria. ¡Qué bueno que nos contactes!\n\n¿Estás buscando para comprar o alquilar?" },
-          { from: "client", text: "Para alquilar" },
-          { from: "bot", text: "Perfecto 🏠 ¿Cuál es tu presupuesto aproximado mensual?" },
-          { from: "client", text: "Hasta 400 mil pesos" },
-          { from: "bot", text: "¡Excelente! Tenemos varias opciones en Palermo dentro de ese rango.\n\n¿Te gustaría agendar una visita con un asesor?" },
-          { from: "client", text: "Si, el jueves a la tarde" },
-          { from: "bot", text: "✅ ¡Perfecto! Tu cita quedó agendada para:\n📅 Jueves 14/02 a las 15:00hs\n\nUn asesor te contactará para confirmar. ¡Gracias! 🙌" }
+          { from: "client", text: "Para alquilar, pero tengo dudas entre Palermo y Belgrano" },
+          { from: "bot", text: "¡Buena pregunta! 🏠 Ambas zonas son excelentes.\n\n📍 Palermo: Más vida nocturna, gastronomía y espacios verdes. Ideal si buscás un ambiente joven y dinámico.\n\n📍 Belgrano: Más tranquilo, familiar, con buenos colegios y acceso a transporte.\n\n¿Cuál se adapta más a tu estilo de vida?" },
+          { from: "client", text: "Palermo suena bien, hasta 400 mil" },
+          { from: "bot", text: "✅ ¡Perfecto! Tenemos varias opciones en Palermo dentro de ese rango.\n\n¿Te gustaría agendar una visita con un asesor? 📅" }
         ]
       }
     },
@@ -44,16 +43,18 @@ export default function Demo() {
         "Métricas en tiempo real",
         "Funnel de conversión visual",
         "Lista de leads con filtros avanzados",
-        "Historial de conversaciones",
-        "Exportación a Excel/CSV"
+        "Historial de conversaciones completo",
+        "Métricas de mensajes procesados",
+        "Exportación a Excel/CSV",
+        "Modo oscuro disponible"
       ],
       demo: {
         type: "stats",
         stats: [
           { label: "Leads este mes", value: "147", trend: "+23%" },
           { label: "Citas agendadas", value: "52", trend: "+18%" },
-          { label: "Tasa conversión", value: "35%", trend: "+5%" },
-          { label: "Tiempo respuesta", value: "< 1 min", trend: "24/7" }
+          { label: "Mensajes procesados", value: "2.4K", trend: "24/7" },
+          { label: "Tasa conversión", value: "35%", trend: "+5%" }
         ]
       }
     },
@@ -63,9 +64,9 @@ export default function Demo() {
       points: [
         "Vista mensual de todas las citas",
         "Citas agendadas automáticamente por el bot",
-        "Recordatorios 24hs antes",
+        "Recordatorios automáticos",
         "Reagendamiento desde WhatsApp",
-        "Sincronización con asesores"
+        "Cancelación con un click"
       ],
       demo: {
         type: "calendar"
