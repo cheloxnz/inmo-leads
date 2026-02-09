@@ -93,7 +93,11 @@ export function NotificationProvider({ children }) {
   }, [soundEnabled]);
 
   useEffect(() => {
-    if (!token || !isAuthenticated) return;
+    // Solo conectar si está autenticado con token válido
+    if (!token || !isAuthenticated) {
+      console.log('No conectando WebSocket - usuario no autenticado');
+      return;
+    }
 
     // WebSocket se conecta directamente sin /api
     const wsUrl = process.env.REACT_APP_BACKEND_URL
@@ -111,7 +115,10 @@ export function NotificationProvider({ children }) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        handleNotification(data);
+        // Solo procesar notificaciones si sigue autenticado
+        if (isAuthenticated) {
+          handleNotification(data);
+        }
       } catch (e) {
         console.error('Error parsing notification:', e);
       }
