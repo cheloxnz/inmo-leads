@@ -18,6 +18,7 @@ SUBSCRIPTION_PLANS = {
         "price": 49.00,
         "setup_price": 99.00,
         "description": "Ideal para empezar",
+        "whatsapp_numbers": 1,
         "features": [
             "1 número de WhatsApp",
             "500 conversaciones/mes",
@@ -31,6 +32,7 @@ SUBSCRIPTION_PLANS = {
         "price": 129.00,
         "setup_price": 149.00,
         "description": "Para inmobiliarias en crecimiento",
+        "whatsapp_numbers": 1,
         "features": [
             "1 número de WhatsApp",
             "Conversaciones ilimitadas",
@@ -44,15 +46,34 @@ SUBSCRIPTION_PLANS = {
         "name": "Agencia",
         "price": 299.00,
         "setup_price": 249.00,
-        "description": "Para grandes operaciones",
+        "description": "Para operaciones medianas",
+        "whatsapp_numbers": 5,
         "features": [
-            "Múltiples números WhatsApp",
+            "Hasta 5 números WhatsApp",
+            "Conversaciones ilimitadas",
+            "10 usuarios",
+            "Dashboard completo",
+            "Métricas por sucursal",
+            "Soporte prioritario",
+            "Onboarding personalizado"
+        ]
+    },
+    "enterprise": {
+        "name": "Enterprise",
+        "price": 499.00,
+        "setup_price": 399.00,
+        "description": "Para grandes operaciones",
+        "whatsapp_numbers": 8,
+        "extra_number_price": 50.00,
+        "features": [
+            "Desde 8 números WhatsApp",
+            "+$50 por número adicional",
             "Conversaciones ilimitadas",
             "Usuarios ilimitados",
-            "White-label",
             "API access",
-            "Soporte dedicado",
-            "Onboarding personalizado"
+            "Soporte dedicado 24/7",
+            "Account manager",
+            "SLA garantizado"
         ]
     }
 }
