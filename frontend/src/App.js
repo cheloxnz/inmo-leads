@@ -247,7 +247,6 @@ function AppContent() {
             <Route path="*" element={<Navigate to="/inicio" replace />} />
           </Routes>
         </main>
-        <Toaster position="top-right" richColors />
       </div>
     );
   }
