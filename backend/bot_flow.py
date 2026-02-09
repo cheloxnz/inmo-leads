@@ -1085,6 +1085,17 @@ class BotFlowManager:
         """Maneja consultas generales usando IA"""
         message_lower = message.lower()
         
+        # Detectar despedida - finalizar conversación
+        farewell_keywords = ["nada más", "nada mas", "eso es todo", "gracias", "muchas gracias", "ok gracias", "listo gracias", "perfecto gracias", "bueno gracias", "no nada", "no, nada", "no gracias", "no, gracias", "estoy bien", "todo bien"]
+        if any(kw in message_lower for kw in farewell_keywords):
+            response = f"¡Perfecto {lead.name or ''}! 😊\n\n"
+            response += "Gracias por contactarnos. Cualquier cosa que necesites, escribinos.\n\n"
+            response += "¡Que tengas un excelente día! 🏠"
+            self.wa.send_text_message(lead.phone, response)
+            # Volver a estado COMPLETED
+            lead.flow_stage = FlowStage.COMPLETED
+            return
+        
         # Si explícitamente quiere buscar/agendar (mensajes cortos que son comandos)
         short_commands = ["buscar propiedad", "quiero buscar", "agendar cita", "nueva búsqueda"]
         if any(cmd in message_lower for cmd in short_commands) and len(message) < 30:
@@ -1110,8 +1121,9 @@ class BotFlowManager:
             response = await self.llm.generate_smart_response(message, lead_context)
             logger.info(f"GPT consulting response for {lead.phone}")
             
-            # Agregar opciones al final
-            response += "\n\n¿Te puedo ayudar en algo más?"
+            # Agregar opciones al final (solo si no es muy larga la respuesta)
+            if len(response) < 500:
+                response += "\n\n¿Hay algo más en lo que pueda ayudarte?"
             
         except Exception as e:
             logger.error(f"Error in consulting GPT: {e}")
