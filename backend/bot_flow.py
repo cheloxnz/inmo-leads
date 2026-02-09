@@ -911,6 +911,10 @@ class BotFlowManager:
         message_lower = message.lower()
         logger.info(f"handle_completed_lead for {lead.phone}: '{message_lower}'")
         
+        # Verificar si la cita ya pasó
+        now = datetime.utcnow()
+        appointment_passed = lead.appointment_datetime < now
+        
         # Si seleccionó reagendar (desde botón o texto)
         if "opcion_reagendar" in message_lower or ("reagendar" in message_lower and "mejor" not in message_lower):
             await self.handle_reschedule_request(lead, message)
@@ -921,18 +925,37 @@ class BotFlowManager:
             await self.handle_cancel_request(lead, message)
             return
         
-        # Si seleccionó consulta
-        if "opcion_consulta" in message_lower or "consulta" in message_lower or "pregunta" in message_lower:
-            response = "¡Claro! Decime tu consulta y te ayudo. 😊\n\n"
-            response += "También podés preguntarme sobre:\n"
-            response += "• 📍 Dirección\n"
-            response += "• 🕐 Horarios\n"
-            response += "• 💳 Formas de pago\n"
-            response += "• 📋 Requisitos"
+        # Si seleccionó consulta o hace una pregunta
+        if "opcion_consulta" in message_lower:
+            response = "¡Claro! Decime tu consulta y te ayudo. 😊"
             self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.CONSULTING
             return
         
-        # Mostrar menú de opciones
+        # Detectar si es una pregunta (no es saludo ni botón)
+        is_question = len(message_lower) > 15 or "?" in message or any(word in message_lower for word in ["quiero", "busco", "necesito", "dudas", "consulta", "ayuda", "zona", "precio", "barrio", "alquiler", "comprar"])
+        is_greeting = message_lower in ["hola", "hi", "hello", "buenas", "buen dia", "buenos dias", "buenas tardes", "buenas noches"]
+        
+        # Si es una pregunta real, usar GPT
+        if is_question and not is_greeting:
+            await self.handle_consulting(lead, message)
+            return
+        
+        # Si la cita ya pasó
+        if appointment_passed:
+            response = f"¡Hola {lead.name or ''}! 👋\n\n"
+            response += f"Veo que tenías una cita agendada para el {lead.appointment_datetime.strftime('%d/%m/%Y')} que ya pasó.\n\n"
+            response += "¿Cómo fue tu experiencia? ¿Necesitás agendar otra cita?"
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "Agendar nueva cita"}},
+                {"type": "reply", "reply": {"id": "opcion_consulta", "title": "Tengo una consulta"}},
+                {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Buscar propiedades"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            return
+        
+        # Mostrar menú de opciones (cita futura)
         appointment = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M')
         
         response = f"¡Hola {lead.name or ''}! 👋\n\n"
