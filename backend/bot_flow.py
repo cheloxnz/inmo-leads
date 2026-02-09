@@ -906,7 +906,7 @@ class BotFlowManager:
     # MANEJO DE LEADS COMPLETADOS
     # ==========================================
     
-    async def handle_completed_lead(self, lead: Lead, message: str):
+    async def handle_completed_lead(self, lead: Lead, message: str, db):
         """Responde a leads que ya tienen cita y vuelven a escribir"""
         message_lower = message.lower()
         logger.info(f"handle_completed_lead for {lead.phone}: '{message_lower}'")
@@ -931,8 +931,8 @@ class BotFlowManager:
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.CONSULTING
             # Guardar el cambio de estado - IMPORTANTE
-            from server import db
             await self.save_lead(lead, db)
+            logger.info(f"Lead {lead.phone} changed to CONSULTING state")
             return
         
         # Detectar si es una pregunta (no es saludo ni botón)
