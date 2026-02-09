@@ -111,24 +111,68 @@ export default function Pricing() {
           {Object.entries(plans).map(([planId, plan]) => (
             <Card 
               key={planId} 
-              className={`plan-card ${planId === 'pro' ? 'featured' : ''}`}
+              className={`plan-card ${planId === 'pro' ? 'featured' : ''} ${planId === 'enterprise' ? 'enterprise' : ''}`}
               data-testid={`plan-${planId}`}
             >
               {planId === 'pro' && (
                 <Badge className="plan-badge">Más Popular</Badge>
               )}
+              {planId === 'enterprise' && (
+                <Badge className="plan-badge enterprise-badge">Personalizable</Badge>
+              )}
               <CardHeader>
                 <CardTitle className="plan-name">{plan.name}</CardTitle>
                 <p className="plan-description">{plan.description}</p>
-                <div className="plan-price">
-                  <span className="price-amount">${plan.price}</span>
-                  <span className="price-period">/mes</span>
-                </div>
-                {plan.setup_price && (
-                  <div className="plan-setup">
-                    <span className="setup-label">Setup único:</span>
-                    <span className="setup-price">${plan.setup_price}</span>
-                  </div>
+                
+                {/* Precio dinámico para Enterprise */}
+                {planId === 'enterprise' ? (
+                  <>
+                    <div className="plan-price">
+                      <span className="price-amount">${calculateEnterprisePrice()}</span>
+                      <span className="price-period">/mes</span>
+                    </div>
+                    <div className="plan-setup">
+                      <span className="setup-label">Setup único:</span>
+                      <span className="setup-price">${calculateEnterpriseSetup()}</span>
+                    </div>
+                    <div className="enterprise-selector">
+                      <label>Cantidad de números WhatsApp:</label>
+                      <div className="number-selector">
+                        <button 
+                          className="selector-btn"
+                          onClick={() => setEnterpriseNumbers(Math.max(8, enterpriseNumbers - 1))}
+                          disabled={enterpriseNumbers <= 8}
+                        >
+                          -
+                        </button>
+                        <span className="selector-value">{enterpriseNumbers}</span>
+                        <button 
+                          className="selector-btn"
+                          onClick={() => setEnterpriseNumbers(enterpriseNumbers + 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                      {enterpriseNumbers > 8 && (
+                        <p className="extra-info">
+                          +{enterpriseNumbers - 8} números extra = +${(enterpriseNumbers - 8) * 50}/mes
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="plan-price">
+                      <span className="price-amount">${plan.price}</span>
+                      <span className="price-period">/mes</span>
+                    </div>
+                    {plan.setup_price && (
+                      <div className="plan-setup">
+                        <span className="setup-label">Setup único:</span>
+                        <span className="setup-price">${plan.setup_price}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardHeader>
               <CardContent>
@@ -145,7 +189,7 @@ export default function Pricing() {
                   onClick={() => handleSelectPlan(planId)}
                   data-testid={`btn-select-${planId}`}
                 >
-                  {planId === 'agency' ? 'Contactar Ventas' : 'Comenzar Ahora'}
+                  Comenzar Ahora
                 </Button>
               </CardContent>
             </Card>
