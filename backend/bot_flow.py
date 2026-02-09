@@ -1085,8 +1085,9 @@ class BotFlowManager:
         """Maneja consultas generales usando IA"""
         message_lower = message.lower()
         
-        # Si quiere salir del modo consulta
-        if any(k in message_lower for k in ["buscar", "propiedad", "comprar", "alquilar", "invertir", "agendar", "cita"]):
+        # Si explícitamente quiere buscar/agendar (mensajes cortos que son comandos)
+        short_commands = ["buscar propiedad", "quiero buscar", "agendar cita", "nueva búsqueda"]
+        if any(cmd in message_lower for cmd in short_commands) and len(message) < 30:
             lead.flow_stage = FlowStage.WELCOME
             await self.handle_welcome(lead, message)
             return
