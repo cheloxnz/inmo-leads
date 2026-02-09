@@ -98,7 +98,7 @@ class BotFlowManager:
         
         # Lead completado o en handoff que vuelve a escribir
         elif (lead.flow_stage == FlowStage.COMPLETED or lead.flow_stage == FlowStage.HANDOFF or lead.flow_stage == FlowStage.CONFIRMATION) and lead.appointment_datetime:
-            await self.handle_completed_lead(lead, message_text)
+            await self.handle_completed_lead(lead, message_text, db)
         
         # Lead en HANDOFF sin cita - ofrecer ayuda
         elif lead.flow_stage == FlowStage.HANDOFF or lead.flow_stage == FlowStage.CONFIRMATION:
