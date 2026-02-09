@@ -930,6 +930,9 @@ class BotFlowManager:
             response = "¡Claro! Decime tu consulta y te ayudo. 😊"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.CONSULTING
+            # Guardar el cambio de estado - IMPORTANTE
+            from server import db
+            await self.save_lead(lead, db)
             return
         
         # Detectar si es una pregunta (no es saludo ni botón)
