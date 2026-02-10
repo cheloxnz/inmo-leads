@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
-import { Send, History, Users, Filter, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Send, History, Users, Filter, Clock, CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 
 export default function Broadcast() {
   const [message, setMessage] = useState('');
