@@ -9,6 +9,7 @@
 :root {
   --primary: #2563eb;
   --primary-dark: #1e40af;
+  --primary-hover: #1d4ed8;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
@@ -23,6 +24,11 @@
   --border: #e2e8f0;
   --shadow: rgba(0, 0, 0, 0.1);
   --shadow-lg: rgba(0, 0, 0, 0.15);
+}
+
+/* Utility classes for buttons */
+.hover\:bg-primary-dark:hover {
+  background-color: var(--primary-dark) !important;
 }
 
 /* Modo Oscuro */
