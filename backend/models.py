@@ -19,9 +19,14 @@ class PropertyType(str, Enum):
     OTRO = "otro"
 
 class LeadStatus(str, Enum):
+    NEW = "new"
+    CONTACTED = "contacted"
+    QUALIFIED = "qualified"
+    APPOINTMENT = "appointment"
     HOT = "hot"
     WARM = "warm"
     COLD = "cold"
+    COMPLETED = "completed"
     ARCHIVED = "archived"
 
 class FlowStage(str, Enum):
