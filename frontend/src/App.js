@@ -103,6 +103,15 @@ function Navigation() {
             </Link>
 
             <Link
+              to="/kanban"
+              className={`nav-link ${isActive('/kanban') ? 'active' : ''}`}
+              data-testid="nav-kanban"
+            >
+              <span className="icon">📋</span>
+              <span>Pipeline (Kanban)</span>
+            </Link>
+
+            <Link
               to="/calendario"
               className={`nav-link ${isActive('/calendario') ? 'active' : ''}`}
               data-testid="nav-calendar"
