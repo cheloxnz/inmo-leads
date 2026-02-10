@@ -73,55 +73,6 @@ export default function FlowVisualization() {
           </div>
         ))}
       </div>
-      
-      <Card className="tech-info-card">
-        <CardHeader>
-          <CardTitle>Tecnologías Utilizadas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="tech-list">
-            <div className="tech-item">
-              <div className="tech-icon">📱</div>
-              <div>
-                <h4>WhatsApp Cloud API</h4>
-                <p>Comunicación directa con clientes vía WhatsApp Business</p>
-              </div>
-            </div>
-            
-            <div className="tech-item">
-              <div className="tech-icon">🧠</div>
-              <div>
-                <h4>OpenAI GPT-4o</h4>
-                <p>Procesamiento de lenguaje natural para entender respuestas libres</p>
-              </div>
-            </div>
-            
-            <div className="tech-item">
-              <div className="tech-icon">📊</div>
-              <div>
-                <h4>Scoring Engine</h4>
-                <p>Algoritmo propietario de calificación automática</p>
-              </div>
-            </div>
-            
-            <div className="tech-item">
-              <div className="tech-icon">📅</div>
-              <div>
-                <h4>Google Calendar</h4>
-                <p>Agendamiento automático de visitas y llamadas</p>
-              </div>
-            </div>
-            
-            <div className="tech-item">
-              <div className="tech-icon">📋</div>
-              <div>
-                <h4>Google Sheets</h4>
-                <p>CRM mínimo viable para gestión de leads</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
