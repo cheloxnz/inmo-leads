@@ -1172,3 +1172,79 @@ class BotFlowManager:
             response = "Disculpá, no pude procesar tu consulta. ¿Querés que te conecte con un asesor?"
         
         self.wa.send_text_message(lead.phone, response)
+
+
+    async def handle_nps_response(self, lead: Lead, message: str, db):
+        """Maneja respuesta de encuesta NPS"""
+        score_map = {
+            "nps_9_10": {"score": 10, "category": "promoter"},
+            "nps_7_8": {"score": 8, "category": "passive"},
+            "nps_1_6": {"score": 5, "category": "detractor"}
+        }
+        
+        nps_data = score_map.get(message.lower(), {"score": 0, "category": "unknown"})
+        
+        # Guardar respuesta NPS
+        await db.leads.update_one(
+            {"phone": lead.phone},
+            {"$set": {
+                "nps_score": nps_data["score"],
+                "nps_category": nps_data["category"],
+                "nps_responded_at": datetime.utcnow().isoformat()
+            }}
+        )
+        
+        # Guardar en colección de NPS para métricas
+        await db.nps_responses.insert_one({
+            "lead_phone": lead.phone,
+            "lead_name": lead.name,
+            "score": nps_data["score"],
+            "category": nps_data["category"],
+            "created_at": datetime.utcnow()
+        })
+        
+        if nps_data["category"] == "promoter":
+            response = f"¡Muchísimas gracias {lead.name or ''}! 🙏💙\n\n"
+            response += "Nos alegra mucho que hayas tenido una buena experiencia.\n\n"
+            response += "Si conocés a alguien que esté buscando propiedad, ¡no dudes en recomendarnos!"
+        elif nps_data["category"] == "passive":
+            response = f"¡Gracias por tu feedback {lead.name or ''}! 🙏\n\n"
+            response += "¿Hay algo que podríamos haber hecho mejor? Tu opinión nos ayuda a mejorar."
+        else:
+            response = f"Gracias por tu honestidad {lead.name or ''}. 🙏\n\n"
+            response += "Lamentamos que la experiencia no haya sido la mejor. ¿Podrías contarnos qué podríamos mejorar?\n\n"
+            response += "Tu feedback es muy importante para nosotros."
+        
+        self.wa.send_text_message(lead.phone, response)
+        logger.info(f"NPS response recorded for {lead.phone}: {nps_data['category']}")
+
+    async def send_property_location(self, lead: Lead):
+        """Envía ubicación de la propiedad"""
+        # Por ahora usa una ubicación de ejemplo
+        # En producción, se obtendría de la propiedad asociada al lead
+        
+        # Ubicación de ejemplo (Buenos Aires centro)
+        latitude = -34.6037
+        longitude = -58.3816
+        name = "Propiedad - InmoBot"
+        address = "Buenos Aires, Argentina"
+        
+        # Verificar si el lead tiene una propiedad asociada con ubicación
+        # Esto se puede expandir para obtener la ubicación real
+        
+        message = "📍 Aquí te comparto la ubicación de la propiedad:\n\n"
+        message += f"📌 {address}\n\n"
+        message += "También podés buscarla en Google Maps."
+        
+        # Enviar mensaje de texto primero
+        self.wa.send_text_message(lead.phone, message)
+        
+        # Enviar ubicación (si el servicio lo soporta)
+        try:
+            self.wa.send_location(lead.phone, latitude, longitude, name, address)
+            logger.info(f"Location sent to {lead.phone}")
+        except Exception as e:
+            logger.warning(f"Could not send location to {lead.phone}: {e}")
+            # Enviar link de Google Maps como fallback
+            maps_link = f"https://www.google.com/maps?q={latitude},{longitude}"
+            self.wa.send_text_message(lead.phone, f"🗺️ Ver en Google Maps: {maps_link}")
