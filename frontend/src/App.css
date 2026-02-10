@@ -3909,6 +3909,7 @@ body {
   padding: 2rem 1.5rem;
   min-height: calc(100vh - 60px);
   background: var(--bg-secondary);
+  overflow: hidden;
 }
 
 .kanban-header {
@@ -3931,12 +3932,15 @@ body {
   display: flex;
   gap: 1rem;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 1rem;
   min-height: 70vh;
+  max-width: 100%;
 }
 
 .kanban-column {
-  flex: 0 0 280px;
+  flex: 0 0 260px;
+  min-width: 260px;
   background: var(--bg-primary);
   border-radius: 12px;
   border: 1px solid var(--border);
