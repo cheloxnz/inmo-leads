@@ -54,6 +54,48 @@ class BotFlowManager:
         
         # PRIMERO: Procesar estados de flujo activos (tienen prioridad)
         
+        # Respuestas a recordatorio de cita
+        if "confirmar_cita" in message_text.lower():
+            response = "¡Perfecto! ✅ Tu cita está confirmada. ¡Te esperamos!"
+            self.wa.send_text_message(lead.phone, response)
+            await db.leads.update_one(
+                {"phone": lead.phone},
+                {"$set": {"appointment_confirmed": True}}
+            )
+            return
+        
+        # Respuestas a follow-up post-visita
+        if "follow_up_interesado" in message_text.lower():
+            response = "¡Qué bueno! 🏠 ¿Querés que te enviemos más opciones similares o preferís agendar otra visita?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "mas_opciones", "title": "📋 Más opciones"}},
+                {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "📅 Agendar visita"}}
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            return
+        
+        if "follow_up_otra_visita" in message_text.lower():
+            response = "¡Perfecto! Vamos a agendar otra visita. 📅\n\n¿Qué día te viene mejor?"
+            lead.flow_stage = FlowStage.RESCHEDULE_DAY
+            await self.save_lead(lead, db)
+            self.wa.send_text_message(lead.phone, response)
+            return
+        
+        if "follow_up_no_gracias" in message_text.lower():
+            response = f"¡Entendido {lead.name or ''}! Gracias por tu tiempo. 🙏\n\nCualquier cosa que necesites en el futuro, escribinos. ¡Éxitos! 🏠"
+            self.wa.send_text_message(lead.phone, response)
+            return
+        
+        # Respuestas a encuesta NPS
+        if message_text.lower().startswith("nps_"):
+            await self.handle_nps_response(lead, message_text, db)
+            return
+        
+        # Solicitud de ubicación
+        if "enviar_ubicacion" in message_text.lower() or "ubicacion" in message_text.lower() or "direccion" in message_text.lower():
+            await self.send_property_location(lead)
+            return
+        
         # Estados de cancelación - verificar que el mensaje sea una respuesta válida
         if lead.flow_stage == FlowStage.CANCEL_CONFIRM:
             # Si es un saludo o mensaje no relacionado, mostrar opciones de nuevo
