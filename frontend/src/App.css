@@ -31,6 +31,20 @@
   background-color: var(--primary-dark) !important;
 }
 
+/* Button hover improvements */
+button:hover,
+.btn:hover,
+[class*="Button"]:hover {
+  transform: translateY(-1px);
+}
+
+/* Primary button hover - más oscuro y visible */
+button[class*="bg-primary"]:hover,
+.bg-primary:hover {
+  background-color: var(--primary-dark) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
 /* Modo Oscuro */
 [data-theme="dark"] {
   --bg-primary: #0f172a;
