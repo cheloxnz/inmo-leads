@@ -4421,3 +4421,144 @@ body {
     justify-content: center;
   }
 }
+
+
+/* =============================================
+   ROI CALCULATOR STYLES
+   ============================================= */
+.roi-section {
+  margin-top: 2rem;
+}
+
+.roi-calculator-card {
+  max-width: 600px;
+}
+
+.roi-input-section {
+  margin-bottom: 1.5rem;
+}
+
+.roi-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.roi-input {
+  max-width: 200px;
+}
+
+.roi-loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.roi-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.roi-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.roi-column {
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.roi-column h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.roi-without {
+  border-left: 3px solid #ef4444;
+}
+
+.roi-with {
+  border-left: 3px solid #22c55e;
+}
+
+.roi-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.roi-stat:last-child {
+  border-bottom: none;
+}
+
+.roi-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.roi-stat-value {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.roi-stat-value.negative {
+  color: #ef4444;
+}
+
+.roi-stat-value.positive {
+  color: #22c55e;
+}
+
+.roi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.roi-highlight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 8px;
+  color: #22c55e;
+}
+
+.roi-highlight.roi-percent {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.roi-highlight-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.roi-highlight-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .roi-comparison,
+  .roi-summary {
+    grid-template-columns: 1fr;
+  }
+}
