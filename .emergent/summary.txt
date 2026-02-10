@@ -1,191 +1,157 @@
-<analysis>**original_problem_statement:**
-The user requested the development of a comprehensive CRM and lead management platform for a real estate business.
+<analysis>Análisis y resumen del trabajo realizado.
+
+**original_problem_statement:**
+El usuario solicitó inicialmente incrustar un video de demostración en la página . Esta solicitud evolucionó rápidamente hasta convertirse en la creación y configuración completa de una plataforma SaaS (Software as a Service) para inmobiliarias, llamada InmoBot.
 
 **PRODUCT REQUIREMENTS:**
-- ✅ **Authentication:** JWT-based authentication.
-- ✅ **Roles:** Admin and Asesor (Advisor) roles with different permissions.
-- ✅ **Advisor Management:** Full CRUD (Create, Read, Update, Delete) functionality for advisors, including their specialties and zones.
-- ✅ **Lead Assignment:** A hybrid automatic assignment system for incoming leads.
-- ✅ **Dashboards:** Separate, role-specific dashboards for Admins and Advisors.
-- ✅ **Metrics:** Display key performance metrics for each advisor.
-- ✅ **Real-time Notifications:** Web-socket-based notifications for events like new lead assignments.
-- ✅ **WhatsApp Bot:**
-    - Qualify new leads.
-    - Schedule appointments.
-    - Handle appointment rescheduling requests.
-    - Handle appointment cancellation requests.
-    - Send automatic 24-hour appointment reminders.
-    - Respond to basic FAQs (address, hours, etc.).
-    - Handle interactions with leads who already have a scheduled appointment.
+- **Funcionalidad Principal:** Un bot de WhatsApp con IA para calificar leads y agendar citas.
+- **Plataforma:** Un dashboard web para gestionar leads, ver el calendario y configurar el bot.
+- **Branding y Marketing:**
+    - Incrustar video demo.
+    - Mejorar páginas de precios y demo.
+    - Configurar dominio propio ().
+    - Configurar email profesional ().
+    - Crear una landing page en el dominio raíz.
+- **Mejoras de UX/UI:**
+    - Logo en la página de login.
+    - Modo oscuro.
+    - Arreglar bugs visuales (botones, colores de texto).
+- **Funcionalidades Avanzadas (solicitadas posteriormente):**
+    - Email de bienvenida automático tras el pago.
+    - Métricas de uso en el dashboard.
+    - Plan de precios Enterprise con coste dinámico.
+    - Recordatorios de citas, seguimiento post-visita, encuestas NPS.
+    - Vista Kanban, reportes PDF, acciones masivas, y más en el dashboard.
 
-**User's preferred language**: Spanish
+**User's preferred language**: Español. El próximo agente DEBE comunicarse en español.
 
 **what currently exists?**
-A full-stack application with a Python/FastAPI backend and a React frontend. The platform supports JWT authentication with Admin/Advisor roles, CRUD for advisors, role-based dashboards, and a WhatsApp bot integrated via the Meta API for lead qualification and appointment management. It also includes real-time notifications via WebSockets and a scheduler for sending appointment reminders.
+- Una aplicación funcional con un frontend en React y un backend en Flask.
+- Integración completa con la API de WhatsApp, OpenAI (para el bot), Stripe (para pagos) y Resend (para emails transaccionales).
+- Dominio personalizado  configurado con un subdominio  para la aplicación principal, gestionado a través de Cloudflare.
+- Email profesional  capaz de recibir (vía Cloudflare) y enviar (vía Resend) correos.
+- La aplicación cuenta con autenticación de usuarios, un dashboard, y páginas públicas (landing, demo, precios).
+- Se han implementado y corregido numerosas funcionalidades y bugs, incluyendo la lógica del bot, la interfaz de usuario y la configuración del entorno.
 
 **Last working item**:
-- **Last item agent was working:** The agent was debugging a critical bug in the WhatsApp bot's date parsing logic. The user reported that when providing a date like Jueves 12, the bot misinterpreted it and scheduled the appointment for the wrong day (mañana viernes 6). The agent was investigating the  function in .
+- **Last item agent was working:** El agente estaba en medio de una fase de desarrollo masiva para implementar un conjunto de nuevas funcionalidades solicitadas por el usuario. Se inició la creación de la infraestructura para tareas programadas, nuevos modelos de base de datos, nuevos endpoints de API y los componentes de frontend para una vista Kanban.
 - **Status:** IN PROGRESS
 - **Agent Testing Done:** N
-- **Which testing method agent to use?** backend testing agent
+- **Which testing method agent to use?** both. El backend necesita pruebas para los nuevos endpoints y el scheduler. El frontend requiere pruebas para los nuevos componentes de UI como el Kanban, la creación de reportes, etc.
 - **User Testing Done:** N
 
-**All Pending/In progress Issue list**:
-- **Issue 1: (P0) Bot's date parsing for appointments is incorrect.**
-- **Issue 2: (P1) The bot's appointment cancellation flow is unreliable.**
-
-**Issues Detail:**
-- **Issue 1:**
-    - **Description:** The bot fails to correctly parse dates when the user provides them in a DayOfWeek DayOfMonth format (e.g., Jueves 12). This affects both initial appointment scheduling and rescheduling, leading to appointments being booked on incorrect dates.
-    - **Attempted fixes:** The agent identified that the  library was struggling with this format and was planning to modify the logic to handle it.
-    - **Next debug checklist:**
-        1. Open .
-        2. Locate the  function and the handlers that use it (, ).
-        3. Modify the logic to correctly handle inputs containing both the day of the week and the day of the month. This could involve pre-processing the string to remove the day of the week before passing it to .
-        4. Create a test case to verify that inputs like Jueves 12 and Sábado 7 are parsed into the correct future dates.
-    - **Why fix this issue and what will be achieved with the fix?** Accurate appointment scheduling is a core function of the bot. Fixing this will ensure appointments are logged correctly, preventing user frustration and operational errors.
-    - **Status:** IN PROGRESS
-    - **Is recurring issue?** N
-    - **Should Test frontend/backend/both after fix?** backend
-    - **Blocked on other issue:** None
-
-- **Issue 2:**
-    - **Description:** The user has repeatedly reported that the Cancelar cita (Cancel Appointment) flow is buggy. Clicking the button often results in the bot repeating the same question or not responding at all.
-    - **Attempted fixes:** The agent made multiple attempts to fix this by reordering logic, changing button IDs to avoid keyword conflicts, and parsing button IDs instead of titles. The issue seems to be a recurring regression.
-    - **Next debug checklist:**
-        1. Review the state management and conditional logic in the  function within .
-        2. Pay close attention to the transition from a  lead state to the  flow state.
-        3. Ensure the  conditions correctly use the button's uid=0(root) gid=0(root) groups=0(root) (e.g., ) and that the  is updated and saved to the database correctly within the same transaction.
-    - **Why fix this issue and what will be achieved with the fix?** Users must be able to manage their appointments reliably. A broken cancellation flow leads to a poor customer experience.
-    - **Status:** IN PROGRESS
-    - **Is recurring issue?** Y
-    - **Should Test frontend/backend/both after fix?** backend
-    - **Blocked on other issue:** None
-
 **In progress Task List**:
-- No tasks are in progress; the current focus is on bug fixing.
+- **Task 1: Implementar suite de nuevas funcionalidades** (P0 - HIGHEST PRIORITY)
+    - **Descripción**: El usuario solicitó un gran número de mejoras para el bot y el dashboard. El agente ha comenzado el trabajo sentando las bases en el backend y frontend.
+    - **Where to resume**: El agente ya creó los archivos , nuevos modelos en , nuevos endpoints en , y el componente . El siguiente paso es completar la implementación de toda esta nueva infraestructura:
+        1.  Finalizar el componente  y su lógica de arrastrar y soltar.
+        2.  Integrar el Kanban en el dashboard principal.
+        3.  Implementar la lógica de los nuevos endpoints (generación de PDF, acciones en masa, etc.).
+        4.  Completar el  para que envíe recordatorios y seguimientos.
+        5.  Integrar todas las nuevas funcionalidades en la interfaz de usuario.
+    - **What will be achieved with this?**: El producto se convertirá en una plataforma mucho más robusta y comercializable, con automatizaciones clave y herramientas de gestión avanzadas que justifican los planes de precios.
+    - **Status:** IN PROGRESS
+    - **Should Test frontend/backend/both after fix?**: both
+    - **Blocked on something**: No.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks (Bot):**
-    - P1: Implement transcription of voice messages to process audio inputs.
-    - P2: Implement urgency detection (e.g., for URGENTE) to notify advisors immediately.
-- **Upcoming Tasks (Dashboard):**
-    - P0: Display the WhatsApp conversation history within the lead detail view.
-    - P1: Create a visual calendar view for all appointments.
-    - P1: Add a feature to export leads to an Excel/CSV file.
-    - P1: Implement advanced filters for the leads list (e.g., by date, zone, status).
+- **Upcoming Tasks (parte del sprint actual, en orden de prioridad):**
+    1.  **P0: Finalizar Tareas Programadas (Backend):**
+        -   : Implementar la lógica para enviar recordatorios 24h antes de la cita y mensajes de seguimiento 48h después.
+    2.  **P1: Finalizar Mejoras del Bot (Backend):**
+        -   : Implementar la lógica para compartir ubicación de propiedades y gestionar encuestas NPS.
+    3.  **P2: Finalizar Mejoras del Dashboard (Frontend/Backend):**
+        -   **Vista Kanban:** Terminar  e integrarlo.
+        -   **Acciones Masivas:** Añadir UI en la lista de leads y lógica en el endpoint .
+        -   **Reportes PDF:** Implementar la generación de PDF con  en el endpoint .
+        -   **Historial de Auditoría:** Registrar acciones importantes en el  y crear una UI para visualizarlo.
+        -   **Mensajes Broadcast:** Crear UI para gestionar campañas y backend para enviarlas.
+        -   **Calculadora de ROI:** Añadir un componente simple en el dashboard.
 - **Future Tasks:**
-    - Implement sending property images/catalogs from the bot.
-    - Add graphs for advanced metrics on the dashboards.
-    - Allow manual reassignment of leads between advisors.
-    - Add timestamps and author names to notes on leads.
-    - Implement audible notifications in the frontend for new high-priority leads.
+    - **Alertas en el navegador (Push Notifications):** Solicitado por el usuario pero pospuesto por su complejidad.
 
 **Completed work in this session**
-- **Full-Stack Application Development:**
-  - Implemented JWT Authentication with Admin/Asesor roles.
-  - Built a full suite of APIs for managing Advisors, Leads, and Metrics.
-  - Developed a multi-step WhatsApp bot for lead qualification, scheduling, rescheduling, cancellation, and FAQs ().
-  - Created a real-time notification system using WebSockets ().
-  - Set up a scheduler for sending 24-hour appointment reminders via WhatsApp ().
-  - Built a role-based React frontend with dashboards for Admins and Advisors ().
-  - Created static pages for Privacy Policy, Terms, and Data Deletion to meet Meta's requirements ().
-- **Recently completed:**
-  - **Bug Fix (Authentication):** Resolved a recurring login error by making the frontend's backend URL dynamic (), preventing it from being overwritten during redeploys.
-  - **Bot Improvements:** Implemented flows for handling messages from leads with existing appointments, answering FAQs, and sending 24h reminders.
-  - **Deployment Hell:** Solved a complex series of deployment and configuration issues related to the Meta WhatsApp API, including expired tokens, incorrect webhook URLs, and setting the Meta App to Live mode. The critical fix was guiding the user to update the  as an environment variable directly on the Emergent platform.
-
-**Earlier issues found/mentioned but not fixed**
-- Covered in the **All Pending/In progress Issue list**. The main unfixed issues are the bot's date parsing and cancellation flow.
-
-**Known issue recurrence from previous fork**
-- N/A
+- **Configuración de Plataforma y Dominio:**
+    - Configuración de dominio propio () y subdominio .
+    - Configuración de email profesional () con Cloudflare (recepción) y Resend (envío).
+    - Creación de una Landing Page en el dominio raíz con redirección desde Cloudflare.
+- **Mejoras de UI/UX:**
+    - Incrustación de video en la página de demo.
+    - Diseño del logo en la página de login (centrado y redondeado).
+    - Implementación de **Modo Oscuro** con un interruptor.
+    - Mejora de la página de precios: se corrigieron textos y se añadió un plan Enterprise con precios dinámicos.
+    - Se eliminó el enlace de Documentación del menú.
+- **Nuevas Funcionalidades:**
+    - Implementación de **email de bienvenida automático** al recibir un pago por Stripe.
+    - Añadida tarjeta de métricas de mensajes en el dashboard.
+- **Corrección de Bugs Críticos:**
+    - **CORS Error:** Solucionado al configurar la variable de entorno  en el panel del deployment de producción.
+    - **Lógica del Bot:**
+        - Corregido el flujo para que el bot use GPT-4 para consultas abiertas, incluso si el lead ya tiene una cita.
+        - Corregido el bucle de conversación donde el bot no reconocía una despedida (gracias).
+        - Corregido el manejo de citas pasadas para ofrecer reagendar.
+    - **Notificaciones:** Solucionado el bug que mostraba notificaciones (visuales y sonoras) en páginas públicas a usuarios no autenticados.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend:** FastAPI (Python), SQLAlchemy (PostgreSQL), JWT Authentication, WebSockets, APScheduler.
-- **Frontend:** React, React Router, Context API, Axios.
-- **APIs / Integrations:** Meta for Developers (WhatsApp Business API).
-- **Deployment:** Emergent Platform with Supervisor.
+- **Frontend:** React, React Router, Axios, Shadcn UI
+- **Backend:** Flask, SQLAlchemy, MongoDB
+- **Integraciones:** WhatsApp Cloud API, OpenAI API, Stripe, Resend (Email SMTP), Cloudflare (DNS, Email Routing, Redirects)
+- **Despliegue:** Plataforma Emergent, sirviendo un build de producción de React.
 
 **key DB schema**
-- **User:** 
-- **Agent:** 
-- **Lead:** 
-- **Message:** 
-
-**changes in tech stack**
-- None.
+- : { name, phone, status, flow_stage, conversation_history, appointment_datetime }
+- : { username, password_hash }
+-  (nuevo): { name, content, status, scheduled_at }
+-  (nuevo): { user_id, action, timestamp, details }
+-  (nuevo): { lead_id, score, comment }
 
 **All files of reference**
-- : The location of the current critical bugs related to date parsing and conversation flow.
-- : The main entry point for the backend application.
-- : Contains the logic for authentication and the dynamic backend URL.
--  (backend & frontend): Historically a source of deployment issues. The  is managed as a secret on the Emergent platform.
-
-**Areas that need refactoring**:
-- : The  function is a large, complex series of  statements that is becoming difficult to maintain and debug. It should be refactored into a more robust state machine pattern to improve readability and reduce the chance of regressions.
-
-**key api endpoints**
-- : User login.
-- : Get current user details.
-- : Manage advisors.
-- : Manage leads.
-- : Receives messages from the WhatsApp API.
-- : Real-time notification WebSocket.
+- **Nuevos o muy modificados:**
+    - : Creado para manejar tareas en segundo plano.
+    - : Extensamente modificado con nuevos endpoints.
+    - : Extensamente modificado para nueva lógica del bot.
+    - : Modificado para incluir nuevos modelos (AuditLog, Broadcast, etc.).
+    - : Reescrito para incluir el plan dinámico Enterprise.
+    - : Modificado para un enrutamiento público/privado y el proveedor de tema (modo oscuro).
+    - : Nuevo archivo para la página de inicio.
+    - : Nuevo archivo (en progreso) para la vista Kanban.
+    - : Se añadió .
 
 **Critical Info for New Agent**
-- **Environment Variables are CRITICAL:** The project has a history of production failures caused by incorrect environment variables, especially . This variable is NOT deployed from the  file; the user must configure it directly in the Emergent platform's Environment Variables or Secrets section for the production app.
-- **Bot Logic is Fragile:** The conversation flow logic in  is complex and prone to regressions. Changes to the state machine (e.g., cancellation or rescheduling) must be tested thoroughly with multiple edge cases to avoid breaking the user experience.
-- **Meta Configuration:** The bot's ability to function depends entirely on the correct setup in Meta for Developers. If the bot stops working, first check the webhook URL, token permissions, and app status (Live) in the Meta dashboard before debugging the code.
-
-**documents and test reports created in this job**
-- 
-- 
-- 
+- **El DNS se gestiona en Cloudflare, NO en GoDaddy.** Cualquier registro nuevo (para servicios como Resend) debe agregarse en Cloudflare.
+- **La variable de entorno  en el panel del DEPLOYMENT (producción) es CRÍTICA.** Debe apuntar a la URL pública final () para evitar errores de CORS. Esto es independiente de la configuración del entorno de desarrollo.
+- El entorno de desarrollo local presenta inestabilidad (Maximum call stack size exceeded). El agente anterior confirmó que los builds de producción () funcionan correctamente. La configuración de  ya está ajustada para servir el build de producción.
+- El usuario es muy proactivo y tiene una visión clara del producto SaaS que quiere construir. Las solicitudes de nuevas funcionalidades son grandes y deben abordarse de manera estructurada, como lo estaba haciendo el agente anterior.
+- El modelo de negocio para múltiples clientes se basa en **hacer Fork del task actual** para crear una instancia y un deployment independiente para cada nuevo cliente.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **perfecto ahora si.. que otras mejoras propones ?**: Confirmed a fix and asked for new features. (Addressed)
-2.  **hagamos las mejoras para el bot, las 3 primeras. luego la de preguntas frecuentes**: Requested 4 bot improvements. (Completed)
-3.  **otra vez error de autenticación da al querer loguearme**: Reported login error. (Fixed)
-4.  **si no decime que url va y la cambio en el .env**: Asked for backend URL. (Addressed)
-5.  **hay algun bug, porque puse cualquier cosa... elegi Tengo una consulta, pero me vuelve a preguntar lo mismo**: Reported bug in consulta flow. (Fixed)
-6.  **falta el flujo, al dale a Cancelar cita... sigue preguntando lo mismo**: Reported bug in cancellation flow. (Attempted fix)
-- **no, el botón cancelar cita no hace nada...**: Confirmed cancellation fix failed. (Attempted fix)
-- **no, sigue sin funcionar...**: Confirmed second cancellation fix failed. (Attempted fix)
-- **sigue igual, no hace nada al darle a cancelar cita**: Confirmed third cancellation fix failed. (Attempted fix)
-- **pasa esto, le dije Hola y me envio No entendí tu respuesta...**: Described buggy state in cancellation flow. (Addressed)
-10. **otra vez está fallando el bot en el flujo, cuando pregunta que día te viene bien... le dije Jueves 12 y me tomó la cita para mañana viernes 6**: **LATEST PENDING MESSAGE**. Reported the critical date-parsing bug. This is the highest priority issue.
-
-**Project Health Check:**
-- **Broken:**
-    - Bot's natural language date parsing for appointments.
-    - Bot's appointment cancellation conversational flow.
+10. : Reporta un bug en la lógica del bot con una captura de pantalla.
+9.  : Reporta que el fix anterior no funcionó y el bot reinicia el flujo.
+8.  : Reporta un nuevo bug con el sonido de las notificaciones y un bucle en la conversación.
+7.  : Pide actualizar la página de demo.
+6.  : Pide sugerencias para futuras funcionalidades.
+5.  : Solicita la implementación de una larga lista de nuevas funcionalidades.
+4.  : Da luz verde para implementar todas las funcionalidades solicitadas.
+3.  : Reporta 3 bugs simultáneamente sobre notificaciones, citas pasadas y la falta de respuesta de GPT.
+2.  : Proporciona una captura de pantalla que muestra notificaciones en una página pública.
+1.  : Pide guiones de venta para contactar a sus primeros clientes.
 
 **3rd Party Integrations**
-- **Meta (WhatsApp Business API)**: Handles all chatbot communication. Requires a User-provided permanent access token configured as a secret on the deployment platform.
-- **dateparser (Python library)**: Used for parsing dates from natural language text.
+- **OpenAI GPT-4:** Para las respuestas inteligentes del bot (usa Emergent LLM Key).
+- **Meta WhatsApp Cloud API:** Para la comunicación del bot (requiere User API Key).
+- **Stripe:** Para procesar pagos (requiere User API Key).
+- **Resend:** Para enviar emails transaccionales (SMTP) (requiere User API Key).
+- **Cloudflare:** Para gestión de DNS, redirecciones y routing de email (configurado por el usuario).
+- **GoDaddy:** Solo para el registro del dominio (configurado por el usuario).
 
 **Testing status**
-- **Testing agent used after significant changes:** YES
+- **Testing agent used after significant changes:** NO
 - **Troubleshoot agent used after agent stuck in loop:** NO
-- **Test files created:** None
-- **Known regressions:**
-    - The bot's cancellation and rescheduling flows have repeatedly broken after fixes were applied, indicating a fragile implementation.
-    - The login functionality broke multiple times due to deployment issues with environment variables.
-
-**Credentials to test flow:**
-- **Admin:**
-  - Email: 
-  - Password: 
-- **Asesor 1:**
-  - Email: 
-  - Password: 
-- **Asesor 2:**
-  - Email: 
-  - Password: 
+- **Test files created:**  (plantilla de CRM para el usuario).
+- **Known regressions:** Ninguna conocida, pero el riesgo es alto debido a la cantidad de nuevas funcionalidades en desarrollo.
 
 **What agent forgot to execute**
-- The agent has not implemented any automated tests (unit or integration) for the bot's conversational logic in . Given the high frequency of regressions in this file, creating a test suite is crucial to ensure stability.</analysis>
+- El agente pospuso la implementación de Alertas en el navegador (Push Notifications) debido a su complejidad, lo cual fue una decisión razonable. Por lo demás, el agente ha sido extremadamente exhaustivo en abordar todas las solicitudes y problemas del usuario.</analysis>
