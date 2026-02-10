@@ -127,20 +127,24 @@ class ScheduledTasks:
                 await asyncio.sleep(3600)
     
     async def check_warm_lead_reactivation(self):
-        """Revisa leads tibios sin actividad y envía reactivación"""
+        """Revisa leads tibios sin actividad y envía reactivación (máximo 1 email cada 7 días por lead)"""
         while self.running:
             try:
                 config = await self.db.bot_config.find_one({})
-                reactivation_days = config.get('warm_lead_reactivation_days', 3) if config else 3
+                # Días sin actividad antes de enviar reactivación (default: 7 días)
+                reactivation_days = config.get('warm_lead_reactivation_days', 7) if config else 7
                 
                 cutoff_date = (datetime.utcnow() - timedelta(days=reactivation_days)).isoformat()
+                # Mínimo 7 días entre emails de reactivación
+                min_days_between_emails = (datetime.utcnow() - timedelta(days=7)).isoformat()
                 
                 leads = await self.db.leads.find({
                     "status": "warm",
                     "last_message_at": {"$lt": cutoff_date},
                     "$or": [
                         {"last_reactivation_email_at": {"$exists": False}},
-                        {"last_reactivation_email_at": {"$lt": cutoff_date}}
+                        {"last_reactivation_email_at": None},
+                        {"last_reactivation_email_at": {"$lt": min_days_between_emails}}
                     ]
                 }, {
                     "_id": 0,
@@ -163,11 +167,12 @@ class ScheduledTasks:
                     except Exception as e:
                         logger.error(f"Error enviando reactivación para {lead['phone']}: {str(e)}")
                 
-                await asyncio.sleep(7200)
+                # Revisar cada 12 horas (antes era 2 horas - muy frecuente)
+                await asyncio.sleep(43200)
             
             except Exception as e:
                 logger.error(f"Error en check_warm_lead_reactivation: {str(e)}")
-                await asyncio.sleep(7200)
+                await asyncio.sleep(43200)
     
     async def stop(self):
         """Detiene las tareas programadas"""
