@@ -22,7 +22,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import LandingPage from './pages/LandingPage';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
