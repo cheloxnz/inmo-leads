@@ -106,6 +106,23 @@ class WhatsAppService:
         
         return self._send_request(payload)
     
+    def send_location(self, recipient_phone: str, latitude: float, longitude: float, name: str = "", address: str = "") -> Dict:
+        """Envía ubicación"""
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient_phone,
+            "type": "location",
+            "location": {
+                "latitude": latitude,
+                "longitude": longitude,
+                "name": name,
+                "address": address
+            }
+        }
+        
+        return self._send_request(payload)
+    
     def send_list_message(self, recipient_phone: str, body_text: str, button_text: str, sections: List[Dict], header_text: Optional[str] = None, footer_text: Optional[str] = None) -> Dict:
         """Envía mensaje con lista interactiva"""
         interactive = {
