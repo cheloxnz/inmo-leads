@@ -1,11 +1,12 @@
 from fastapi import FastAPI, APIRouter, Request, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import json
+import io
 from pathlib import Path
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
@@ -28,6 +29,7 @@ from auth_routes import router as auth_router, get_current_user, require_admin
 from assignment import AssignmentEngine
 from audio_service import AudioTranscriptionService
 from payment_service import PaymentService, SUBSCRIPTION_PLANS
+from scheduled_messages import ScheduledMessagesService, BroadcastService
 from resend_service import send_welcome_email
 
 ROOT_DIR = Path(__file__).parent
