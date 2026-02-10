@@ -33,16 +33,26 @@
 
 /* Button hover improvements */
 button:hover,
-.btn:hover,
-[class*="Button"]:hover {
-  transform: translateY(-1px);
+.btn:hover {
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
 }
 
-/* Primary button hover - más oscuro y visible */
+/* Primary button hover - más brillante y visible */
 button[class*="bg-primary"]:hover,
-.bg-primary:hover {
-  background-color: var(--primary-dark) !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+.bg-primary:hover,
+button.bg-primary:hover {
+  background-color: #3b82f6 !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Dark background button hover - efecto de brillo */
+.landing-hero button:hover,
+.cta-section button:hover,
+.demo-cta button:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
 }
 
 /* Modo Oscuro */
