@@ -5,6 +5,7 @@ import {
   MessageSquare, Bot, Calendar, BarChart3, 
   Zap, Clock, CheckCircle, ArrowRight, Play
 } from 'lucide-react';
+import PublicROICalculator from '../components/PublicROICalculator';
 
 export default function LandingPage() {
   const navigate = useNavigate();
