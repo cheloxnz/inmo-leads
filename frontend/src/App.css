@@ -98,6 +98,35 @@ body {
   position: fixed;
   height: 100vh;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
+  transition: width 0.3s ease;
+  z-index: 1000;
+}
+
+.nav-sidebar.collapsed {
+  width: 70px;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  right: -12px;
+  top: 70px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--bg-primary);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  transition: all 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background: var(--primary-hover);
+  transform: scale(1.1);
 }
 
 .nav-logo {
