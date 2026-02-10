@@ -159,6 +159,26 @@ function Navigation() {
               <span className="icon">👔</span>
               {!isCollapsed && <span>Gestión Asesores</span>}
             </Link>
+
+            <Link
+              to="/broadcast"
+              className={`nav-link ${isActive('/broadcast') ? 'active' : ''}`}
+              data-testid="nav-broadcast"
+              title="Mensajes Masivos"
+            >
+              <span className="icon">📢</span>
+              {!isCollapsed && <span>Broadcast</span>}
+            </Link>
+
+            <Link
+              to="/auditoria"
+              className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
+              data-testid="nav-audit"
+              title="Historial de Auditoría"
+            >
+              <span className="icon">📜</span>
+              {!isCollapsed && <span>Auditoría</span>}
+            </Link>
           </>
         ) : (
           <>
