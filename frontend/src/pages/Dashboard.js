@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MetricsCharts from '../components/MetricsCharts';
+import ROICalculator from '../components/ROICalculator';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
