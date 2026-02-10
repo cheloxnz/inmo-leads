@@ -107,6 +107,60 @@ export default function Leads({ filterByAgent = null }) {
     setSearchDateFrom('');
     setSearchDateTo('');
   };
+
+  // Bulk Actions
+  const toggleSelectLead = (phone) => {
+    setSelectedLeads(prev => 
+      prev.includes(phone) 
+        ? prev.filter(p => p !== phone)
+        : [...prev, phone]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeads.length === filteredLeads.length) {
+      setSelectedLeads([]);
+    } else {
+      setSelectedLeads(filteredLeads.map(l => l.phone));
+    }
+  };
+
+  const executeBulkAction = async () => {
+    if (!bulkAction || selectedLeads.length === 0) {
+      toast.error('Seleccioná una acción y al menos un lead');
+      return;
+    }
+
+    if ((bulkAction === 'tag' || bulkAction === 'assign' || bulkAction === 'status') && !bulkValue) {
+      toast.error('Ingresá un valor para la acción');
+      return;
+    }
+
+    if (bulkAction === 'delete') {
+      const confirmed = window.confirm(`¿Estás seguro de eliminar ${selectedLeads.length} leads? Esta acción no se puede deshacer.`);
+      if (!confirmed) return;
+    }
+
+    setProcessingBulk(true);
+    try {
+      const response = await axios.post(`${API}/leads/bulk-action`, {
+        lead_phones: selectedLeads,
+        action: bulkAction,
+        value: bulkValue || null
+      });
+
+      toast.success(`Acción ejecutada: ${response.data.updated_count} leads actualizados`);
+      setSelectedLeads([]);
+      setBulkAction('');
+      setBulkValue('');
+      fetchLeads();
+    } catch (error) {
+      console.error('Error executing bulk action:', error);
+      toast.error('Error ejecutando acción masiva');
+    } finally {
+      setProcessingBulk(false);
+    }
+  };
   
   const exportToCSV = () => {
     try {
