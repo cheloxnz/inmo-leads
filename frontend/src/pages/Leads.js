@@ -236,10 +236,99 @@ export default function Leads({ filterByAgent = null }) {
           <h1>Leads</h1>
           <p className="subtitle">Gestión y seguimiento de contactos</p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" data-testid="btn-export-csv">
-          📥 Exportar CSV ({filteredLeads.length})
-        </Button>
+        <div className="header-actions">
+          <Button onClick={fetchLeads} variant="ghost" size="sm" data-testid="btn-refresh">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Button onClick={exportToCSV} variant="outline" data-testid="btn-export-csv">
+            📥 Exportar CSV ({filteredLeads.length})
+          </Button>
+        </div>
       </header>
+
+      {/* Bulk Actions Panel */}
+      {selectedLeads.length > 0 && (
+        <Card className="bulk-actions-panel" data-testid="bulk-actions-panel">
+          <CardContent className="bulk-actions-content">
+            <div className="bulk-selection-info">
+              <Checkbox 
+                checked={selectedLeads.length === filteredLeads.length}
+                onCheckedChange={toggleSelectAll}
+                data-testid="checkbox-select-all"
+              />
+              <span>{selectedLeads.length} leads seleccionados</span>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedLeads([])}>
+                Deseleccionar
+              </Button>
+            </div>
+            
+            <div className="bulk-actions-form">
+              <Select value={bulkAction} onValueChange={setBulkAction}>
+                <SelectTrigger className="w-40" data-testid="select-bulk-action">
+                  <SelectValue placeholder="Acción..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tag"><Tag className="w-4 h-4 inline mr-2" />Agregar Tag</SelectItem>
+                  <SelectItem value="status"><RefreshCw className="w-4 h-4 inline mr-2" />Cambiar Estado</SelectItem>
+                  <SelectItem value="assign"><UserCheck className="w-4 h-4 inline mr-2" />Asignar Asesor</SelectItem>
+                  <SelectItem value="delete"><Trash2 className="w-4 h-4 inline mr-2" />Eliminar</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {bulkAction === 'tag' && (
+                <Input 
+                  placeholder="Nombre del tag..."
+                  value={bulkValue}
+                  onChange={(e) => setBulkValue(e.target.value)}
+                  className="w-40"
+                  data-testid="input-bulk-tag"
+                />
+              )}
+
+              {bulkAction === 'status' && (
+                <Select value={bulkValue} onValueChange={setBulkValue}>
+                  <SelectTrigger className="w-40" data-testid="select-bulk-status">
+                    <SelectValue placeholder="Estado..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new">Nuevo</SelectItem>
+                    <SelectItem value="contacted">Contactado</SelectItem>
+                    <SelectItem value="qualified">Calificado</SelectItem>
+                    <SelectItem value="hot">Caliente</SelectItem>
+                    <SelectItem value="warm">Tibio</SelectItem>
+                    <SelectItem value="cold">Frío</SelectItem>
+                    <SelectItem value="completed">Cerrado</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+
+              {bulkAction === 'assign' && (
+                <Select value={bulkValue} onValueChange={setBulkValue}>
+                  <SelectTrigger className="w-48" data-testid="select-bulk-agent">
+                    <SelectValue placeholder="Asesor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agents.filter(a => a.role !== 'admin').map(agent => (
+                      <SelectItem key={agent.email} value={agent.email}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Button 
+                onClick={executeBulkAction} 
+                disabled={processingBulk || !bulkAction}
+                variant={bulkAction === 'delete' ? 'destructive' : 'default'}
+                data-testid="btn-execute-bulk"
+              >
+                {processingBulk ? 'Procesando...' : 'Ejecutar'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       
       <Card className="filters-card">
         <CardContent>
