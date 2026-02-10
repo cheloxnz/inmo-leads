@@ -88,13 +88,15 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - [x] Página de precios
 - [x] Video demo incrustado
 - [x] Vista Kanban integrada
+- [x] Sidebar colapsable
+- [x] Acciones masivas en leads (UI)
+- [x] Historial de auditoría (UI)
+- [x] Mensajes broadcast (UI)
 
-### P1 (Alto) - En Progreso
-- [ ] Tareas programadas (scheduler) - recordatorios 24h antes, seguimientos 48h después
-- [ ] Acciones masivas en leads (UI)
-- [ ] Historial de auditoría (UI)
-- [ ] Mensajes broadcast
-- [ ] Encuestas NPS
+### P1 (Alto) - Pendiente
+- [ ] Tareas programadas (scheduler) - Testing real con citas
+- [ ] Encuestas NPS en el bot
+- [ ] Seguimiento post-visita automático
 
 ### P2 (Medio) - Futuro
 - [ ] Alertas Push en navegador
