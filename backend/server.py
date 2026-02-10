@@ -1286,51 +1286,6 @@ async def calculate_roi(
     }
 
 
-# ==============================================
-# KANBAN DATA
-# ==============================================
-@api_router.get("/leads/kanban")
-async def get_kanban_data(current_user: User = Depends(get_current_user)):
-    """Obtiene leads organizados para vista Kanban"""
-    pipeline = [
-        {"$group": {
-            "_id": "$status",
-            "leads": {"$push": {
-                "phone": "$phone",
-                "name": "$name",
-                "zone": "$zone",
-                "budget_text": "$budget_text",
-                "score": "$score",
-                "intent": "$intent",
-                "appointment_datetime": "$appointment_datetime",
-                "created_at": "$created_at",
-                "tags": "$tags"
-            }},
-            "count": {"$sum": 1}
-        }},
-        {"$sort": {"_id": 1}}
-    ]
-    
-    results = await db.leads.aggregate(pipeline).to_list(20)
-    
-    # Organizar en columnas del Kanban
-    kanban_columns = {
-        "new": {"title": "Nuevos", "leads": [], "count": 0},
-        "contacted": {"title": "Contactados", "leads": [], "count": 0},
-        "qualified": {"title": "Calificados", "leads": [], "count": 0},
-        "appointment": {"title": "Cita Agendada", "leads": [], "count": 0},
-        "hot": {"title": "Calientes", "leads": [], "count": 0},
-        "completed": {"title": "Cerrados", "leads": [], "count": 0}
-    }
-    
-    for result in results:
-        status = result["_id"] or "new"
-        if status in kanban_columns:
-            kanban_columns[status]["leads"] = result["leads"][:20]  # Limitar a 20 por columna
-            kanban_columns[status]["count"] = result["count"]
-    
-    return kanban_columns
-
 @api_router.put("/leads/{phone}/status")
 async def update_lead_status(
     phone: str,
