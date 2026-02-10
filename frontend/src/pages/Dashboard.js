@@ -222,11 +222,6 @@ export default function Dashboard() {
       
       {/* Gráficos de métricas */}
       <MetricsCharts />
-      
-      {/* Calculadora ROI */}
-      <div className="roi-section">
-        <ROICalculator />
-      </div>
     </div>
   );
 }
