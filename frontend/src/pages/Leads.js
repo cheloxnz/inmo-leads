@@ -404,20 +404,27 @@ export default function Leads({ filterByAgent = null }) {
               filteredLeads.map((lead) => (
                 <Card 
                   key={lead.phone} 
-                  className="lead-card"
-                  onClick={() => navigate(`/leads/${lead.phone}`)}
+                  className={`lead-card ${selectedLeads.includes(lead.phone) ? 'selected' : ''}`}
                   data-testid={`lead-card-${lead.phone}`}
                 >
                   <CardContent className="lead-card-content">
                     <div className="lead-header">
-                      <div>
-                        <h3>{lead.name || 'Sin nombre'}</h3>
-                        <p className="lead-phone">{lead.phone}</p>
+                      <div className="lead-header-left">
+                        <Checkbox 
+                          checked={selectedLeads.includes(lead.phone)}
+                          onCheckedChange={() => toggleSelectLead(lead.phone)}
+                          onClick={(e) => e.stopPropagation()}
+                          data-testid={`checkbox-lead-${lead.phone}`}
+                        />
+                        <div onClick={() => navigate(`/leads/${lead.phone}`)} className="lead-info-clickable">
+                          <h3>{lead.name || 'Sin nombre'}</h3>
+                          <p className="lead-phone">{lead.phone}</p>
+                        </div>
                       </div>
                       {getStatusBadge(lead.status)}
                     </div>
                     
-                    <div className="lead-details">
+                    <div className="lead-details" onClick={() => navigate(`/leads/${lead.phone}`)}>
                       <div className="detail-row">
                         <span className="label">Intención:</span>
                         <span className="value">{lead.intent || 'No definida'}</span>
@@ -453,6 +460,14 @@ export default function Leads({ filterByAgent = null }) {
                       <span className="created-date">
                         Creado: {formatDate(lead.created_at)}
                       </span>
+                      {lead.tags && lead.tags.length > 0 && (
+                        <div className="lead-tags">
+                          {lead.tags.slice(0, 2).map(tag => (
+                            <Badge key={tag} variant="outline" className="tag-badge">{tag}</Badge>
+                          ))}
+                          {lead.tags.length > 2 && <span className="more-tags">+{lead.tags.length - 2}</span>}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
