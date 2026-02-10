@@ -69,17 +69,41 @@ function Navigation() {
   const location = useLocation();
   const { user, logout, isAdmin, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebarCollapsed') === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', isCollapsed);
+  }, [isCollapsed]);
 
   if (!isAuthenticated) return null;
 
   const isActive = (path) => location.pathname === path;
 
+  const toggleSidebar = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
-    <nav className="nav-sidebar">
+    <nav className={`nav-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="nav-logo">
-        <div className="logo-icon">🏠</div>
-        <h1>InmoBot AI</h1>
+        <img 
+          src="/logo192.png" 
+          alt="InmoBot" 
+          className="logo-image"
+        />
+        {!isCollapsed && <h1>InmoBot AI</h1>}
       </div>
+
+      <button 
+        className="sidebar-toggle" 
+        onClick={toggleSidebar}
+        data-testid="btn-toggle-sidebar"
+        title={isCollapsed ? 'Expandir menú' : 'Contraer menú'}
+      >
+        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
 
       <div className="nav-links">
         {isAdmin ? (
@@ -88,45 +112,50 @@ function Navigation() {
               to="/"
               className={`nav-link ${isActive('/') ? 'active' : ''}`}
               data-testid="nav-dashboard"
+              title="Dashboard General"
             >
               <span className="icon">📊</span>
-              <span>Dashboard General</span>
+              {!isCollapsed && <span>Dashboard General</span>}
             </Link>
 
             <Link
               to="/leads"
               className={`nav-link ${isActive('/leads') ? 'active' : ''}`}
               data-testid="nav-leads"
+              title="Todos los Leads"
             >
               <span className="icon">👥</span>
-              <span>Todos los Leads</span>
+              {!isCollapsed && <span>Todos los Leads</span>}
             </Link>
 
             <Link
               to="/kanban"
               className={`nav-link ${isActive('/kanban') ? 'active' : ''}`}
               data-testid="nav-kanban"
+              title="Pipeline (Kanban)"
             >
               <span className="icon">📋</span>
-              <span>Pipeline (Kanban)</span>
+              {!isCollapsed && <span>Pipeline (Kanban)</span>}
             </Link>
 
             <Link
               to="/calendario"
               className={`nav-link ${isActive('/calendario') ? 'active' : ''}`}
               data-testid="nav-calendar"
+              title="Calendario"
             >
               <span className="icon">📅</span>
-              <span>Calendario</span>
+              {!isCollapsed && <span>Calendario</span>}
             </Link>
 
             <Link
               to="/asesores"
               className={`nav-link ${isActive('/asesores') ? 'active' : ''}`}
               data-testid="nav-agents"
+              title="Gestión Asesores"
             >
               <span className="icon">👔</span>
-              <span>Gestión Asesores</span>
+              {!isCollapsed && <span>Gestión Asesores</span>}
             </Link>
           </>
         ) : (
@@ -135,27 +164,30 @@ function Navigation() {
               to="/mi-dashboard"
               className={`nav-link ${isActive('/mi-dashboard') ? 'active' : ''}`}
               data-testid="nav-my-dashboard"
+              title="Mi Dashboard"
             >
               <span className="icon">📊</span>
-              <span>Mi Dashboard</span>
+              {!isCollapsed && <span>Mi Dashboard</span>}
             </Link>
 
             <Link
               to="/my-leads"
               className={`nav-link ${isActive('/my-leads') ? 'active' : ''}`}
               data-testid="nav-my-leads"
+              title="Mis Leads"
             >
               <span className="icon">👥</span>
-              <span>Mis Leads</span>
+              {!isCollapsed && <span>Mis Leads</span>}
             </Link>
 
             <Link
               to="/calendario"
               className={`nav-link ${isActive('/calendario') ? 'active' : ''}`}
               data-testid="nav-calendar-asesor"
+              title="Calendario"
             >
               <span className="icon">📅</span>
-              <span>Calendario</span>
+              {!isCollapsed && <span>Calendario</span>}
             </Link>
           </>
         )}
@@ -164,9 +196,10 @@ function Navigation() {
           to="/flow"
           className={`nav-link ${isActive('/flow') ? 'active' : ''}`}
           data-testid="nav-flow"
+          title="Flujo Bot"
         >
           <span className="icon">🔄</span>
-          <span>Flujo Bot</span>
+          {!isCollapsed && <span>Flujo Bot</span>}
         </Link>
 
         {isAdmin && (
@@ -174,9 +207,10 @@ function Navigation() {
             to="/config"
             className={`nav-link ${isActive('/config') ? 'active' : ''}`}
             data-testid="nav-config"
+            title="Configuración"
           >
             <span className="icon">⚙️</span>
-            <span>Configuración</span>
+            {!isCollapsed && <span>Configuración</span>}
           </Link>
         )}
       </div>
@@ -190,17 +224,24 @@ function Navigation() {
         >
           {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </button>
-        <div className="user-info">
-          <div className="user-avatar">
+        {!isCollapsed && (
+          <div className="user-info">
+            <div className="user-avatar">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div className="user-details">
+              <span className="user-name">{user?.name || 'Usuario'}</span>
+              <span className="user-role">{isAdmin ? 'Administrador' : 'Asesor'}</span>
+            </div>
+          </div>
+        )}
+        {isCollapsed && (
+          <div className="user-avatar-only" title={user?.name || 'Usuario'}>
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </div>
-          <div className="user-details">
-            <span className="user-name">{user?.name || 'Usuario'}</span>
-            <span className="user-role">{isAdmin ? 'Administrador' : 'Asesor'}</span>
-          </div>
-        </div>
-        <button className="logout-btn" onClick={logout} data-testid="btn-logout">
-          Cerrar Sesión
+        )}
+        <button className="logout-btn" onClick={logout} data-testid="btn-logout" title="Cerrar Sesión">
+          {isCollapsed ? '🚪' : 'Cerrar Sesión'}
         </button>
       </div>
     </nav>
