@@ -34,7 +34,15 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-02-10 (Sesión Actual)
+### 2026-02-10 (Sesión Actual - Parte 2)
+- **Mejoras de UI/UX:**
+  - Sidebar colapsable con botón para expandir/contraer
+  - Logo real del InmoBot en el sidebar
+  - Favicon y título de página actualizados
+  - Corrección del Kanban que se superponía con el sidebar
+  - Estado del sidebar persiste en localStorage
+
+### 2026-02-10 (Sesión Actual - Parte 1)
 - **Vista Kanban integrada completamente:**
   - Agregado enlace "Pipeline (Kanban)" en navegación lateral
   - Corregido orden de rutas en backend (/leads/kanban antes de /leads/{phone})
