@@ -221,6 +221,36 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.nav-sidebar.collapsed .nav-footer {
+  padding: 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar-only {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.nav-sidebar.collapsed .logout-btn {
+  padding: 0.5rem;
+  min-width: 36px;
+  justify-content: center;
+}
+
+.nav-sidebar.collapsed .theme-toggle {
+  margin-bottom: 0.5rem;
+}
+
 .status-indicator {
   display: flex;
   align-items: center;
