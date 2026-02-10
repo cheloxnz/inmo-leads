@@ -30,6 +30,7 @@ export default function Leads({ filterByAgent = null }) {
   
   useEffect(() => {
     fetchLeads();
+    fetchAgents();
   }, [filterByAgent]);
   
   useEffect(() => {
@@ -45,6 +46,15 @@ export default function Leads({ filterByAgent = null }) {
       console.error('Error fetching leads:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAgents = async () => {
+    try {
+      const response = await axios.get(`${API}/agents`);
+      setAgents(response.data);
+    } catch (error) {
+      console.error('Error fetching agents:', error);
     }
   };
   
