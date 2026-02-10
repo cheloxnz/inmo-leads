@@ -96,6 +96,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ROI Calculator Section */}
+      <section className="landing-roi-section">
+        <PublicROICalculator />
+      </section>
+
       {/* CTA Section */}
       <section className="landing-cta">
         <h2>¿Listo para automatizar tu inmobiliaria?</h2>
