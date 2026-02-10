@@ -356,6 +356,16 @@ function AppContent() {
               <Configuration />
             </ProtectedRoute>
           } />
+          <Route path="/broadcast" element={
+            <ProtectedRoute adminOnly>
+              <Broadcast />
+            </ProtectedRoute>
+          } />
+          <Route path="/auditoria" element={
+            <ProtectedRoute adminOnly>
+              <AuditLog />
+            </ProtectedRoute>
+          } />
           <Route path="/calendario" element={
             <ProtectedRoute>
               <Calendar />
