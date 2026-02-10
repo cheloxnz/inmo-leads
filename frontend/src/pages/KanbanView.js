@@ -16,6 +16,8 @@ const statusColors = {
   qualified: { bg: '#dbeafe', border: '#3b82f6', text: '#1d4ed8' },
   appointment: { bg: '#f3e8ff', border: '#a855f7', text: '#7c3aed' },
   hot: { bg: '#fee2e2', border: '#ef4444', text: '#dc2626' },
+  warm: { bg: '#fef3c7', border: '#f59e0b', text: '#b45309' },
+  cold: { bg: '#e0f7fa', border: '#06b6d4', text: '#0891b2' },
   completed: { bg: '#dcfce7', border: '#22c55e', text: '#16a34a' }
 };
 
