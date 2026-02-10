@@ -39,10 +39,9 @@ export default function ROICalculator() {
 
   const formatPercent = (value) => {
     return new Intl.NumberFormat('es-AR', {
-      style: 'percent',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(value / 100);
+    }).format(value) + '%';
   };
 
   return (
@@ -78,28 +77,36 @@ export default function ROICalculator() {
               <div className="roi-column roi-without">
                 <h4>Sin InmoBot</h4>
                 <div className="roi-stat">
-                  <span className="roi-stat-label">Costo mensual</span>
-                  <span className="roi-stat-value negative">
-                    {formatCurrency(roiData.without_bot.monthly_cost)}
-                  </span>
+                  <span className="roi-stat-label">Tasa respuesta</span>
+                  <span className="roi-stat-value">{roiData.without_inmobot?.response_rate}</span>
                 </div>
                 <div className="roi-stat">
-                  <span className="roi-stat-label">Tiempo/lead</span>
-                  <span className="roi-stat-value">15 min</span>
+                  <span className="roi-stat-label">Conversión</span>
+                  <span className="roi-stat-value">{roiData.without_inmobot?.conversion_rate}</span>
+                </div>
+                <div className="roi-stat">
+                  <span className="roi-stat-label">Ingresos est.</span>
+                  <span className="roi-stat-value negative">
+                    {formatCurrency(roiData.without_inmobot?.estimated_revenue || 0)}
+                  </span>
                 </div>
               </div>
 
               <div className="roi-column roi-with">
                 <h4>Con InmoBot</h4>
                 <div className="roi-stat">
-                  <span className="roi-stat-label">Costo mensual</span>
-                  <span className="roi-stat-value positive">
-                    {formatCurrency(roiData.with_bot.monthly_cost)}
-                  </span>
+                  <span className="roi-stat-label">Tasa respuesta</span>
+                  <span className="roi-stat-value">{roiData.with_inmobot?.response_rate}</span>
                 </div>
                 <div className="roi-stat">
-                  <span className="roi-stat-label">Tiempo/lead</span>
-                  <span className="roi-stat-value">2 min</span>
+                  <span className="roi-stat-label">Conversión</span>
+                  <span className="roi-stat-value">{roiData.with_inmobot?.conversion_rate}</span>
+                </div>
+                <div className="roi-stat">
+                  <span className="roi-stat-label">Ingresos est.</span>
+                  <span className="roi-stat-value positive">
+                    {formatCurrency(roiData.with_inmobot?.estimated_revenue || 0)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -108,9 +115,9 @@ export default function ROICalculator() {
               <div className="roi-highlight">
                 <DollarSign className="w-6 h-6" />
                 <div>
-                  <span className="roi-highlight-label">Ahorro mensual</span>
+                  <span className="roi-highlight-label">Ganancia adicional</span>
                   <span className="roi-highlight-value">
-                    {formatCurrency(roiData.with_bot.net_gain)}
+                    {formatCurrency(roiData.comparison?.net_gain || 0)}
                   </span>
                 </div>
               </div>
@@ -120,7 +127,7 @@ export default function ROICalculator() {
                 <div>
                   <span className="roi-highlight-label">ROI</span>
                   <span className="roi-highlight-value">
-                    {formatPercent(roiData.with_bot.roi_percentage)}
+                    {formatPercent(roiData.comparison?.roi_percentage || 0)}
                   </span>
                 </div>
               </div>
