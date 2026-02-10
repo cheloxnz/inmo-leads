@@ -278,6 +278,11 @@ function AppContent() {
               <Leads />
             </ProtectedRoute>
           } />
+          <Route path="/kanban" element={
+            <ProtectedRoute adminOnly>
+              <KanbanView />
+            </ProtectedRoute>
+          } />
           <Route path="/asesores" element={
             <ProtectedRoute adminOnly>
               <AgentManagement />
