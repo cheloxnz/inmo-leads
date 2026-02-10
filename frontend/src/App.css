@@ -277,6 +277,12 @@ body {
   flex: 1;
   min-height: 100vh;
   background: var(--bg-secondary);
+  transition: margin-left 0.3s ease;
+}
+
+.nav-sidebar.collapsed ~ .main-content,
+.main-content.sidebar-collapsed {
+  margin-left: 70px;
 }
 
 .page-container {
