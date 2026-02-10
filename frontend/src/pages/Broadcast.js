@@ -126,6 +126,20 @@ export default function Broadcast() {
         </div>
       </header>
 
+      {/* Nota informativa */}
+      <Alert className="broadcast-info-alert" data-testid="broadcast-info">
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          <strong>¿Cómo funciona el Broadcast?</strong>
+          <ul className="broadcast-info-list">
+            <li>Los mensajes se envían a través de la <strong>API de WhatsApp Business</strong> conectada a tu cuenta.</li>
+            <li>Podés filtrar por estado del lead (calientes, tibios, etc.) o por zona geográfica.</li>
+            <li>Los mensajes se envían de forma escalonada para cumplir con los límites de WhatsApp.</li>
+            <li>Asegurate de tener configurado tu token de WhatsApp en <strong>Configuración</strong>.</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
+
       <div className="broadcast-grid">
         {/* Formulario de envío */}
         <Card className="broadcast-form-card">
