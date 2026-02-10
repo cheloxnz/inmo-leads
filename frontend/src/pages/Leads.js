@@ -7,7 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Trash2, Tag, UserCheck, RefreshCw } from 'lucide-react';
 
 export default function Leads({ filterByAgent = null }) {
   const [leads, setLeads] = useState([]);
@@ -18,6 +21,11 @@ export default function Leads({ filterByAgent = null }) {
   const [searchZone, setSearchZone] = useState('');
   const [searchDateFrom, setSearchDateFrom] = useState('');
   const [searchDateTo, setSearchDateTo] = useState('');
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [bulkAction, setBulkAction] = useState('');
+  const [bulkValue, setBulkValue] = useState('');
+  const [agents, setAgents] = useState([]);
+  const [processingBulk, setProcessingBulk] = useState(false);
   const navigate = useNavigate();
   
   useEffect(() => {
