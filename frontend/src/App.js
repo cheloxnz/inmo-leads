@@ -22,6 +22,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import LandingPage from './pages/LandingPage';
+import AuditLog from './pages/AuditLog';
+import Broadcast from './pages/Broadcast';
 import { Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
 import '@/App.css';
 
