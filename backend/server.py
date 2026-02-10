@@ -947,6 +947,372 @@ async def get_transactions(current_user: User = Depends(require_admin)):
 
 
 # ==============================================
+# BROADCAST & MENSAJES MASIVOS
+# ==============================================
+class BroadcastRequest(BaseModel):
+    message: str
+    filters: Optional[Dict] = None
+    scheduled_at: Optional[str] = None
+
+broadcast_service = None
+
+@api_router.post("/broadcast")
+async def send_broadcast(request: BroadcastRequest, current_user: User = Depends(require_admin)):
+    """Envía mensaje broadcast a múltiples leads"""
+    global broadcast_service
+    if not broadcast_service:
+        broadcast_service = BroadcastService(wa_service, db)
+    
+    scheduled = None
+    if request.scheduled_at:
+        scheduled = datetime.fromisoformat(request.scheduled_at)
+    
+    result = await broadcast_service.send_broadcast(
+        message=request.message,
+        filters=request.filters,
+        scheduled_at=scheduled
+    )
+    
+    # Registrar en auditoría
+    await log_audit_event(
+        action="broadcast_sent",
+        user_email=current_user.email,
+        details={"recipients": result.get("total_recipients"), "filters": request.filters}
+    )
+    
+    return result
+
+@api_router.get("/broadcast/history")
+async def get_broadcast_history(current_user: User = Depends(require_admin)):
+    """Obtiene historial de broadcasts"""
+    global broadcast_service
+    if not broadcast_service:
+        broadcast_service = BroadcastService(wa_service, db)
+    return await broadcast_service.get_broadcast_history()
+
+
+# ==============================================
+# ACCIONES MASIVAS
+# ==============================================
+class BulkActionRequest(BaseModel):
+    lead_phones: List[str]
+    action: str  # "tag", "assign", "status", "delete"
+    value: Optional[str] = None
+
+@api_router.post("/leads/bulk-action")
+async def bulk_action(request: BulkActionRequest, current_user: User = Depends(require_admin)):
+    """Ejecuta acción masiva sobre múltiples leads"""
+    updated_count = 0
+    
+    for phone in request.lead_phones:
+        try:
+            if request.action == "tag" and request.value:
+                await db.leads.update_one(
+                    {"phone": phone},
+                    {"$addToSet": {"tags": request.value}}
+                )
+            elif request.action == "assign" and request.value:
+                await db.leads.update_one(
+                    {"phone": phone},
+                    {"$set": {"assigned_to": request.value}}
+                )
+            elif request.action == "status" and request.value:
+                await db.leads.update_one(
+                    {"phone": phone},
+                    {"$set": {"status": request.value}}
+                )
+            elif request.action == "delete":
+                await db.leads.delete_one({"phone": phone})
+            
+            updated_count += 1
+        except Exception as e:
+            logger.error(f"Error in bulk action for {phone}: {e}")
+    
+    # Registrar en auditoría
+    await log_audit_event(
+        action=f"bulk_{request.action}",
+        user_email=current_user.email,
+        details={"count": updated_count, "value": request.value}
+    )
+    
+    return {"updated_count": updated_count, "total": len(request.lead_phones)}
+
+
+# ==============================================
+# HISTORIAL DE AUDITORÍA
+# ==============================================
+async def log_audit_event(action: str, user_email: str, details: dict = None, lead_phone: str = None):
+    """Registra evento de auditoría"""
+    await db.audit_log.insert_one({
+        "action": action,
+        "user_email": user_email,
+        "lead_phone": lead_phone,
+        "details": details,
+        "timestamp": datetime.utcnow(),
+        "ip_address": None  # Se puede agregar desde el request
+    })
+
+@api_router.get("/audit-log")
+async def get_audit_log(
+    limit: int = 50,
+    action: Optional[str] = None,
+    current_user: User = Depends(require_admin)
+):
+    """Obtiene historial de auditoría"""
+    query = {}
+    if action:
+        query["action"] = action
+    
+    logs = await db.audit_log.find(query, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
+    
+    for log in logs:
+        if log.get("timestamp"):
+            log["timestamp"] = log["timestamp"].isoformat()
+    
+    return logs
+
+
+# ==============================================
+# MÉTRICAS NPS
+# ==============================================
+@api_router.get("/metrics/nps")
+async def get_nps_metrics(current_user: User = Depends(require_admin)):
+    """Obtiene métricas de NPS"""
+    pipeline = [
+        {"$group": {
+            "_id": "$category",
+            "count": {"$sum": 1},
+            "avg_score": {"$avg": "$score"}
+        }}
+    ]
+    
+    results = await db.nps_responses.aggregate(pipeline).to_list(10)
+    
+    total = sum(r["count"] for r in results)
+    promoters = next((r["count"] for r in results if r["_id"] == "promoter"), 0)
+    detractors = next((r["count"] for r in results if r["_id"] == "detractor"), 0)
+    
+    nps_score = 0
+    if total > 0:
+        nps_score = round(((promoters - detractors) / total) * 100)
+    
+    return {
+        "nps_score": nps_score,
+        "total_responses": total,
+        "promoters": promoters,
+        "passives": next((r["count"] for r in results if r["_id"] == "passive"), 0),
+        "detractors": detractors,
+        "breakdown": results
+    }
+
+
+# ==============================================
+# REPORTES PDF
+# ==============================================
+@api_router.get("/reports/pdf")
+async def generate_pdf_report(
+    report_type: str = "monthly",
+    current_user: User = Depends(require_admin)
+):
+    """Genera reporte PDF descargable"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+    except ImportError:
+        raise HTTPException(status_code=500, detail="ReportLab no instalado")
+    
+    # Obtener datos para el reporte
+    now = datetime.utcnow()
+    start_date = now - timedelta(days=30)
+    
+    # Estadísticas
+    total_leads = await db.leads.count_documents({})
+    new_leads = await db.leads.count_documents({"created_at": {"$gte": start_date.isoformat()}})
+    appointments = await db.leads.count_documents({"appointment_datetime": {"$exists": True}})
+    hot_leads = await db.leads.count_documents({"status": "hot"})
+    
+    # Crear PDF en memoria
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # Header
+    p.setFont("Helvetica-Bold", 24)
+    p.drawString(50, height - 50, "InmoBot - Reporte Mensual")
+    
+    p.setFont("Helvetica", 12)
+    p.drawString(50, height - 75, f"Generado: {now.strftime('%d/%m/%Y %H:%M')}")
+    
+    # Línea separadora
+    p.line(50, height - 90, width - 50, height - 90)
+    
+    # Métricas principales
+    y_pos = height - 130
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y_pos, "Resumen del Período")
+    
+    y_pos -= 30
+    p.setFont("Helvetica", 12)
+    metrics = [
+        ("Total de Leads", total_leads),
+        ("Nuevos Leads (30 días)", new_leads),
+        ("Citas Agendadas", appointments),
+        ("Leads Calientes", hot_leads),
+    ]
+    
+    for label, value in metrics:
+        p.drawString(70, y_pos, f"• {label}: {value}")
+        y_pos -= 20
+    
+    # Pie de página
+    p.setFont("Helvetica", 10)
+    p.drawString(50, 30, "InmoBot - Sistema de Gestión de Leads Inmobiliarios")
+    p.drawString(width - 100, 30, f"Página 1")
+    
+    p.showPage()
+    p.save()
+    
+    buffer.seek(0)
+    
+    # Registrar en auditoría
+    await log_audit_event(
+        action="report_generated",
+        user_email=current_user.email,
+        details={"report_type": report_type}
+    )
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=inmobot_reporte_{now.strftime('%Y%m%d')}.pdf"}
+    )
+
+
+# ==============================================
+# CALCULADORA ROI
+# ==============================================
+@api_router.get("/calculator/roi")
+async def calculate_roi(
+    monthly_leads: int = 100,
+    conversion_rate: float = 0.05,
+    avg_commission: float = 5000,
+    plan_cost: float = 129,
+    current_user: User = Depends(require_admin)
+):
+    """Calcula ROI estimado"""
+    # Sin InmoBot (estimado)
+    manual_response_rate = 0.6  # 60% de leads contactados
+    manual_conversion = conversion_rate * 0.7  # 30% menos conversión por respuesta tardía
+    
+    revenue_without = monthly_leads * manual_response_rate * manual_conversion * avg_commission
+    
+    # Con InmoBot
+    bot_response_rate = 1.0  # 100% respuesta
+    bot_conversion = conversion_rate * 1.4  # 40% más conversión por respuesta inmediata
+    
+    revenue_with = monthly_leads * bot_response_rate * bot_conversion * avg_commission
+    
+    # Cálculos
+    additional_revenue = revenue_with - revenue_without
+    roi = ((additional_revenue - plan_cost) / plan_cost) * 100 if plan_cost > 0 else 0
+    
+    return {
+        "monthly_leads": monthly_leads,
+        "without_inmobot": {
+            "response_rate": f"{manual_response_rate * 100}%",
+            "conversion_rate": f"{manual_conversion * 100:.1f}%",
+            "estimated_revenue": round(revenue_without, 2),
+            "closed_deals": round(monthly_leads * manual_response_rate * manual_conversion, 1)
+        },
+        "with_inmobot": {
+            "response_rate": "100%",
+            "conversion_rate": f"{bot_conversion * 100:.1f}%",
+            "estimated_revenue": round(revenue_with, 2),
+            "closed_deals": round(monthly_leads * bot_response_rate * bot_conversion, 1)
+        },
+        "comparison": {
+            "additional_revenue": round(additional_revenue, 2),
+            "plan_cost": plan_cost,
+            "net_gain": round(additional_revenue - plan_cost, 2),
+            "roi_percentage": round(roi, 1)
+        }
+    }
+
+
+# ==============================================
+# KANBAN DATA
+# ==============================================
+@api_router.get("/leads/kanban")
+async def get_kanban_data(current_user: User = Depends(get_current_user)):
+    """Obtiene leads organizados para vista Kanban"""
+    pipeline = [
+        {"$group": {
+            "_id": "$status",
+            "leads": {"$push": {
+                "phone": "$phone",
+                "name": "$name",
+                "zone": "$zone",
+                "budget_text": "$budget_text",
+                "score": "$score",
+                "intent": "$intent",
+                "appointment_datetime": "$appointment_datetime",
+                "created_at": "$created_at",
+                "tags": "$tags"
+            }},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    
+    results = await db.leads.aggregate(pipeline).to_list(20)
+    
+    # Organizar en columnas del Kanban
+    kanban_columns = {
+        "new": {"title": "Nuevos", "leads": [], "count": 0},
+        "contacted": {"title": "Contactados", "leads": [], "count": 0},
+        "qualified": {"title": "Calificados", "leads": [], "count": 0},
+        "appointment": {"title": "Cita Agendada", "leads": [], "count": 0},
+        "hot": {"title": "Calientes", "leads": [], "count": 0},
+        "completed": {"title": "Cerrados", "leads": [], "count": 0}
+    }
+    
+    for result in results:
+        status = result["_id"] or "new"
+        if status in kanban_columns:
+            kanban_columns[status]["leads"] = result["leads"][:20]  # Limitar a 20 por columna
+            kanban_columns[status]["count"] = result["count"]
+    
+    return kanban_columns
+
+@api_router.put("/leads/{phone}/status")
+async def update_lead_status(
+    phone: str,
+    new_status: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Actualiza el estado de un lead (para drag & drop del Kanban)"""
+    result = await db.leads.update_one(
+        {"phone": phone},
+        {"$set": {"status": new_status, "updated_at": datetime.utcnow().isoformat()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+    
+    # Registrar en auditoría
+    await log_audit_event(
+        action="status_changed",
+        user_email=current_user.email,
+        lead_phone=phone,
+        details={"new_status": new_status}
+    )
+    
+    return {"success": True, "new_status": new_status}
+
+
+# ==============================================
 # WEBSOCKET ENDPOINT
 # ==============================================
 @api_router.websocket("/ws/notifications")
