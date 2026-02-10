@@ -34,6 +34,14 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-02-10 (Sesión Actual - Parte 3)
+- **Nuevas Funcionalidades Implementadas:**
+  - **Acciones Masivas en Leads:** Checkboxes para seleccionar múltiples leads y ejecutar acciones (tag, status, asignar, eliminar)
+  - **Página de Historial de Auditoría:** Nueva ruta /auditoria con timeline de todas las acciones del sistema
+  - **Página de Broadcast:** Nueva ruta /broadcast para enviar mensajes masivos por WhatsApp con filtros
+  - Navegación actualizada con enlaces a Broadcast (📢) y Auditoría (📜)
+- **Testing completado:** 100% tests pasados en iteration_2.json
+
 ### 2026-02-10 (Sesión Actual - Parte 2)
 - **Mejoras de UI/UX:**
   - Sidebar colapsable con botón para expandir/contraer
