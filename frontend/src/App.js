@@ -11,6 +11,7 @@ import FlowVisualization from './pages/FlowVisualization';
 import Configuration from './pages/Configuration';
 import Documentation from './pages/Documentation';
 import Login from './pages/Login';
+import KanbanView from './pages/KanbanView';
 import AgentManagement from './pages/AgentManagement';
 import MyDashboard from './pages/MyDashboard';
 import Calendar from './pages/Calendar';
