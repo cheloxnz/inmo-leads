@@ -185,6 +185,20 @@ body {
   transition: all 0.2s;
   font-weight: 500;
   border-left: 3px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 0.875rem 0;
+  border-left: none;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-sidebar.collapsed .nav-link.active {
+  border-left: none;
+  border-bottom-color: #3b82f6;
 }
 
 .nav-link:hover {
