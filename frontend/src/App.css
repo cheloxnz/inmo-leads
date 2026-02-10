@@ -130,11 +130,30 @@ body {
 }
 
 .nav-logo {
-  padding: 2rem 1.5rem;
+  padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 80px;
+}
+
+.logo-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.nav-sidebar.collapsed .logo-image {
+  width: 36px;
+  height: 36px;
+}
+
+.nav-sidebar.collapsed .nav-logo {
+  justify-content: center;
+  padding: 1.5rem 0.5rem;
 }
 
 .logo-icon {
