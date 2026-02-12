@@ -161,6 +161,69 @@ Si el bot no funciona como se describió, te devolvemos el 100% de tu dinero.
 
 ---
 
+## Términos de Licencia
+
+### Tipo de Licencia: Exclusiva
+
+Esta es una **licencia exclusiva** de uso. Al adquirir InmoBot:
+
+| Aspecto | Detalle |
+|---------|---------|
+| **Propiedad del código** | Transferencia completa al comprador |
+| **Exclusividad** | El comprador es el único autorizado a usar este sistema |
+| **Modificaciones** | Libertad total para modificar, personalizar y extender |
+| **Sublicencia** | El comprador puede revender o sublicenciar si lo desea |
+| **Restricciones al vendedor** | No venderé este mismo código a otras inmobiliarias |
+
+### ¿Qué incluye la entrega?
+
+✅ Código fuente completo (repositorio Git)  
+✅ Base de datos configurada  
+✅ Documentación técnica  
+✅ Manual de usuario  
+✅ Credenciales de todas las integraciones  
+✅ Acceso al servidor de producción  
+
+### Período de Soporte
+
+| Plan | Soporte Incluido | Soporte Extendido |
+|------|------------------|-------------------|
+| Completo | 30 días | +$300/mes adicional |
+| Premium | 90 días | +$200/mes adicional |
+
+**El soporte incluye:**
+- Corrección de bugs
+- Asistencia técnica por WhatsApp/email
+- Pequeños ajustes de configuración
+
+**El soporte NO incluye:**
+- Nuevas funcionalidades (se cotizan aparte)
+- Cambios mayores en el diseño
+- Integraciones adicionales
+
+### Post-Soporte
+
+Una vez finalizado el período de soporte:
+
+1. **El sistema sigue funcionando** sin intervención
+2. **Hosting:** El comprador asume el costo (~$20-50/mes en DigitalOcean o similar)
+3. **Mantenimiento futuro:** El comprador puede:
+   - Contratar soporte mensual adicional conmigo
+   - Contratar su propio desarrollador
+   - Dejar el sistema funcionando sin cambios
+
+### Costos Recurrentes del Comprador (estimados)
+
+| Servicio | Costo Mensual |
+|----------|---------------|
+| Hosting (VPS) | $20-50 USD |
+| WhatsApp Business API | $0-50 USD (según volumen) |
+| OpenAI (IA) | $10-30 USD (según uso) |
+| Dominio | ~$15 USD/año |
+| **Total estimado** | **$30-130 USD/mes** |
+
+---
+
 ## Próximos Pasos
 
 1. **Elegí tu plan** (Completo o Premium)
