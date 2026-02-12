@@ -306,26 +306,25 @@ def build_pdf():
         ['Dominio incluido', '✓', '✓'],
         ['Instalación y setup', '✓', '✓'],
         ['Conexión WhatsApp', '✓', '✓'],
-        ['Capacitación', '1 hora', '2 horas'],
+        ['Documentación completa', '✓', '✓'],
+        ['Capacitación (handoff)', '1 hora', '2 horas'],
         ['Personalización de marca', '—', '✓'],
         ['Flujos personalizados', '—', '✓'],
         ['Landing page', '—', '✓'],
-        ['Precio CON soporte', '$10,000', '$18,000'],
-        ['Precio SIN soporte', '$7,500', '$12,000'],
+        ['Updates y bugs (3 meses)', '—', '✓'],
+        ['Precio', '$7,500', '$12,000'],
     ]
     
     compare_table = Table(compare_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
     compare_style = create_table_style()
-    compare_style.add('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold')
+    compare_style.add('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
     compare_table.setStyle(compare_style)
     story.append(compare_table)
     
     story.append(Spacer(1, 0.2*inch))
     
-    # Modalidades
-    story.append(Paragraph("<b>¿Con o Sin Soporte?</b>", styles['CustomBody']))
-    story.append(Paragraph("• <b>Con Soporte:</b> Incluye corrección de bugs, asistencia técnica y ajustes durante el período.", styles['BulletPoint']))
-    story.append(Paragraph("• <b>Sin Soporte:</b> Entrega completa + handoff. Ideal si tenés tu propio desarrollador.", styles['BulletPoint']))
+    # Nota sobre soporte
+    story.append(Paragraph("<b>Importante:</b> Ambos planes son sin soporte post-entrega. El Plan Premium incluye 3 meses de corrección de bugs y updates si se requieren.", styles['CustomBody']))
     
     story.append(PageBreak())
     
