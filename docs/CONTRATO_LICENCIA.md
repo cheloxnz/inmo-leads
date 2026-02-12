@@ -120,44 +120,30 @@ El LICENCIANTE entregará al LICENCIATARIO:
 
 ### SÉPTIMA: SOPORTE TÉCNICO
 
-**Aplica solo si se contrató modalidad "Con Soporte".**
+### SÉPTIMA: SOPORTE TÉCNICO Y ACTUALIZACIONES
 
-El LICENCIANTE brindará soporte técnico según el plan contratado:
+**Plan Completo ($7,500):**
+- Sin soporte técnico post-entrega
+- El LICENCIATARIO recibe el sistema funcionando
+- 1 videollamada de handoff/entrega (1 hora)
+- Documentación completa y FAQ
+- El LICENCIATARIO (o su equipo técnico) se encarga del mantenimiento
 
-| Plan | Duración del soporte | Soporte extendido |
-|------|---------------------|-------------------|
-| Completo | 30 días | +$300 USD/mes |
-| Premium | 90 días | +$200 USD/mes |
+**Plan Premium ($12,000):**
+- Durante los primeros **3 (tres) meses** desde la entrega:
+  - Corrección de bugs si se detectan
+  - Actualizaciones menores si se requieren
+  - Comunicación por email para temas técnicos
+- Después de los 3 meses: mismo que Plan Completo (sin soporte)
 
-**El soporte incluye:**
-- Corrección de errores (bugs) del software
-- Asistencia técnica por email y WhatsApp
-- Pequeños ajustes de configuración
-
-**El soporte NO incluye:**
+**En ambos planes NO se incluye:**
 - Desarrollo de nuevas funcionalidades
 - Cambios mayores en el diseño
 - Integraciones adicionales no contempladas
 - Soporte para modificaciones realizadas por terceros
+- Asistencia técnica fuera del período (Plan Premium)
 
-**Si se contrató modalidad "Sin Soporte":**
-- El LICENCIATARIO recibe el sistema funcionando
-- 1 videollamada de handoff/entrega (1 hora)
-- Documentación completa y FAQ
-- Sin asistencia técnica post-entrega
-- Sin corrección de bugs incluida
-
-### OCTAVA: ACTUALIZACIONES (Solo Plan Premium)
-
-Para el **Plan Premium**, el LICENCIANTE proveerá actualizaciones gratuitas del software durante un período de **6 (seis) meses** desde la entrega. Estas actualizaciones incluyen:
-
-- Correcciones de seguridad
-- Mejoras de rendimiento
-- Nuevas funcionalidades menores
-
-Finalizado este período, las actualizaciones se cotizarán por separado.
-
-### NOVENA: GARANTÍA
+### OCTAVA: GARANTÍA
 
 El LICENCIANTE garantiza que:
 
@@ -167,7 +153,7 @@ c) Tiene pleno derecho a licenciar el software
 
 **Garantía de satisfacción:** El LICENCIATARIO dispone de **7 (siete) días corridos** desde la entrega para verificar el funcionamiento. Si el software no cumple con las especificaciones acordadas, podrá solicitar la devolución del 100% del monto abonado.
 
-### DÉCIMA: RESPONSABILIDADES DEL LICENCIATARIO
+### NOVENA: RESPONSABILIDADES DEL LICENCIATARIO
 
 El LICENCIATARIO se compromete a:
 
