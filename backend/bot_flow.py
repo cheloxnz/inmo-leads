@@ -276,19 +276,27 @@ class BotFlowManager:
             lead.intent = LeadIntent.COMPRAR
         elif "alquilar" in message_lower or message_lower == "2":
             lead.intent = LeadIntent.ALQUILAR
-        elif "inversion" in message_lower or "inversión" in message_lower or message_lower == "3":
+        elif "vender" in message_lower or message_lower == "3":
+            lead.intent = LeadIntent.VENDER
+        elif "inversion" in message_lower or "inversión" in message_lower or message_lower == "4":
             lead.intent = LeadIntent.INVERSION
         else:
             result = await self.llm.classify_intent(message)
             intent_str = result.get("intent", "sin_definir")
-            if intent_str in ["comprar", "alquilar", "inversion"]:
+            if intent_str in ["comprar", "alquilar", "vender", "inversion"]:
                 lead.intent = LeadIntent(intent_str)
             else:
                 lead.intent = LeadIntent.SIN_DEFINIR
         
-        response = f"Perfecto. ¿Cuál es tu nombre completo?"
-        self.wa.send_text_message(lead.phone, response)
-        lead.flow_stage = FlowStage.NAME
+        # Flujo diferente para vendedores
+        if lead.intent == LeadIntent.VENDER:
+            response = f"¡Genial! Querés vender tu propiedad. ¿Cuál es tu nombre completo?"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.NAME
+        else:
+            response = f"Perfecto. ¿Cuál es tu nombre completo?"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.NAME
     
     async def handle_name(self, lead: Lead, message: str):
         """Maneja captura de nombre"""
