@@ -257,12 +257,12 @@ class BotFlowManager:
     
     async def handle_welcome(self, lead: Lead, message: str):
         """Maneja etapa de bienvenida"""
-        response = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy acá para ayudarte a encontrar tu propiedad ideal 🏡\n\n¿Qué estás buscando?"
+        response = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy acá para ayudarte 🏡\n\n¿Qué te gustaría hacer?"
         
         buttons = [
             {"type": "reply", "reply": {"id": "comprar", "title": "Comprar"}},
             {"type": "reply", "reply": {"id": "alquilar", "title": "Alquilar"}},
-            {"type": "reply", "reply": {"id": "inversion", "title": "Inversión"}}
+            {"type": "reply", "reply": {"id": "vender", "title": "Vender"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
