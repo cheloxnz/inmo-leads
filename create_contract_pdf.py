@@ -242,6 +242,7 @@ def build_contract_pdf():
     
     # Séptima
     story.append(Paragraph("<b>SÉPTIMA: SOPORTE TÉCNICO</b>", styles['SectionHeader']))
+    story.append(Paragraph("<b>Aplica solo si se contrató modalidad 'Con Soporte':</b>", styles['ContractBody']))
     soporte_data = [
         ['Plan', 'Duración', 'Extendido'],
         ['Completo', '30 días', '+$300 USD/mes'],
@@ -254,6 +255,8 @@ def build_contract_pdf():
     
     story.append(Paragraph("<b>Incluye:</b> Corrección de bugs, asistencia técnica, ajustes de configuración.", styles['ContractBody']))
     story.append(Paragraph("<b>No incluye:</b> Nuevas funcionalidades, cambios mayores de diseño, integraciones adicionales.", styles['ContractBody']))
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph("<b>Modalidad 'Sin Soporte':</b> Entrega completa + 1 hora de handoff + documentación. Sin asistencia post-entrega.", styles['ContractBody']))
     
     # Octava
     story.append(Paragraph("<b>OCTAVA: ACTUALIZACIONES (Solo Plan Premium)</b>", styles['SectionHeader']))
