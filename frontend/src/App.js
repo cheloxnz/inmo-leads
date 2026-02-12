@@ -75,6 +75,7 @@ function Navigation() {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true';
   });
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', isCollapsed);
