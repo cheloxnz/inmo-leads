@@ -242,7 +242,18 @@ def build_pdf():
     
     # Plan Completo
     story.append(Paragraph("Plan Completo", styles['PlanName']))
-    story.append(Paragraph("USD $10,000", styles['PriceHighlight']))
+    
+    # Tabla de precios Completo
+    precio_completo = [
+        ['Modalidad', 'Precio', 'Soporte'],
+        ['Con Soporte', 'USD $10,000', '30 días incluidos'],
+        ['Sin Soporte', 'USD $7,500', 'Solo entrega y handoff'],
+    ]
+    t_precio_c = Table(precio_completo, colWidths=[1.8*inch, 1.8*inch, 2.4*inch])
+    t_precio_c.setStyle(create_table_style())
+    story.append(t_precio_c)
+    story.append(Spacer(1, 0.1*inch))
+    
     story.append(Paragraph(
         "<b>Ideal para:</b> Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.",
         styles['CustomBody']
@@ -255,7 +266,6 @@ def build_pdf():
         "Conexión con tu WhatsApp Business",
         "Configuración de integraciones (IA, email)",
         "Capacitación de uso (1 hora por videollamada)",
-        "<b>30 días de soporte técnico incluido</b>",
         "Documentación técnica completa"
     ]
     for item in plan_completo:
@@ -267,9 +277,20 @@ def build_pdf():
     
     # Plan Premium
     story.append(Paragraph("Plan Premium", styles['PlanName']))
-    story.append(Paragraph("USD $18,000", styles['PriceHighlight']))
+    
+    # Tabla de precios Premium
+    precio_premium = [
+        ['Modalidad', 'Precio', 'Soporte'],
+        ['Con Soporte', 'USD $18,000', '90 días + 6 meses updates'],
+        ['Sin Soporte', 'USD $12,000', 'Solo entrega y handoff'],
+    ]
+    t_precio_p = Table(precio_premium, colWidths=[1.8*inch, 1.8*inch, 2.4*inch])
+    t_precio_p.setStyle(create_table_style())
+    story.append(t_precio_p)
+    story.append(Spacer(1, 0.1*inch))
+    
     story.append(Paragraph(
-        "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada, soporte extendido y exclusividad garantizada.",
+        "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada y exclusividad garantizada.",
         styles['CustomBody']
     ))
     story.append(Paragraph(
@@ -282,9 +303,7 @@ def build_pdf():
         "<b>Flujos de conversación personalizados</b> según tu operación",
         "<b>Integración con tu CRM actual</b> (si aplica)",
         "<b>Landing page personalizada</b> para captar leads",
-        "<b>90 días de soporte técnico prioritario</b>",
         "<b>2 horas de capacitación</b> para tu equipo",
-        "<b>Actualizaciones gratuitas</b> durante 6 meses",
         "Asesoría en estrategia de captación digital"
     ]
     for item in plan_premium:
@@ -305,19 +324,25 @@ def build_pdf():
         ['Instalación y setup', '✓', '✓'],
         ['Conexión WhatsApp', '✓', '✓'],
         ['Capacitación', '1 hora', '2 horas'],
-        ['Soporte técnico', '30 días', '90 días'],
         ['Personalización de marca', '—', '✓'],
         ['Flujos personalizados', '—', '✓'],
         ['Landing page', '—', '✓'],
-        ['Actualizaciones', '—', '6 meses'],
-        ['Precio', '$10,000', '$18,000'],
+        ['Precio CON soporte', '$10,000', '$18,000'],
+        ['Precio SIN soporte', '$7,500', '$12,000'],
     ]
     
     compare_table = Table(compare_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
     compare_style = create_table_style()
-    compare_style.add('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
+    compare_style.add('FONTNAME', (0, -2), (-1, -1), 'Helvetica-Bold')
     compare_table.setStyle(compare_style)
     story.append(compare_table)
+    
+    story.append(Spacer(1, 0.2*inch))
+    
+    # Modalidades
+    story.append(Paragraph("<b>¿Con o Sin Soporte?</b>", styles['CustomBody']))
+    story.append(Paragraph("• <b>Con Soporte:</b> Incluye corrección de bugs, asistencia técnica y ajustes durante el período.", styles['BulletPoint']))
+    story.append(Paragraph("• <b>Sin Soporte:</b> Entrega completa + handoff. Ideal si tenés tu propio desarrollador.", styles['BulletPoint']))
     
     story.append(PageBreak())
     
