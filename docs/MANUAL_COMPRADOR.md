@@ -7,22 +7,23 @@
 # Índice
 
 1. [Introducción](#introducción)
-2. [Arquitectura del Sistema](#arquitectura-del-sistema)
-3. [Requisitos Previos](#requisitos-previos)
-4. [Opción 1: Deploy en Railway (Recomendado)](#opción-1-deploy-en-railway-recomendado)
-5. [Opción 2: Deploy en DigitalOcean](#opción-2-deploy-en-digitalocean)
-6. [Configuración de Variables de Entorno](#configuración-de-variables-de-entorno)
-7. [Configuración de WhatsApp Business API](#configuración-de-whatsapp-business-api)
-8. [Configuración de OpenAI (IA)](#configuración-de-openai-ia)
-9. [Configuración de Stripe (Pagos)](#configuración-de-stripe-pagos)
-10. [Configuración de Emails](#configuración-de-emails)
-11. [Configuración del Dominio](#configuración-del-dominio)
-12. [Uso del Dashboard](#uso-del-dashboard)
-13. [Personalización del Bot](#personalización-del-bot)
-14. [Mantenimiento y Actualizaciones](#mantenimiento-y-actualizaciones)
-15. [Solución de Problemas Comunes](#solución-de-problemas-comunes)
-16. [Costos Operativos Mensuales](#costos-operativos-mensuales)
-17. [Contacto de Soporte](#contacto-de-soporte)
+2. [Resumen: ¿Qué tengo que hacer?](#resumen-qué-tengo-que-hacer)
+3. [Arquitectura del Sistema](#arquitectura-del-sistema)
+4. [Requisitos Previos](#requisitos-previos)
+5. [Opción 1: Deploy en Railway (Recomendado)](#opción-1-deploy-en-railway-recomendado)
+6. [Opción 2: Deploy en DigitalOcean](#opción-2-deploy-en-digitalocean)
+7. [Configuración de Variables de Entorno](#configuración-de-variables-de-entorno)
+8. [Configuración de WhatsApp Business API](#configuración-de-whatsapp-business-api)
+9. [Configuración de OpenAI (IA)](#configuración-de-openai-ia)
+10. [Configuración de Stripe (Pagos)](#configuración-de-stripe-pagos)
+11. [Configuración de Emails](#configuración-de-emails)
+12. [Configuración del Dominio](#configuración-del-dominio)
+13. [Uso del Dashboard](#uso-del-dashboard)
+14. [Personalización del Bot](#personalización-del-bot)
+15. [Mantenimiento y Actualizaciones](#mantenimiento-y-actualizaciones)
+16. [Solución de Problemas Comunes](#solución-de-problemas-comunes)
+17. [Costos Operativos Mensuales](#costos-operativos-mensuales)
+18. [Contacto de Soporte](#contacto-de-soporte)
 
 ---
 
@@ -38,6 +39,109 @@ Este documento contiene todas las instrucciones necesarias para:
 - Resolver problemas comunes
 
 **Tiempo estimado de configuración inicial:** 2-4 horas
+
+---
+
+# Resumen: ¿Qué tengo que hacer?
+
+## Diagrama de Opciones de Deploy
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        OPCIONES DE DEPLOYMENT                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                    LO QUE RECIBÍS DEL VENDEDOR                       │   │
+│   │                                                                      │   │
+│   │    📁 Acceso al Repositorio GitHub                                  │   │
+│   │    📄 Documentación completa                                        │   │
+│   │    📞 1 hora de videollamada (handoff)                              │   │
+│   │    🔑 Archivos .env.example con instrucciones                       │   │
+│   │                                                                      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│                         ┌─────────────────────┐                             │
+│                         │  ELEGÍ TU OPCIÓN    │                             │
+│                         └─────────────────────┘                             │
+│                          /                    \                              │
+│                         /                      \                             │
+│                        ▼                        ▼                            │
+│   ┌────────────────────────────┐    ┌────────────────────────────┐          │
+│   │     OPCIÓN A: RAILWAY      │    │  OPCIÓN B: DIGITALOCEAN    │          │
+│   │      (Recomendado)         │    │    + MONGODB ATLAS         │          │
+│   ├────────────────────────────┤    ├────────────────────────────┤          │
+│   │                            │    │                            │          │
+│   │  ✅ Fácil (10-15 min)      │    │  ⚠️  Media (1-2 horas)     │          │
+│   │  ✅ Todo en un lugar       │    │  ✅ Más control            │          │
+│   │  ✅ Deploy automático      │    │  ✅ Menor costo mensual    │          │
+│   │  💰 ~$20-40/mes            │    │  💰 ~$15-30/mes            │          │
+│   │                            │    │                            │          │
+│   │  Ideal si:                 │    │  Ideal si:                 │          │
+│   │  • No tenés desarrollador  │    │  • Tenés desarrollador     │          │
+│   │  • Querés simplicidad      │    │  • Querés control total    │          │
+│   │                            │    │                            │          │
+│   └────────────────────────────┘    └────────────────────────────┘          │
+│                │                                   │                         │
+│                ▼                                   ▼                         │
+│   ┌────────────────────────────┐    ┌────────────────────────────┐          │
+│   │        PASOS RAILWAY       │    │    PASOS DIGITALOCEAN      │          │
+│   ├────────────────────────────┤    ├────────────────────────────┤          │
+│   │                            │    │                            │          │
+│   │  1. Crear cuenta Railway   │    │  1. Crear Droplet ($12/mes)│          │
+│   │  2. Conectar GitHub        │    │  2. Crear DB en Atlas      │          │
+│   │  3. Crear MongoDB (1 clic) │    │  3. Clonar repo en servidor│          │
+│   │  4. Configurar variables   │    │  4. Instalar dependencias  │          │
+│   │  5. ¡Listo! ✅             │    │  5. Configurar Nginx + SSL │          │
+│   │                            │    │  6. ¡Listo! ✅             │          │
+│   └────────────────────────────┘    └────────────────────────────┘          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Flujo Paso a Paso (Opción Railway)
+
+```
+   TU                          RAILWAY                        SERVICIOS
+    │                             │                               │
+    │  1. Crear cuenta            │                               │
+    ├────────────────────────────►│                               │
+    │                             │                               │
+    │  2. Conectar repo GitHub    │                               │
+    ├────────────────────────────►│                               │
+    │                             │                               │
+    │                             │  3. Deploy automático         │
+    │                             ├──────────────────────────────►│
+    │                             │                               │
+    │  4. Crear MongoDB           │                               │
+    ├────────────────────────────►│  (1 click)                    │
+    │                             │                               │
+    │  5. Configurar .env         │                               │
+    ├────────────────────────────►│                               │
+    │                             │                               │
+    │  6. Conectar dominio        │                               │
+    ├────────────────────────────►│                               │
+    │                             │                               │
+    │                      ✅ APP FUNCIONANDO                     │
+    │◄────────────────────────────┼───────────────────────────────│
+```
+
+## Checklist Rápido
+
+```
+□ Paso 1: Recibir acceso al repositorio GitHub
+□ Paso 2: Elegir plataforma (Railway o DigitalOcean)
+□ Paso 3: Crear cuentas en servicios externos:
+    □ Meta Business (WhatsApp)
+    □ OpenAI (Inteligencia Artificial)
+    □ Stripe (Pagos) - opcional
+□ Paso 4: Seguir guía de deploy de la opción elegida
+□ Paso 5: Configurar variables de entorno
+□ Paso 6: Configurar webhook de WhatsApp
+□ Paso 7: Conectar dominio personalizado
+□ Paso 8: ¡Probar el bot!
+```
 
 ---
 
