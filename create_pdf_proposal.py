@@ -252,10 +252,8 @@ def build_pdf():
     plan_completo = [
         "Código fuente completo (React + Python + MongoDB)",
         "Dominio profesional (inmobot-ia.com)",
-        "Instalación y configuración en servidor",
-        "Conexión con tu WhatsApp Business",
-        "Configuración de integraciones (IA, email)",
-        "<b>1 hora de videollamada de handoff/entrega</b>",
+        "Instalación en servidor (Railway o DigitalOcean)",
+        "<b>30 minutos de videollamada de handoff/entrega</b>",
         "Documentación técnica completa",
         "Script de inicialización"
     ]
@@ -263,6 +261,7 @@ def build_pdf():
         story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
     
     story.append(Paragraph("✗ Sin soporte post-entrega", styles['BulletPoint']))
+    story.append(Paragraph("<i>El comprador configura las integraciones con la documentación.</i>", styles['CustomBody']))
     story.append(Paragraph("<b>Entrega:</b> 5-7 días hábiles", styles['CustomBody']))
     
     story.append(Spacer(1, 0.3*inch))
@@ -281,13 +280,12 @@ def build_pdf():
     ))
     
     plan_premium = [
-        "<b>Personalización de marca</b> (logo, colores, mensajes)",
+        "<b>Personalización de marca</b> (logo, colores, mensajes del bot)",
         "<b>Flujos de conversación personalizados</b>",
         "<b>Integración con tu CRM actual</b> (si aplica)",
         "<b>Landing page personalizada</b>",
-        "<b>2 horas de capacitación</b> para tu equipo",
-        "<b>3 meses de updates y corrección de bugs</b> (si se requieren)",
-        "Asesoría en estrategia de captación digital"
+        "<b>1 hora de capacitación</b> para tu equipo",
+        "<b>3 meses de updates y corrección de bugs</b> (si se requieren)"
     ]
     for item in plan_premium:
         story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
