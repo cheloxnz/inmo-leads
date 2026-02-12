@@ -401,6 +401,112 @@ def build_pdf():
         styles['CustomBody']
     ))
     
+    story.append(PageBreak())
+    
+    # === TÉRMINOS DE LICENCIA ===
+    story.append(Paragraph("Términos de Licencia", styles['SectionHeader']))
+    story.append(HRFlowable(width="100%", thickness=1, color=ACCENT_COLOR, spaceAfter=15))
+    
+    story.append(Paragraph(
+        "<b>Tipo de Licencia: Exclusiva</b>",
+        styles['CustomBody']
+    ))
+    story.append(Paragraph(
+        "Esta es una licencia exclusiva de uso. Al adquirir InmoBot:",
+        styles['CustomBody']
+    ))
+    
+    licencia_data = [
+        ['Aspecto', 'Detalle'],
+        ['Propiedad del código', 'Transferencia completa al comprador'],
+        ['Exclusividad', 'El comprador es el único autorizado a usar este sistema'],
+        ['Modificaciones', 'Libertad total para modificar, personalizar y extender'],
+        ['Sublicencia', 'El comprador puede revender o sublicenciar si lo desea'],
+        ['Restricciones al vendedor', 'No venderé este mismo código a otras inmobiliarias'],
+    ]
+    
+    licencia_table = Table(licencia_data, colWidths=[2.2*inch, 4.3*inch])
+    licencia_table.setStyle(create_table_style())
+    story.append(licencia_table)
+    
+    story.append(Spacer(1, 0.25*inch))
+    
+    # Qué incluye la entrega
+    story.append(Paragraph("<b>¿Qué incluye la entrega?</b>", styles['CustomBody']))
+    entrega_items = [
+        "Código fuente completo (repositorio Git)",
+        "Base de datos configurada",
+        "Documentación técnica",
+        "Manual de usuario",
+        "Credenciales de todas las integraciones",
+        "Acceso al servidor de producción"
+    ]
+    for item in entrega_items:
+        story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
+    
+    story.append(Spacer(1, 0.25*inch))
+    
+    # Período de soporte
+    story.append(Paragraph("<b>Período de Soporte</b>", styles['CustomBody']))
+    
+    soporte_data = [
+        ['Plan', 'Soporte Incluido', 'Soporte Extendido'],
+        ['Completo', '30 días', '+$300/mes adicional'],
+        ['Premium', '90 días', '+$200/mes adicional'],
+    ]
+    
+    soporte_table = Table(soporte_data, colWidths=[1.5*inch, 2*inch, 2.5*inch])
+    soporte_table.setStyle(create_table_style())
+    story.append(soporte_table)
+    
+    story.append(Spacer(1, 0.15*inch))
+    
+    story.append(Paragraph("<b>El soporte incluye:</b>", styles['CustomBody']))
+    soporte_incluye = ["Corrección de bugs", "Asistencia técnica por WhatsApp/email", "Pequeños ajustes de configuración"]
+    for item in soporte_incluye:
+        story.append(Paragraph(f"• {item}", styles['BulletPoint']))
+    
+    story.append(Paragraph("<b>El soporte NO incluye:</b>", styles['CustomBody']))
+    soporte_no_incluye = ["Nuevas funcionalidades (se cotizan aparte)", "Cambios mayores en el diseño", "Integraciones adicionales"]
+    for item in soporte_no_incluye:
+        story.append(Paragraph(f"• {item}", styles['BulletPoint']))
+    
+    story.append(Spacer(1, 0.25*inch))
+    
+    # Post-soporte
+    story.append(Paragraph("<b>Post-Soporte</b>", styles['CustomBody']))
+    story.append(Paragraph(
+        "Una vez finalizado el período de soporte:",
+        styles['CustomBody']
+    ))
+    post_soporte = [
+        "El sistema sigue funcionando sin intervención",
+        "Hosting: El comprador asume el costo (~$20-50/mes en DigitalOcean o similar)",
+        "Mantenimiento futuro: El comprador puede contratar soporte adicional, su propio desarrollador, o dejar el sistema funcionando sin cambios"
+    ]
+    for i, item in enumerate(post_soporte, 1):
+        story.append(Paragraph(f"{i}. {item}", styles['BulletPoint']))
+    
+    story.append(Spacer(1, 0.25*inch))
+    
+    # Costos recurrentes
+    story.append(Paragraph("<b>Costos Recurrentes del Comprador (estimados)</b>", styles['CustomBody']))
+    
+    costos_data = [
+        ['Servicio', 'Costo Mensual'],
+        ['Hosting (VPS)', '$20-50 USD'],
+        ['WhatsApp Business API', '$0-50 USD (según volumen)'],
+        ['OpenAI (IA)', '$10-30 USD (según uso)'],
+        ['Dominio', '~$15 USD/año'],
+        ['Total estimado', '$30-130 USD/mes'],
+    ]
+    
+    costos_table = Table(costos_data, colWidths=[3*inch, 2.5*inch])
+    costos_style = create_table_style()
+    costos_style.add('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold')
+    costos_table.setStyle(costos_style)
+    story.append(costos_table)
+    
     story.append(Spacer(1, 0.5*inch))
     
     # === CONTACTO ===
