@@ -57,12 +57,27 @@ La licencia otorgada es de tipo **EXCLUSIVA**, lo que implica:
 
 ### TERCERA: PLAN CONTRATADO
 
-[ ] **Plan Completo** - USD $10,000 (Diez mil dólares estadounidenses)
-[ ] **Plan Premium** - USD $18,000 (Dieciocho mil dólares estadounidenses)
+**Plan seleccionado:**
 
-**Características del plan seleccionado:**
+[ ] **Plan Completo**
+[ ] **Plan Premium**
 
-_____________________________________________
+**Modalidad de soporte:**
+
+[ ] **Con Soporte**
+[ ] **Sin Soporte** (Solo entrega y handoff)
+
+**Tabla de precios:**
+
+| Plan | Con Soporte | Sin Soporte |
+|------|-------------|-------------|
+| Completo | USD $10,000 | USD $7,500 |
+| Premium | USD $18,000 | USD $12,000 |
+
+**Precio acordado:** USD $_____________
+
+**Características adicionales acordadas:**
+
 _____________________________________________
 _____________________________________________
 
