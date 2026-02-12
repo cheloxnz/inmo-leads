@@ -60,7 +60,7 @@ def create_styles():
     
     # Texto normal
     styles.add(ParagraphStyle(
-        name='BodyText',
+        name='CustomBody',
         parent=styles['Normal'],
         fontSize=11,
         textColor=SECONDARY_COLOR,
