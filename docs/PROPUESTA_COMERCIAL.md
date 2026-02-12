@@ -57,9 +57,14 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 
 ## Planes Disponibles
 
-### 📦 Plan Completo — USD $10,000
+### 📦 Plan Completo
 
 **Ideal para:** Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.
+
+| Modalidad | Precio | Soporte |
+|-----------|--------|---------|
+| **Con Soporte** | USD $10,000 | 30 días incluidos |
+| **Sin Soporte** | USD $7,500 | Solo entrega y handoff |
 
 **Incluye:**
 - ✅ Código fuente completo (React + Python + MongoDB)
@@ -68,25 +73,27 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 - ✅ Conexión con tu WhatsApp Business
 - ✅ Configuración de integraciones (IA, email)
 - ✅ Capacitación de uso (1 hora por videollamada)
-- ✅ **30 días de soporte técnico incluido**
 - ✅ Documentación técnica completa
 
 **Entrega:** 5-7 días hábiles
 
 ---
 
-### 🚀 Plan Premium — USD $18,000
+### 🚀 Plan Premium
 
-**Ideal para:** Inmobiliarias que quieren una solución personalizada, soporte extendido y exclusividad garantizada.
+**Ideal para:** Inmobiliarias que quieren una solución personalizada y exclusividad garantizada.
+
+| Modalidad | Precio | Soporte |
+|-----------|--------|---------|
+| **Con Soporte** | USD $18,000 | 90 días + 6 meses updates |
+| **Sin Soporte** | USD $12,000 | Solo entrega y handoff |
 
 **Incluye todo lo del Plan Completo, más:**
 - ✅ **Personalización de marca** (logo, colores, mensajes)
 - ✅ **Flujos de conversación personalizados** según tu operación
 - ✅ **Integración con tu CRM actual** (si aplica)
 - ✅ **Landing page personalizada** para captar leads
-- ✅ **90 días de soporte técnico prioritario**
 - ✅ **2 horas de capacitación** para tu equipo
-- ✅ **Actualizaciones gratuitas** durante 6 meses
 - ✅ Asesoría en estrategia de captación digital
 
 **Entrega:** 10-15 días hábiles
@@ -102,12 +109,31 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 | Instalación y setup | ✅ | ✅ |
 | Conexión WhatsApp | ✅ | ✅ |
 | Capacitación | 1 hora | 2 horas |
-| Soporte técnico | 30 días | 90 días |
 | Personalización de marca | ❌ | ✅ |
 | Flujos personalizados | ❌ | ✅ |
 | Landing page | ❌ | ✅ |
-| Actualizaciones | ❌ | 6 meses |
-| **Precio** | **$10,000** | **$18,000** |
+| **Precio CON soporte** | **$10,000** | **$18,000** |
+| **Precio SIN soporte** | **$7,500** | **$12,000** |
+
+---
+
+## ¿Qué incluye cada modalidad?
+
+### Con Soporte
+- ✅ Corrección de bugs durante el período
+- ✅ Asistencia técnica por WhatsApp/email
+- ✅ Ajustes de configuración
+- ✅ Actualizaciones (solo Premium)
+
+### Sin Soporte
+- ✅ Entrega completa del sistema funcionando
+- ✅ 1 videollamada de handoff/entrega
+- ✅ Documentación y manuales
+- ✅ FAQ para resolver dudas comunes
+- ❌ Sin asistencia post-entrega
+- ❌ Sin corrección de bugs incluida
+
+*Ideal si tenés tu propio desarrollador o equipo técnico.*
 
 ---
 
