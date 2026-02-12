@@ -66,9 +66,9 @@ La licencia otorgada es de tipo **EXCLUSIVA**, lo que implica:
 |----------------|:--------:|:-------:|
 | Código fuente completo | ✅ | ✅ |
 | Dominio incluido | ✅ | ✅ |
-| Instalación y setup | ✅ | ✅ |
+| Instalación en servidor | ✅ | ✅ |
 | Documentación completa | ✅ | ✅ |
-| Capacitación (handoff) | 1 hora | 2 horas |
+| Videollamada handoff | 30 min | 1 hora |
 | Personalización de marca | ❌ | ✅ |
 | Flujos personalizados | ❌ | ✅ |
 | Landing page | ❌ | ✅ |
