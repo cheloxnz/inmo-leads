@@ -57,36 +57,28 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 
 ## Planes Disponibles
 
-### 📦 Plan Completo
+### 📦 Plan Completo — USD $7,500
 
-**Ideal para:** Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.
-
-| Modalidad | Precio | Soporte |
-|-----------|--------|---------|
-| **Con Soporte** | USD $10,000 | 30 días incluidos |
-| **Sin Soporte** | USD $7,500 | Solo entrega y handoff |
+**Ideal para:** Inmobiliarias que tienen equipo técnico propio o quieren empezar a operar de inmediato.
 
 **Incluye:**
 - ✅ Código fuente completo (React + Python + MongoDB)
-- ✅ Dominio profesional (inmobot-ia.com o similar)
+- ✅ Dominio profesional (inmobot-ia.com)
 - ✅ Instalación y configuración en servidor
 - ✅ Conexión con tu WhatsApp Business
 - ✅ Configuración de integraciones (IA, email)
-- ✅ Capacitación de uso (1 hora por videollamada)
+- ✅ **1 hora de videollamada de handoff/entrega**
 - ✅ Documentación técnica completa
+- ✅ Script de inicialización para empezar de cero
+- ❌ Sin soporte post-entrega
 
 **Entrega:** 5-7 días hábiles
 
 ---
 
-### 🚀 Plan Premium
+### 🚀 Plan Premium — USD $12,000
 
-**Ideal para:** Inmobiliarias que quieren una solución personalizada y exclusividad garantizada.
-
-| Modalidad | Precio | Soporte |
-|-----------|--------|---------|
-| **Con Soporte** | USD $18,000 | 90 días + 6 meses updates |
-| **Sin Soporte** | USD $12,000 | Solo entrega y handoff |
+**Ideal para:** Inmobiliarias que quieren una solución personalizada y respaldo durante los primeros meses.
 
 **Incluye todo lo del Plan Completo, más:**
 - ✅ **Personalización de marca** (logo, colores, mensajes)
@@ -94,6 +86,7 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 - ✅ **Integración con tu CRM actual** (si aplica)
 - ✅ **Landing page personalizada** para captar leads
 - ✅ **2 horas de capacitación** para tu equipo
+- ✅ **3 meses de actualizaciones y corrección de bugs** (si se requieren)
 - ✅ Asesoría en estrategia de captación digital
 
 **Entrega:** 10-15 días hábiles
@@ -108,32 +101,28 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 | Dominio incluido | ✅ | ✅ |
 | Instalación y setup | ✅ | ✅ |
 | Conexión WhatsApp | ✅ | ✅ |
-| Capacitación | 1 hora | 2 horas |
+| Documentación completa | ✅ | ✅ |
+| Capacitación (handoff) | 1 hora | 2 horas |
 | Personalización de marca | ❌ | ✅ |
 | Flujos personalizados | ❌ | ✅ |
 | Landing page | ❌ | ✅ |
-| **Precio CON soporte** | **$10,000** | **$18,000** |
-| **Precio SIN soporte** | **$7,500** | **$12,000** |
+| Updates y bugs (3 meses) | ❌ | ✅ |
+| **Precio** | **$7,500** | **$12,000** |
 
 ---
 
-## ¿Qué incluye cada modalidad?
+## ¿Qué pasa después de la entrega?
 
-### Con Soporte
-- ✅ Corrección de bugs durante el período
-- ✅ Asistencia técnica por WhatsApp/email
-- ✅ Ajustes de configuración
-- ✅ Actualizaciones (solo Premium)
+### Plan Completo
+- Recibís el sistema funcionando y la documentación
+- Vos (o tu desarrollador) se encarga del mantenimiento
+- Sin comunicación post-entrega
 
-### Sin Soporte
-- ✅ Entrega completa del sistema funcionando
-- ✅ 1 videollamada de handoff/entrega
-- ✅ Documentación y manuales
-- ✅ FAQ para resolver dudas comunes
-- ❌ Sin asistencia post-entrega
-- ❌ Sin corrección de bugs incluida
+### Plan Premium
+- Durante 3 meses: si hay bugs o necesitás updates, los resuelvo
+- Después de 3 meses: mismo que Plan Completo
 
-*Ideal si tenés tu propio desarrollador o equipo técnico.*
+*Ambos planes son licencia exclusiva: no venderé este sistema a otras inmobiliarias.*
 
 ---
 
