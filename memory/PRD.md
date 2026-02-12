@@ -34,7 +34,18 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-02-10 (Sesión Actual - Parte 3)
+### 2025-02-12 (Sesión Actual)
+- **Tarea Completada:**
+  - Generación de Propuesta Comercial en PDF (`/app/docs/PROPUESTA_COMERCIAL.pdf`)
+  - Script Python con ReportLab para convertir MD a PDF profesional
+  - PDF incluye: portada, tablas de funcionalidades, comparativa de planes, ROI, proceso de implementación
+- **Documentos de Venta Disponibles:**
+  - `/app/docs/PROPUESTA_COMERCIAL.md` (versión markdown)
+  - `/app/docs/PROPUESTA_COMERCIAL.pdf` (versión PDF profesional)
+  - `/app/docs/MENSAJES_VENTA.md` (mensajes cortos para contactar compradores)
+- **Estado:** El foco del usuario es la venta de la aplicación, no nuevas funcionalidades
+
+### 2026-02-10 (Sesión Anterior - Parte 3)
 - **Nuevas Funcionalidades Implementadas:**
   - **Acciones Masivas en Leads:** Checkboxes para seleccionar múltiples leads y ejecutar acciones (tag, status, asignar, eliminar)
   - **Página de Historial de Auditoría:** Nueva ruta /auditoria con timeline de todas las acciones del sistema
