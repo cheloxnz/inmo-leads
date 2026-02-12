@@ -195,21 +195,25 @@ def build_contract_pdf():
     
     # Tercera
     story.append(Paragraph("<b>TERCERA: PLAN CONTRATADO</b>", styles['SectionHeader']))
-    story.append(Paragraph("<b>Plan:</b> [ ] Completo &nbsp;&nbsp; [ ] Premium", styles['ContractBody']))
-    story.append(Paragraph("<b>Modalidad:</b> [ ] Con Soporte &nbsp;&nbsp; [ ] Sin Soporte", styles['ContractBody']))
+    story.append(Paragraph("<b>Plan seleccionado:</b>", styles['ContractBody']))
+    story.append(Paragraph("[ ] Plan Completo — USD $7,500", styles['ContractBullet']))
+    story.append(Paragraph("[ ] Plan Premium — USD $12,000", styles['ContractBullet']))
     story.append(Spacer(1, 0.1*inch))
     
-    precios_data = [
-        ['Plan', 'Con Soporte', 'Sin Soporte'],
-        ['Completo', 'USD $10,000', 'USD $7,500'],
-        ['Premium', 'USD $18,000', 'USD $12,000'],
+    compare_data = [
+        ['Característica', 'Completo', 'Premium'],
+        ['Código y dominio', '✓', '✓'],
+        ['Documentación', '✓', '✓'],
+        ['Capacitación', '1 hora', '2 horas'],
+        ['Personalización', '—', '✓'],
+        ['Updates/bugs (3 meses)', '—', '✓'],
+        ['Precio', '$7,500', '$12,000'],
     ]
-    t_precios = Table(precios_data, colWidths=[2*inch, 2*inch, 2*inch])
-    t_precios.setStyle(create_table_style())
-    story.append(t_precios)
+    t_compare = Table(compare_data, colWidths=[2.2*inch, 1.8*inch, 1.8*inch])
+    t_compare.setStyle(create_table_style())
+    story.append(t_compare)
     story.append(Spacer(1, 0.1*inch))
     story.append(Paragraph("<b>Precio acordado:</b> USD $_________________", styles['ContractBody']))
-    story.append(Paragraph("Características adicionales: _______________________________________________", styles['FieldLine']))
     
     # Cuarta
     story.append(Paragraph("<b>CUARTA: FORMA DE PAGO</b>", styles['SectionHeader']))
@@ -230,24 +234,26 @@ def build_contract_pdf():
     story.append(Paragraph("<b>SEXTA: ENTREGABLES</b>", styles['SectionHeader']))
     entregables = [
         "[ ] Acceso al repositorio de código fuente (GitHub)",
-        "[ ] Acceso a la base de datos (MongoDB Atlas)",
-        "[ ] Acceso al servidor de producción",
-        "[ ] Credenciales de todas las integraciones",
+        "[ ] Dominio profesional configurado",
+        "[ ] Base de datos vacía (estructura lista)",
+        "[ ] Script de inicialización (crear admin)",
         "[ ] Documentación técnica completa",
-        "[ ] Manual de usuario",
-        "[ ] Capacitación por videollamada"
+        "[ ] Manual de usuario y FAQ",
+        "[ ] Videollamada de handoff/entrega"
     ]
     for e in entregables:
         story.append(Paragraph(e, styles['ContractBullet']))
     
     # Séptima
-    story.append(Paragraph("<b>SÉPTIMA: SOPORTE TÉCNICO</b>", styles['SectionHeader']))
-    story.append(Paragraph("<b>Aplica solo si se contrató modalidad 'Con Soporte':</b>", styles['ContractBody']))
-    soporte_data = [
-        ['Plan', 'Duración', 'Extendido'],
-        ['Completo', '30 días', '+$300 USD/mes'],
-        ['Premium', '90 días', '+$200 USD/mes'],
-    ]
+    story.append(Paragraph("<b>SÉPTIMA: SOPORTE Y ACTUALIZACIONES</b>", styles['SectionHeader']))
+    story.append(Paragraph("<b>Plan Completo ($7,500):</b>", styles['ContractBody']))
+    story.append(Paragraph("• Sin soporte técnico post-entrega", styles['ContractBullet']))
+    story.append(Paragraph("• El LICENCIATARIO se encarga del mantenimiento", styles['ContractBullet']))
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph("<b>Plan Premium ($12,000):</b>", styles['ContractBody']))
+    story.append(Paragraph("• 3 meses de corrección de bugs (si se detectan)", styles['ContractBullet']))
+    story.append(Paragraph("• 3 meses de actualizaciones menores (si se requieren)", styles['ContractBullet']))
+    story.append(Paragraph("• Después de 3 meses: mismo que Plan Completo", styles['ContractBullet']))
     t = Table(soporte_data, colWidths=[2*inch, 2*inch, 2*inch])
     t.setStyle(create_table_style())
     story.append(t)
