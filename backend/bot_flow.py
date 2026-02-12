@@ -241,8 +241,8 @@ class BotFlowManager:
                 logger.warning(f"Estado no manejado para {lead.phone}: {lead.flow_stage}")
                 response = "¡Hola! 👋 ¿En qué puedo ayudarte?"
                 buttons = [
-                    {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Buscar propiedad"}},
-                    {"type": "reply", "reply": {"id": "tengo_consulta", "title": "Tengo una consulta"}},
+                    {"type": "reply", "reply": {"id": "buscar_propiedad", "title": "Comprar/Alquilar"}},
+                    {"type": "reply", "reply": {"id": "vender", "title": "Vender mi propiedad"}},
                     {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}
                 ]
                 self.wa.send_interactive_buttons(lead.phone, response, buttons)
