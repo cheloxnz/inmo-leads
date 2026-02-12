@@ -125,8 +125,9 @@ El LICENCIANTE entregará al LICENCIATARIO:
 **Plan Completo ($7,500):**
 - Sin soporte técnico post-entrega
 - El LICENCIATARIO recibe el sistema funcionando
-- 1 videollamada de handoff/entrega (1 hora)
-- Documentación completa y FAQ
+- 30 minutos de videollamada de handoff/entrega
+- Documentación completa
+- El LICENCIATARIO configura las integraciones (WhatsApp, OpenAI, etc.) con la documentación
 - El LICENCIATARIO (o su equipo técnico) se encarga del mantenimiento
 
 **Plan Premium ($12,000):**
@@ -134,6 +135,7 @@ El LICENCIANTE entregará al LICENCIATARIO:
   - Corrección de bugs si se detectan
   - Actualizaciones menores si se requieren
   - Comunicación por email para temas técnicos
+- 1 hora de videollamada de capacitación
 - Después de los 3 meses: mismo que Plan Completo (sin soporte)
 
 **En ambos planes NO se incluye:**
