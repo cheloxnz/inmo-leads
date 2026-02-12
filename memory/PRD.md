@@ -39,6 +39,18 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
   - Generación de Propuesta Comercial en PDF (`/app/docs/PROPUESTA_COMERCIAL.pdf`)
   - Script Python con ReportLab para convertir MD a PDF profesional
   - PDF incluye: portada, tablas de funcionalidades, comparativa de planes, ROI, proceso de implementación
+  - **Precios actualizados a licencia exclusiva:** $10,000 (Completo) / $18,000 (Premium)
+  - **Sección de Términos de Licencia agregada** con detalles de exclusividad, entrega, soporte y costos post-venta
+- **Documentación para el Comprador:**
+  - `/app/docs/MANUAL_COMPRADOR.md` - Manual completo (844 líneas) con:
+    - Arquitectura del sistema
+    - Deploy en Railway y DigitalOcean
+    - Configuración de todas las integraciones
+    - Personalización del bot
+    - Mantenimiento y actualizaciones
+    - Solución de problemas
+  - `/app/docs/GUIA_RAPIDA.md` - Setup en 30 minutos
+  - `/app/docs/FAQ.md` - Preguntas frecuentes (220 respuestas)
 - **Documentos de Venta Disponibles:**
   - `/app/docs/PROPUESTA_COMERCIAL.md` (versión markdown)
   - `/app/docs/PROPUESTA_COMERCIAL.pdf` (versión PDF profesional)
