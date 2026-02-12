@@ -195,8 +195,21 @@ def build_contract_pdf():
     
     # Tercera
     story.append(Paragraph("<b>TERCERA: PLAN CONTRATADO</b>", styles['SectionHeader']))
-    story.append(Paragraph("[ ] Plan Completo - USD $10,000 &nbsp;&nbsp;&nbsp; [ ] Plan Premium - USD $18,000", styles['ContractBody']))
-    story.append(Paragraph("Características adicionales acordadas: _______________________________________________", styles['FieldLine']))
+    story.append(Paragraph("<b>Plan:</b> [ ] Completo &nbsp;&nbsp; [ ] Premium", styles['ContractBody']))
+    story.append(Paragraph("<b>Modalidad:</b> [ ] Con Soporte &nbsp;&nbsp; [ ] Sin Soporte", styles['ContractBody']))
+    story.append(Spacer(1, 0.1*inch))
+    
+    precios_data = [
+        ['Plan', 'Con Soporte', 'Sin Soporte'],
+        ['Completo', 'USD $10,000', 'USD $7,500'],
+        ['Premium', 'USD $18,000', 'USD $12,000'],
+    ]
+    t_precios = Table(precios_data, colWidths=[2*inch, 2*inch, 2*inch])
+    t_precios.setStyle(create_table_style())
+    story.append(t_precios)
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph("<b>Precio acordado:</b> USD $_________________", styles['ContractBody']))
+    story.append(Paragraph("Características adicionales: _______________________________________________", styles['FieldLine']))
     
     # Cuarta
     story.append(Paragraph("<b>CUARTA: FORMA DE PAGO</b>", styles['SectionHeader']))
