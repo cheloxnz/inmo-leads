@@ -6,6 +6,7 @@ from enum import Enum
 class LeadIntent(str, Enum):
     COMPRAR = "comprar"
     ALQUILAR = "alquilar"
+    VENDER = "vender"
     INVERSION = "inversion"
     SIN_DEFINIR = "sin_definir"
 
