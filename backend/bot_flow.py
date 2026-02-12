@@ -309,7 +309,12 @@ class BotFlowManager:
         
         lead.name = name
         
-        response = f"Encantado, {name}. ¿En qué zona estás buscando?\n\nPodés escribir el barrio o zona que te interesa."
+        # Pregunta diferente para vendedores
+        if lead.intent == LeadIntent.VENDER:
+            response = f"Encantado, {name}. ¿En qué zona/barrio está ubicada tu propiedad?\n\nEjemplo: Palermo, Belgrano, etc."
+        else:
+            response = f"Encantado, {name}. ¿En qué zona estás buscando?\n\nPodés escribir el barrio o zona que te interesa."
+        
         self.wa.send_text_message(lead.phone, response)
         lead.flow_stage = FlowStage.ZONE
     
