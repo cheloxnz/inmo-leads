@@ -314,16 +314,26 @@ class BotFlowManager:
         lead.flow_stage = FlowStage.ZONE
     
     async def handle_zone(self, lead: Lead, message: str):
-        """Maneja zona de interés"""
+        """Maneja zona de interés o ubicación de propiedad (para vendedores)"""
         zone = await self.llm.extract_zone(message)
         
         if zone:
             lead.zone = zone
-            response = f"Genial, {zone}. ¿Cuál es tu presupuesto aproximado? (en USD)\n\nEjemplo: 150.000 USD o 100k-200k"
-            self.wa.send_text_message(lead.phone, response)
-            lead.flow_stage = FlowStage.BUDGET
+            
+            # Flujo diferente para vendedores
+            if lead.intent == LeadIntent.VENDER:
+                response = f"Perfecto, tu propiedad está en {zone}. ¿Qué tipo de propiedad es?\n\n1️⃣ Departamento\n2️⃣ Casa\n3️⃣ PH\n4️⃣ Local comercial\n5️⃣ Terreno\n6️⃣ Otro"
+                self.wa.send_text_message(lead.phone, response)
+                lead.flow_stage = FlowStage.PROPERTY_TYPE
+            else:
+                response = f"Genial, {zone}. ¿Cuál es tu presupuesto aproximado? (en USD)\n\nEjemplo: 150.000 USD o 100k-200k"
+                self.wa.send_text_message(lead.phone, response)
+                lead.flow_stage = FlowStage.BUDGET
         else:
-            response = "No pude identificar la zona. ¿Podés escribirla de nuevo?\n\nEjemplo: Palermo, Belgrano, etc."
+            if lead.intent == LeadIntent.VENDER:
+                response = "No pude identificar la zona. ¿En qué barrio está ubicada tu propiedad?\n\nEjemplo: Palermo, Belgrano, etc."
+            else:
+                response = "No pude identificar la zona. ¿Podés escribirla de nuevo?\n\nEjemplo: Palermo, Belgrano, etc."
             self.wa.send_text_message(lead.phone, response)
     
     async def handle_budget(self, lead: Lead, message: str):
