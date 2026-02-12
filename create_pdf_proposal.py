@@ -153,7 +153,7 @@ def build_pdf():
     story.append(Spacer(1, 0.3*inch))
     story.append(Paragraph("PROPUESTA COMERCIAL", styles['SectionHeader']))
     story.append(Spacer(1, 2*inch))
-    story.append(Paragraph("hola@inmobot-ia.com", styles['BodyText']))
+    story.append(Paragraph("hola@inmobot-ia.com", styles['CustomBody']))
     story.append(PageBreak())
     
     # === EL PROBLEMA ===
@@ -162,7 +162,7 @@ def build_pdf():
     
     story.append(Paragraph(
         "Las inmobiliarias pierden <b>hasta el 40% de sus leads</b> porque:",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     problems = [
@@ -182,7 +182,7 @@ def build_pdf():
     
     story.append(Paragraph(
         "<b>InmoBot</b> es un asistente virtual inteligente que:",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     solutions = [
@@ -245,7 +245,7 @@ def build_pdf():
     story.append(Paragraph("USD $3,500", styles['PriceHighlight']))
     story.append(Paragraph(
         "<b>Ideal para:</b> Inmobiliarias que quieren empezar a operar de inmediato.",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     plan_completo = [
@@ -261,7 +261,7 @@ def build_pdf():
     for item in plan_completo:
         story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
     
-    story.append(Paragraph("<b>Entrega:</b> 5-7 días hábiles", styles['BodyText']))
+    story.append(Paragraph("<b>Entrega:</b> 5-7 días hábiles", styles['CustomBody']))
     
     story.append(Spacer(1, 0.3*inch))
     
@@ -270,11 +270,11 @@ def build_pdf():
     story.append(Paragraph("USD $6,000", styles['PriceHighlight']))
     story.append(Paragraph(
         "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada y soporte extendido.",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     story.append(Paragraph(
         "<b>Incluye todo lo del Plan Completo, más:</b>",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     plan_premium = [
@@ -290,7 +290,7 @@ def build_pdf():
     for item in plan_premium:
         story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
     
-    story.append(Paragraph("<b>Entrega:</b> 10-15 días hábiles", styles['BodyText']))
+    story.append(Paragraph("<b>Entrega:</b> 10-15 días hábiles", styles['CustomBody']))
     
     story.append(Spacer(1, 0.3*inch))
     
@@ -325,7 +325,7 @@ def build_pdf():
     story.append(Paragraph("Retorno de Inversión (ROI)", styles['SectionHeader']))
     story.append(HRFlowable(width="100%", thickness=1, color=ACCENT_COLOR, spaceAfter=15))
     
-    story.append(Paragraph("<b>Ejemplo con 100 leads/mes:</b>", styles['BodyText']))
+    story.append(Paragraph("<b>Ejemplo con 100 leads/mes:</b>", styles['CustomBody']))
     
     roi_data = [
         ['Métrica', 'Sin InmoBot', 'Con InmoBot'],
@@ -343,11 +343,11 @@ def build_pdf():
     story.append(Spacer(1, 0.2*inch))
     story.append(Paragraph(
         "<b>Ganancia adicional:</b> $24,500/mes",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     story.append(Paragraph(
         "<b>Recuperás la inversión:</b> En menos de 1 semana",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     story.append(Spacer(1, 0.3*inch))
@@ -383,7 +383,7 @@ def build_pdf():
     
     story.append(Paragraph(
         "<b>Modalidad:</b> 50% al confirmar, 50% al entregar",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     story.append(Spacer(1, 0.3*inch))
@@ -394,11 +394,11 @@ def build_pdf():
     
     story.append(Paragraph(
         "<b>7 días de garantía de satisfacción</b>",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     story.append(Paragraph(
         "Si el bot no funciona como se describió, te devolvemos el 100% de tu dinero.",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     story.append(Spacer(1, 0.5*inch))
@@ -407,13 +407,13 @@ def build_pdf():
     story.append(HRFlowable(width="100%", thickness=2, color=PRIMARY_COLOR, spaceAfter=20))
     story.append(Paragraph("Contacto", styles['SectionHeader']))
     
-    story.append(Paragraph("Email: hola@inmobot-ia.com", styles['BodyText']))
-    story.append(Paragraph("Demo: https://app.inmobot-ia.com/demo", styles['BodyText']))
+    story.append(Paragraph("Email: hola@inmobot-ia.com", styles['CustomBody']))
+    story.append(Paragraph("Demo: https://app.inmobot-ia.com/demo", styles['CustomBody']))
     
     story.append(Spacer(1, 0.5*inch))
     story.append(Paragraph(
         "<i>InmoBot - Convertí consultas en ventas, mientras dormís.</i>",
-        styles['BodyText']
+        styles['CustomBody']
     ))
     
     # Generar PDF
