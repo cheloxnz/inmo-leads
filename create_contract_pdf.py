@@ -204,7 +204,7 @@ def build_contract_pdf():
         ['Característica', 'Completo', 'Premium'],
         ['Código y dominio', '✓', '✓'],
         ['Documentación', '✓', '✓'],
-        ['Capacitación', '1 hora', '2 horas'],
+        ['Videollamada handoff', '30 min', '1 hora'],
         ['Personalización', '—', '✓'],
         ['Updates/bugs (3 meses)', '—', '✓'],
         ['Precio', '$7,500', '$12,000'],
