@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import NotificationBell from './components/NotificationBell';
+import ChangePassword from './components/ChangePassword';
 import Dashboard from './pages/Dashboard';
 import Leads from './pages/Leads';
 import LeadDetail from './pages/LeadDetail';
@@ -24,7 +25,7 @@ import DataDeletion from './pages/DataDeletion';
 import LandingPage from './pages/LandingPage';
 import AuditLog from './pages/AuditLog';
 import Broadcast from './pages/Broadcast';
-import { Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
