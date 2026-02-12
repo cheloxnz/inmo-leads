@@ -1,5 +1,24 @@
 # InmoBot - Guía Rápida de Inicio
 
+## Resumen Visual
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SETUP EN 5 PASOS                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│    📁 REPO          🚂 RAILWAY         🔧 CONFIG             │
+│    GITHUB    ───►   DEPLOY     ───►   VARIABLES             │
+│                                                              │
+│        │                │                   │                │
+│        ▼                ▼                   ▼                │
+│                                                              │
+│    📱 WHATSAPP      🌐 DOMINIO        ✅ LISTO!             │
+│    WEBHOOK    ───►   (opcional)  ───►   BOT ACTIVO          │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ## Setup en 30 minutos (Railway)
 
 ### Paso 1: Cuentas necesarias (10 min)
