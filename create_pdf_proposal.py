@@ -242,9 +242,9 @@ def build_pdf():
     
     # Plan Completo
     story.append(Paragraph("Plan Completo", styles['PlanName']))
-    story.append(Paragraph("USD $3,500", styles['PriceHighlight']))
+    story.append(Paragraph("USD $10,000", styles['PriceHighlight']))
     story.append(Paragraph(
-        "<b>Ideal para:</b> Inmobiliarias que quieren empezar a operar de inmediato.",
+        "<b>Ideal para:</b> Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.",
         styles['CustomBody']
     ))
     
@@ -267,9 +267,9 @@ def build_pdf():
     
     # Plan Premium
     story.append(Paragraph("Plan Premium", styles['PlanName']))
-    story.append(Paragraph("USD $6,000", styles['PriceHighlight']))
+    story.append(Paragraph("USD $18,000", styles['PriceHighlight']))
     story.append(Paragraph(
-        "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada y soporte extendido.",
+        "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada, soporte extendido y exclusividad garantizada.",
         styles['CustomBody']
     ))
     story.append(Paragraph(
@@ -310,7 +310,7 @@ def build_pdf():
         ['Flujos personalizados', '—', '✓'],
         ['Landing page', '—', '✓'],
         ['Actualizaciones', '—', '6 meses'],
-        ['Precio', '$3,500', '$6,000'],
+        ['Precio', '$10,000', '$18,000'],
     ]
     
     compare_table = Table(compare_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
@@ -346,7 +346,7 @@ def build_pdf():
         styles['CustomBody']
     ))
     story.append(Paragraph(
-        "<b>Recuperás la inversión:</b> En menos de 1 semana",
+        "<b>Recuperás la inversión:</b> En menos de 2-3 semanas",
         styles['CustomBody']
     ))
     
