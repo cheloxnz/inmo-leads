@@ -103,6 +103,7 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - [x] Acciones masivas en leads (UI)
 - [x] Historial de auditoría (UI)
 - [x] Mensajes broadcast (UI)
+- [x] Propuesta comercial PDF para venta
 
 ### P1 (Alto) - Pendiente
 - [ ] Tareas programadas (scheduler) - Testing real con citas
