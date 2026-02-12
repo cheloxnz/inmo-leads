@@ -61,19 +61,18 @@ def create_admin():
     admin_email = "admin@inmobot.com"
     admin_password = "Admin123!"
     
-    # Verificar si ya existe
-    existing = db.users.find_one({"email": admin_email})
+    # Verificar si ya existe (en colección agents que usa el sistema de auth)
+    existing = db.agents.find_one({"email": admin_email})
     
     if existing:
         print(f"⚠️  El usuario {admin_email} ya existe.")
         response = input("¿Deseas resetear la contraseña? (s/n): ").strip().lower()
         
         if response == 's':
-            db.users.update_one(
+            db.agents.update_one(
                 {"email": admin_email},
                 {"$set": {
                     "password_hash": get_password_hash(admin_password),
-                    "updated_at": datetime.now(timezone.utc)
                 }}
             )
             print(f"✅ Contraseña reseteada para {admin_email}")
@@ -81,18 +80,20 @@ def create_admin():
             print("ℹ️  No se realizaron cambios.")
             return
     else:
-        # Crear nuevo usuario admin
+        # Crear nuevo usuario admin en colección agents
         admin_user = {
             "email": admin_email,
-            "username": "Administrador",
+            "name": "Administrador",
             "password_hash": get_password_hash(admin_password),
             "role": "admin",
-            "is_active": True,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
+            "active": True,
+            "phone": "",
+            "specialties": [],
+            "zones": [],
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
-        db.users.insert_one(admin_user)
+        db.agents.insert_one(admin_user)
         print(f"✅ Usuario administrador creado")
     
     print("")
