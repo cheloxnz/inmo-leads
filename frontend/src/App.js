@@ -264,10 +264,23 @@ function Navigation() {
             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
           </div>
         )}
+        <button 
+          className="change-password-btn" 
+          onClick={() => setShowChangePassword(true)} 
+          data-testid="btn-open-change-password" 
+          title="Cambiar Contraseña"
+        >
+          {isCollapsed ? <Key size={16} /> : <><Key size={16} /> Cambiar Contraseña</>}
+        </button>
         <button className="logout-btn" onClick={logout} data-testid="btn-logout" title="Cerrar Sesión">
           {isCollapsed ? '🚪' : 'Cerrar Sesión'}
         </button>
       </div>
+      
+      <ChangePassword 
+        isOpen={showChangePassword} 
+        onClose={() => setShowChangePassword(false)} 
+      />
     </nav>
   );
 }
