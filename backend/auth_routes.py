@@ -118,6 +118,41 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncIOMoto
     
     return agent
 
+@router.put("/change-password")
+async def change_password(
+    password_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Cambiar contraseña del usuario actual"""
+    current_password = password_data.get("current_password")
+    new_password = password_data.get("new_password")
+    
+    if not current_password or not new_password:
+        raise HTTPException(status_code=400, detail="Se requiere contraseña actual y nueva")
+    
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+    
+    # Obtener usuario actual con password_hash
+    agent = await db.agents.find_one({"email": current_user.email})
+    
+    if not agent:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verificar contraseña actual
+    if not verify_password(current_password, agent.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Contraseña actual incorrecta")
+    
+    # Actualizar contraseña
+    new_hash = get_password_hash(new_password)
+    await db.agents.update_one(
+        {"email": current_user.email},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    return {"message": "Contraseña actualizada exitosamente"}
+
 @router.get("/agents")
 async def list_agents(
     current_user: User = Depends(get_current_user),
