@@ -59,20 +59,20 @@ La licencia otorgada es de tipo **EXCLUSIVA**, lo que implica:
 
 **Plan seleccionado:**
 
-[ ] **Plan Completo**
-[ ] **Plan Premium**
+[ ] **Plan Completo** — USD $7,500
+[ ] **Plan Premium** — USD $12,000
 
-**Modalidad de soporte:**
-
-[ ] **Con Soporte**
-[ ] **Sin Soporte** (Solo entrega y handoff)
-
-**Tabla de precios:**
-
-| Plan | Con Soporte | Sin Soporte |
-|------|-------------|-------------|
-| Completo | USD $10,000 | USD $7,500 |
-| Premium | USD $18,000 | USD $12,000 |
+| Característica | Completo | Premium |
+|----------------|:--------:|:-------:|
+| Código fuente completo | ✅ | ✅ |
+| Dominio incluido | ✅ | ✅ |
+| Instalación y setup | ✅ | ✅ |
+| Documentación completa | ✅ | ✅ |
+| Capacitación (handoff) | 1 hora | 2 horas |
+| Personalización de marca | ❌ | ✅ |
+| Flujos personalizados | ❌ | ✅ |
+| Landing page | ❌ | ✅ |
+| Updates y bugs (3 meses) | ❌ | ✅ |
 
 **Precio acordado:** USD $_____________
 
