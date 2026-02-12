@@ -57,9 +57,9 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 
 ## Planes Disponibles
 
-### 📦 Plan Completo — USD $3,500
+### 📦 Plan Completo — USD $10,000
 
-**Ideal para:** Inmobiliarias que quieren empezar a operar de inmediato.
+**Ideal para:** Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.
 
 **Incluye:**
 - ✅ Código fuente completo (React + Python + MongoDB)
@@ -75,9 +75,9 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 
 ---
 
-### 🚀 Plan Premium — USD $6,000
+### 🚀 Plan Premium — USD $18,000
 
-**Ideal para:** Inmobiliarias que quieren una solución personalizada y soporte extendido.
+**Ideal para:** Inmobiliarias que quieren una solución personalizada, soporte extendido y exclusividad garantizada.
 
 **Incluye todo lo del Plan Completo, más:**
 - ✅ **Personalización de marca** (logo, colores, mensajes)
