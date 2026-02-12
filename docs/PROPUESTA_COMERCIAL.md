@@ -124,7 +124,7 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 | **Ingreso mensual** | **$10,500** | **$35,000** |
 
 **Ganancia adicional:** $24,500/mes  
-**Recuperás la inversión:** En menos de 1 semana
+**Recuperás la inversión:** En menos de 2-3 semanas
 
 ---
 
