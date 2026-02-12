@@ -242,55 +242,37 @@ def build_pdf():
     
     # Plan Completo
     story.append(Paragraph("Plan Completo", styles['PlanName']))
-    
-    # Tabla de precios Completo
-    precio_completo = [
-        ['Modalidad', 'Precio', 'Soporte'],
-        ['Con Soporte', 'USD $10,000', '30 días incluidos'],
-        ['Sin Soporte', 'USD $7,500', 'Solo entrega y handoff'],
-    ]
-    t_precio_c = Table(precio_completo, colWidths=[1.8*inch, 1.8*inch, 2.4*inch])
-    t_precio_c.setStyle(create_table_style())
-    story.append(t_precio_c)
-    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph("USD $7,500", styles['PriceHighlight']))
     
     story.append(Paragraph(
-        "<b>Ideal para:</b> Inmobiliarias que quieren empezar a operar de inmediato con exclusividad total.",
+        "<b>Ideal para:</b> Inmobiliarias que tienen equipo técnico propio o quieren empezar de inmediato.",
         styles['CustomBody']
     ))
     
     plan_completo = [
         "Código fuente completo (React + Python + MongoDB)",
-        "Dominio profesional (inmobot-ia.com o similar)",
+        "Dominio profesional (inmobot-ia.com)",
         "Instalación y configuración en servidor",
         "Conexión con tu WhatsApp Business",
         "Configuración de integraciones (IA, email)",
-        "Capacitación de uso (1 hora por videollamada)",
-        "Documentación técnica completa"
+        "<b>1 hora de videollamada de handoff/entrega</b>",
+        "Documentación técnica completa",
+        "Script de inicialización"
     ]
     for item in plan_completo:
         story.append(Paragraph(f"✓ {item}", styles['BulletPoint']))
     
+    story.append(Paragraph("✗ Sin soporte post-entrega", styles['BulletPoint']))
     story.append(Paragraph("<b>Entrega:</b> 5-7 días hábiles", styles['CustomBody']))
     
     story.append(Spacer(1, 0.3*inch))
     
     # Plan Premium
     story.append(Paragraph("Plan Premium", styles['PlanName']))
-    
-    # Tabla de precios Premium
-    precio_premium = [
-        ['Modalidad', 'Precio', 'Soporte'],
-        ['Con Soporte', 'USD $18,000', '90 días + 6 meses updates'],
-        ['Sin Soporte', 'USD $12,000', 'Solo entrega y handoff'],
-    ]
-    t_precio_p = Table(precio_premium, colWidths=[1.8*inch, 1.8*inch, 2.4*inch])
-    t_precio_p.setStyle(create_table_style())
-    story.append(t_precio_p)
-    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph("USD $12,000", styles['PriceHighlight']))
     
     story.append(Paragraph(
-        "<b>Ideal para:</b> Inmobiliarias que quieren una solución personalizada y exclusividad garantizada.",
+        "<b>Ideal para:</b> Inmobiliarias que quieren personalización y respaldo los primeros meses.",
         styles['CustomBody']
     ))
     story.append(Paragraph(
@@ -300,10 +282,11 @@ def build_pdf():
     
     plan_premium = [
         "<b>Personalización de marca</b> (logo, colores, mensajes)",
-        "<b>Flujos de conversación personalizados</b> según tu operación",
+        "<b>Flujos de conversación personalizados</b>",
         "<b>Integración con tu CRM actual</b> (si aplica)",
-        "<b>Landing page personalizada</b> para captar leads",
+        "<b>Landing page personalizada</b>",
         "<b>2 horas de capacitación</b> para tu equipo",
+        "<b>3 meses de updates y corrección de bugs</b> (si se requieren)",
         "Asesoría en estrategia de captación digital"
     ]
     for item in plan_premium:
