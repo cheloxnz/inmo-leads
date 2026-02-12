@@ -254,32 +254,18 @@ def build_contract_pdf():
     story.append(Paragraph("• 3 meses de corrección de bugs (si se detectan)", styles['ContractBullet']))
     story.append(Paragraph("• 3 meses de actualizaciones menores (si se requieren)", styles['ContractBullet']))
     story.append(Paragraph("• Después de 3 meses: mismo que Plan Completo", styles['ContractBullet']))
-    t = Table(soporte_data, colWidths=[2*inch, 2*inch, 2*inch])
-    t.setStyle(create_table_style())
-    story.append(t)
     story.append(Spacer(1, 0.1*inch))
-    
-    story.append(Paragraph("<b>Incluye:</b> Corrección de bugs, asistencia técnica, ajustes de configuración.", styles['ContractBody']))
-    story.append(Paragraph("<b>No incluye:</b> Nuevas funcionalidades, cambios mayores de diseño, integraciones adicionales.", styles['ContractBody']))
-    story.append(Spacer(1, 0.1*inch))
-    story.append(Paragraph("<b>Modalidad 'Sin Soporte':</b> Entrega completa + 1 hora de handoff + documentación. Sin asistencia post-entrega.", styles['ContractBody']))
+    story.append(Paragraph("<b>En ambos planes NO se incluye:</b> Nuevas funcionalidades, cambios mayores de diseño, integraciones adicionales, soporte fuera del período.", styles['ContractBody']))
     
     # Octava
-    story.append(Paragraph("<b>OCTAVA: ACTUALIZACIONES (Solo Plan Premium)</b>", styles['SectionHeader']))
-    story.append(Paragraph(
-        "El LICENCIANTE proveerá actualizaciones gratuitas durante <b>6 meses</b> desde la entrega, incluyendo correcciones de seguridad y mejoras menores.",
-        styles['ContractBody']
-    ))
-    
-    # Novena
-    story.append(Paragraph("<b>NOVENA: GARANTÍA</b>", styles['SectionHeader']))
+    story.append(Paragraph("<b>OCTAVA: GARANTÍA</b>", styles['SectionHeader']))
     story.append(Paragraph(
         "El LICENCIANTE garantiza el funcionamiento según especificaciones y código libre de malware. <b>Garantía de satisfacción: 7 días</b> desde la entrega para verificar funcionamiento, con devolución del 100% si no cumple lo acordado.",
         styles['ContractBody']
     ))
     
-    # Décima
-    story.append(Paragraph("<b>DÉCIMA: RESPONSABILIDADES DEL LICENCIATARIO</b>", styles['SectionHeader']))
+    # Novena
+    story.append(Paragraph("<b>NOVENA: RESPONSABILIDADES DEL LICENCIATARIO</b>", styles['SectionHeader']))
     resp = [
         "a) Mantener confidencialidad de credenciales y accesos",
         "b) Asumir costos operativos post-entrega (hosting, APIs, dominio)",
