@@ -12,7 +12,7 @@ class LLMService:
         self.model_name = "gpt-4o"
     
     async def classify_intent(self, user_message: str) -> Dict:
-        """Clasifica la intención del usuario: comprar, alquilar, inversión"""
+        """Clasifica la intención del usuario: comprar, alquilar, vender, inversión"""
         chat = LlmChat(
             api_key=self.api_key,
             session_id="intent_classification",
@@ -20,6 +20,7 @@ class LLMService:
             El usuario te dirá algo sobre propiedades. Debes clasificar su intención en una de estas categorías:
             - comprar: quiere comprar una propiedad
             - alquilar: quiere alquilar una propiedad
+            - vender: quiere vender su propiedad
             - inversion: busca invertir en propiedades
             - sin_definir: no está claro o está explorando opciones
             
