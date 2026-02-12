@@ -64,13 +64,13 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 **Incluye:**
 - ✅ Código fuente completo (React + Python + MongoDB)
 - ✅ Dominio profesional (inmobot-ia.com)
-- ✅ Instalación y configuración en servidor
-- ✅ Conexión con tu WhatsApp Business
-- ✅ Configuración de integraciones (IA, email)
-- ✅ **1 hora de videollamada de handoff/entrega**
+- ✅ Instalación en servidor (Railway o DigitalOcean)
+- ✅ **30 minutos de videollamada de handoff/entrega**
 - ✅ Documentación técnica completa
 - ✅ Script de inicialización para empezar de cero
 - ❌ Sin soporte post-entrega
+
+*El comprador configura las integraciones (WhatsApp, OpenAI, Stripe) siguiendo la documentación.*
 
 **Entrega:** 5-7 días hábiles
 
@@ -81,13 +81,12 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 **Ideal para:** Inmobiliarias que quieren una solución personalizada y respaldo durante los primeros meses.
 
 **Incluye todo lo del Plan Completo, más:**
-- ✅ **Personalización de marca** (logo, colores, mensajes)
+- ✅ **Personalización de marca** (logo, colores, mensajes del bot)
 - ✅ **Flujos de conversación personalizados** según tu operación
 - ✅ **Integración con tu CRM actual** (si aplica)
 - ✅ **Landing page personalizada** para captar leads
-- ✅ **2 horas de capacitación** para tu equipo
+- ✅ **1 hora de capacitación** para tu equipo
 - ✅ **3 meses de actualizaciones y corrección de bugs** (si se requieren)
-- ✅ Asesoría en estrategia de captación digital
 
 **Entrega:** 10-15 días hábiles
 
@@ -99,15 +98,26 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 |----------------|:--------:|:-------:|
 | Código fuente completo | ✅ | ✅ |
 | Dominio incluido | ✅ | ✅ |
-| Instalación y setup | ✅ | ✅ |
-| Conexión WhatsApp | ✅ | ✅ |
+| Instalación en servidor | ✅ | ✅ |
 | Documentación completa | ✅ | ✅ |
-| Capacitación (handoff) | 1 hora | 2 horas |
+| Videollamada handoff | 30 min | 1 hora |
 | Personalización de marca | ❌ | ✅ |
 | Flujos personalizados | ❌ | ✅ |
 | Landing page | ❌ | ✅ |
 | Updates y bugs (3 meses) | ❌ | ✅ |
 | **Precio** | **$7,500** | **$12,000** |
+
+---
+
+## ¿Qué configura el comprador?
+
+Con la documentación incluida, el comprador configura:
+- WhatsApp Business API (cuenta de Meta)
+- OpenAI API Key (para la IA)
+- Stripe (para pagos, si lo usa)
+- Emails (Resend o SMTP)
+
+*Todo está explicado paso a paso en el manual.*
 
 ---
 
