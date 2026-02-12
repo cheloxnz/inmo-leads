@@ -409,15 +409,31 @@ class BotFlowManager:
         if not lead.property_type:
             lead.property_type = PropertyType.OTRO
         
-        response = "¿Cuántos dormitorios necesitás?"
-        buttons = [
-            {"type": "reply", "reply": {"id": "1", "title": "1 ambiente"}},
-            {"type": "reply", "reply": {"id": "2", "title": "2 ambientes"}},
-            {"type": "reply", "reply": {"id": "3+", "title": "3 o más"}}
-        ]
-        
-        self.wa.send_interactive_buttons(lead.phone, response, buttons)
-        lead.flow_stage = FlowStage.BEDROOMS
+        # Flujo diferente para vendedores - van directo a agendar tasación
+        if lead.intent == LeadIntent.VENDER:
+            response = f"Excelente, {lead.name}. Tenés un/a {lead.property_type.value} en {lead.zone}.\n\n"
+            response += "Para darte una valoración precisa, necesitamos agendar una visita de tasación gratuita.\n\n"
+            response += "¿Qué día te viene mejor esta semana?"
+            
+            buttons = [
+                {"type": "reply", "reply": {"id": "hoy", "title": "Hoy"}},
+                {"type": "reply", "reply": {"id": "manana", "title": "Mañana"}},
+                {"type": "reply", "reply": {"id": "semana", "title": "Esta semana"}}
+            ]
+            
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            lead.flow_stage = FlowStage.SCHEDULE_DAY
+            lead.score += 3  # Vendedor interesado en tasación
+        else:
+            response = "¿Cuántos dormitorios necesitás?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "1", "title": "1 ambiente"}},
+                {"type": "reply", "reply": {"id": "2", "title": "2 ambientes"}},
+                {"type": "reply", "reply": {"id": "3+", "title": "3 o más"}}
+            ]
+            
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            lead.flow_stage = FlowStage.BEDROOMS
     
     async def handle_bedrooms(self, lead: Lead, message: str):
         """Maneja cantidad de dormitorios"""
