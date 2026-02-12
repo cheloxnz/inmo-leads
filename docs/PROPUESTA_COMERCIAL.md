@@ -107,7 +107,7 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 | Flujos personalizados | ❌ | ✅ |
 | Landing page | ❌ | ✅ |
 | Actualizaciones | ❌ | 6 meses |
-| **Precio** | **$3,500** | **$6,000** |
+| **Precio** | **$10,000** | **$18,000** |
 
 ---
 
