@@ -120,6 +120,8 @@ El LICENCIANTE entregará al LICENCIATARIO:
 
 ### SÉPTIMA: SOPORTE TÉCNICO
 
+**Aplica solo si se contrató modalidad "Con Soporte".**
+
 El LICENCIANTE brindará soporte técnico según el plan contratado:
 
 | Plan | Duración del soporte | Soporte extendido |
@@ -137,6 +139,13 @@ El LICENCIANTE brindará soporte técnico según el plan contratado:
 - Cambios mayores en el diseño
 - Integraciones adicionales no contempladas
 - Soporte para modificaciones realizadas por terceros
+
+**Si se contrató modalidad "Sin Soporte":**
+- El LICENCIATARIO recibe el sistema funcionando
+- 1 videollamada de handoff/entrega (1 hora)
+- Documentación completa y FAQ
+- Sin asistencia técnica post-entrega
+- Sin corrección de bugs incluida
 
 ### OCTAVA: ACTUALIZACIONES (Solo Plan Premium)
 
