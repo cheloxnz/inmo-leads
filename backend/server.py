@@ -211,6 +211,15 @@ async def handle_incoming_message(message: dict):
             lead_dict["last_message_at"] = lead.last_message_at.isoformat()
             lead_dict["created_at"] = lead.created_at.isoformat()
             await db.leads.insert_one(lead_dict)
+            
+            # 🔔 Notificar NUEVO LEAD (solo primer mensaje)
+            await notification_manager.send_to_admins({
+                "type": "new_lead",
+                "title": "📥 Nuevo Lead",
+                "message": f"Nueva conversación iniciada desde {sender}",
+                "lead_phone": sender,
+                "timestamp": datetime.utcnow().isoformat()
+            })
         else:
             if isinstance(lead.get("created_at"), str):
                 lead["created_at"] = datetime.fromisoformat(lead["created_at"])
@@ -288,15 +297,17 @@ async def handle_incoming_message(message: dict):
                 
                 await sheets_service.sync_lead_to_sheet(updated_lead.model_dump())
             
-            # Notificar cuando cliente responde
-            if updated_lead.assigned_agent and previous_status:
-                await notification_manager.send_to_user(updated_lead.assigned_agent, {
-                    "type": "customer_replied",
-                    "title": "💬 Cliente Respondió",
-                    "message": f"{updated_lead.name or 'Cliente'} respondió en WhatsApp",
-                    "lead_phone": updated_lead.phone,
-                    "timestamp": datetime.utcnow().isoformat()
-                })
+            # 🔔 Notificar cuando conversación se COMPLETA (cita agendada o calificación finalizada)
+            if updated_lead.flow_stage in ["appointment_confirmed", "completed", "tasacion_scheduled"]:
+                previous_flow_stage = lead.flow_stage if hasattr(lead, 'flow_stage') else None
+                if previous_flow_stage != updated_lead.flow_stage:
+                    await notification_manager.send_to_admins({
+                        "type": "conversation_completed",
+                        "title": "✅ Conversación Completada",
+                        "message": f"{updated_lead.name or 'Lead'} - {updated_lead.intent or 'Sin intención'} - Cita/Tasación agendada",
+                        "lead_phone": updated_lead.phone,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
             
             # 🚨 Notificar URGENCIA a todos los admins y asesor asignado
             if updated_lead.is_urgent:

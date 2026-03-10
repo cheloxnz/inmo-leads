@@ -50,12 +50,13 @@ export function NotificationProvider({ children }) {
         case 'urgent_lead':
           playSound(SOUND_URGENT, 0.8);
           break;
+        case 'new_lead':
         case 'new_lead_assigned':
         case 'high_value_lead':
           playSound(SOUND_HOT, 0.6);
           break;
-        case 'customer_replied':
-          playSound(SOUND_MESSAGE, 0.4);
+        case 'conversation_completed':
+          playSound(SOUND_MESSAGE, 0.5);
           break;
         default:
           playSound(SOUND_MESSAGE, 0.3);
@@ -66,11 +67,14 @@ export function NotificationProvider({ children }) {
       case 'urgent_lead':
         toast.error(data.title, { description: data.message, duration: 10000 });
         break;
+      case 'new_lead':
+        toast.info(data.title, { description: data.message });
+        break;
       case 'new_lead_assigned':
         toast.success(data.title, { description: data.message });
         break;
-      case 'customer_replied':
-        toast.info(data.title, { description: data.message });
+      case 'conversation_completed':
+        toast.success(data.title, { description: data.message });
         break;
       case 'high_value_lead':
         toast.warning(data.title, { description: data.message });
