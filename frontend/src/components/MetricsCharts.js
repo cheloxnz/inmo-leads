@@ -52,7 +52,7 @@ export default function MetricsCharts() {
   };
 
   const getStatusLabel = (status) => {
-    const labels = { hot: 'Caliente', warm: 'Tibio', cold: 'Frío', archived: 'Archivado' };
+    const labels = { hot: 'Caliente', warm: 'Tibio', cold: 'Frío', archived: 'Archivado', completed: 'Completado', new: 'Nuevo', contacted: 'Contactado', qualified: 'Calificado', appointment: 'Cita' };
     return labels[status] || status;
   };
 
