@@ -17,6 +17,7 @@ import AgentManagement from './pages/AgentManagement';
 import MyDashboard from './pages/MyDashboard';
 import Calendar from './pages/Calendar';
 import Pricing from './pages/Pricing';
+import ComprarPage from './pages/ComprarPage';
 import PaymentSuccess from './pages/PaymentSuccess';
 import Demo from './pages/Demo';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -327,6 +328,7 @@ function AppContent() {
             } />
             <Route path="/inicio" element={<LandingPage />} />
             <Route path="/planes" element={<Pricing />} />
+            <Route path="/comprar" element={<ComprarPage />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/pago-exitoso" element={<PaymentSuccess />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
