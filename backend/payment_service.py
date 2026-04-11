@@ -3,6 +3,7 @@ Servicio de pagos con Stripe para suscripciones SaaS
 """
 import os
 import logging
+import stripe
 from datetime import datetime
 from typing import Optional, Dict
 from dotenv import load_dotenv
@@ -60,31 +61,40 @@ SUBSCRIPTION_PLANS = {
     },
     "enterprise": {
         "name": "Enterprise",
-        "price": 499.00,
-        "setup_price": 399.00,
-        "description": "Para grandes operaciones",
-        "whatsapp_numbers": 8,
-        "extra_number_price": 50.00,
+        "price": 799.00,
+        "setup_price": 499.00,
+        "description": "Solución completa para grandes operaciones",
+        "whatsapp_numbers": 999,
         "features": [
-            "Desde 8 números WhatsApp",
-            "+$50 por número adicional",
+            "Números WhatsApp ilimitados",
             "Conversaciones ilimitadas",
             "Usuarios ilimitados",
-            "API access",
-            "Soporte dedicado 24/7",
-            "Account manager",
+            "Dashboard completo",
+            "Métricas avanzadas",
+            "API completa",
+            "Integraciones personalizadas",
+            "Soporte 24/7",
+            "Onboarding VIP",
             "SLA garantizado"
         ]
     }
 }
 
-
 class PaymentService:
     def __init__(self, db):
         self.db = db
         self.api_key = os.getenv("STRIPE_API_KEY")
-        if not self.api_key:
+        self.webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+        
+        if self.api_key:
+            stripe.api_key = self.api_key
+            logger.info("Stripe configurado correctamente")
+        else:
             logger.warning("STRIPE_API_KEY no configurada")
+    
+    def get_plans(self) -> Dict:
+        """Retorna los planes disponibles"""
+        return SUBSCRIPTION_PLANS
     
     async def create_checkout_session(
         self, 
@@ -93,35 +103,38 @@ class PaymentService:
         customer_name: str,
         origin_url: str
     ) -> Dict:
-        """Crea una sesión de checkout para suscripción"""
+        """Crea una sesión de checkout de Stripe"""
+        if not self.api_key:
+            raise ValueError("Stripe no está configurado")
         
         if plan_id not in SUBSCRIPTION_PLANS:
-            raise ValueError(f"Plan inválido: {plan_id}")
+            raise ValueError(f"Plan no válido: {plan_id}")
         
         plan = SUBSCRIPTION_PLANS[plan_id]
         
         try:
-            from emergentintegrations.payments.stripe.checkout import (
-                StripeCheckout, 
-                CheckoutSessionRequest
-            )
-            
             # URLs de redirección
             success_url = f"{origin_url}/pago-exitoso?session_id={{CHECKOUT_SESSION_ID}}"
             cancel_url = f"{origin_url}/planes"
-            webhook_url = f"{origin_url}/api/webhook/stripe"
-            
-            stripe_checkout = StripeCheckout(
-                api_key=self.api_key, 
-                webhook_url=webhook_url
-            )
             
             # Crear sesión de checkout
-            checkout_request = CheckoutSessionRequest(
-                amount=plan["price"],
-                currency="usd",
+            session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {
+                            'name': f"InmoBot - Plan {plan['name']}",
+                            'description': plan['description'],
+                        },
+                        'unit_amount': int(plan['price'] * 100),  # Stripe usa centavos
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
                 success_url=success_url,
                 cancel_url=cancel_url,
+                customer_email=customer_email,
                 metadata={
                     "plan_id": plan_id,
                     "plan_name": plan["name"],
@@ -130,11 +143,9 @@ class PaymentService:
                 }
             )
             
-            session = await stripe_checkout.create_checkout_session(checkout_request)
-            
             # Guardar transacción pendiente
             transaction = {
-                "session_id": session.session_id,
+                "session_id": session.id,
                 "plan_id": plan_id,
                 "plan_name": plan["name"],
                 "amount": plan["price"],
@@ -146,11 +157,11 @@ class PaymentService:
             }
             
             await self.db.payment_transactions.insert_one(transaction)
-            logger.info(f"Checkout session creada: {session.session_id} para {customer_email}")
+            logger.info(f"Checkout session creada: {session.id} para {customer_email}")
             
             return {
                 "checkout_url": session.url,
-                "session_id": session.session_id
+                "session_id": session.id
             }
             
         except Exception as e:
@@ -160,13 +171,10 @@ class PaymentService:
     async def get_checkout_status(self, session_id: str) -> Dict:
         """Obtiene el estado de una sesión de checkout"""
         try:
-            from emergentintegrations.payments.stripe.checkout import StripeCheckout
-            
-            stripe_checkout = StripeCheckout(api_key=self.api_key, webhook_url="")
-            status = await stripe_checkout.get_checkout_status(session_id)
+            session = stripe.checkout.Session.retrieve(session_id)
             
             # Actualizar transacción en DB
-            if status.payment_status == "paid":
+            if session.payment_status == "paid":
                 await self.db.payment_transactions.update_one(
                     {"session_id": session_id},
                     {"$set": {
@@ -177,11 +185,11 @@ class PaymentService:
                 logger.info(f"Pago confirmado para session: {session_id}")
             
             return {
-                "status": status.status,
-                "payment_status": status.payment_status,
-                "amount": status.amount_total / 100,  # Convertir de centavos
-                "currency": status.currency,
-                "metadata": status.metadata
+                "status": session.status,
+                "payment_status": session.payment_status,
+                "amount": session.amount_total / 100,  # Convertir de centavos
+                "currency": session.currency,
+                "metadata": session.metadata
             }
             
         except Exception as e:
@@ -191,41 +199,74 @@ class PaymentService:
     async def handle_webhook(self, body: bytes, signature: str) -> Dict:
         """Maneja webhooks de Stripe"""
         try:
-            from emergentintegrations.payments.stripe.checkout import StripeCheckout
-            
-            stripe_checkout = StripeCheckout(api_key=self.api_key, webhook_url="")
-            event = await stripe_checkout.handle_webhook(body, signature)
-            
-            logger.info(f"Webhook recibido: {event.event_type}")
-            
-            if event.payment_status == "paid":
-                await self.db.payment_transactions.update_one(
-                    {"session_id": event.session_id},
-                    {"$set": {
-                        "payment_status": "paid",
-                        "paid_at": datetime.utcnow().isoformat(),
-                        "event_id": event.event_id
-                    }}
+            if self.webhook_secret:
+                event = stripe.Webhook.construct_event(
+                    body, signature, self.webhook_secret
+                )
+            else:
+                # Sin verificación de firma (solo para desarrollo)
+                import json
+                event = stripe.Event.construct_from(
+                    json.loads(body), stripe.api_key
                 )
             
-            return {
-                "event_type": event.event_type,
-                "session_id": event.session_id,
-                "payment_status": event.payment_status
-            }
+            logger.info(f"Webhook recibido: {event.type}")
             
+            # Manejar evento de pago completado
+            if event.type == "checkout.session.completed":
+                session = event.data.object
+                await self._handle_successful_payment(session)
+            
+            return {"status": "success", "event_type": event.type}
+            
+        except stripe.error.SignatureVerificationError as e:
+            logger.error(f"Error verificando firma del webhook: {e}")
+            raise
         except Exception as e:
-            logger.error(f"Error procesando webhook: {e}")
+            logger.error(f"Error en webhook: {e}")
             raise
     
-    async def get_all_transactions(self) -> list:
-        """Obtiene todas las transacciones"""
-        cursor = self.db.payment_transactions.find({}).sort("created_at", -1)
-        transactions = await cursor.to_list(100)
+    async def _handle_successful_payment(self, session) -> None:
+        """Procesa un pago exitoso"""
+        try:
+            session_id = session.id
+            metadata = session.metadata
+            
+            # Actualizar transacción
+            await self.db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "payment_status": "paid",
+                    "stripe_payment_intent": session.payment_intent,
+                    "paid_at": datetime.utcnow().isoformat()
+                }}
+            )
+            
+            # Crear registro de suscripción
+            subscription = {
+                "session_id": session_id,
+                "plan_id": metadata.get("plan_id"),
+                "plan_name": metadata.get("plan_name"),
+                "customer_email": metadata.get("customer_email"),
+                "customer_name": metadata.get("customer_name"),
+                "status": "active",
+                "started_at": datetime.utcnow().isoformat()
+            }
+            
+            await self.db.subscriptions.insert_one(subscription)
+            logger.info(f"Suscripción creada para: {metadata.get('customer_email')}")
+            
+        except Exception as e:
+            logger.error(f"Error procesando pago exitoso: {e}")
+            raise
+    
+    async def get_transaction_history(self, limit: int = 50) -> list:
+        """Obtiene historial de transacciones"""
+        cursor = self.db.payment_transactions.find().sort("created_at", -1).limit(limit)
+        transactions = await cursor.to_list(length=limit)
+        
+        # Convertir ObjectId a string
         for t in transactions:
             t["_id"] = str(t["_id"])
+        
         return transactions
-    
-    def get_plans(self) -> Dict:
-        """Retorna los planes disponibles"""
-        return SUBSCRIPTION_PLANS

@@ -5,6 +5,7 @@ import logging
 import os
 import tempfile
 import httpx
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,9 +16,11 @@ class AudioTranscriptionService:
     """Servicio para transcribir mensajes de voz de WhatsApp"""
     
     def __init__(self):
-        self.api_key = os.getenv("EMERGENT_LLM_KEY")
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
+        
         if not self.api_key:
-            logger.warning("EMERGENT_LLM_KEY no configurada - transcripción deshabilitada")
+            logger.warning("OPENAI_API_KEY no configurada - transcripción deshabilitada")
     
     async def download_audio(self, media_url: str, access_token: str) -> bytes:
         """Descarga el archivo de audio desde WhatsApp"""
@@ -47,27 +50,22 @@ class AudioTranscriptionService:
     
     async def transcribe(self, audio_data: bytes, filename: str = "audio.ogg") -> str:
         """Transcribe audio usando Whisper"""
-        if not self.api_key:
+        if not self.client:
             logger.error("API key no disponible para transcripción")
             return None
         
         try:
-            from emergentintegrations.llm.openai import OpenAISpeechToText
-            
             # Guardar audio temporalmente
             with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_file:
                 temp_file.write(audio_data)
                 temp_path = temp_file.name
             
             try:
-                stt = OpenAISpeechToText(api_key=self.api_key)
-                
                 with open(temp_path, "rb") as audio_file:
-                    response = await stt.transcribe(
-                        file=audio_file,
+                    response = await self.client.audio.transcriptions.create(
                         model="whisper-1",
-                        language="es",  # Español
-                        response_format="json"
+                        file=audio_file,
+                        language="es"
                     )
                 
                 transcribed_text = response.text
