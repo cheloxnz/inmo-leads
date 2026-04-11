@@ -32,6 +32,27 @@ Creá cuentas en:
 
 ---
 
+### Paso 1.5: Crear Base de Datos en MongoDB Atlas (5 min)
+
+1. Entrá a https://mongodb.com/atlas → **"Try Free"**
+2. Creá un cluster **M0 FREE** (región cercana a tus clientes)
+3. **Crear usuario de BD:** Database Access → Add New Database User
+   - Username: `inmobot_admin`
+   - Password: generá una segura y guardala
+   - Permisos: "Read and write to any database"
+4. **Abrir acceso de red:** Network Access → Add IP → "Allow Access from Anywhere" (`0.0.0.0/0`)
+5. **Obtener connection string:** Database → Connect → Drivers → Copiá la URL
+6. Reemplazá `<password>` y agregá `/inmobot_db`:
+
+```
+mongodb+srv://inmobot_admin:TU_PASSWORD@cluster.xxxxx.mongodb.net/inmobot_db?retryWrites=true&w=majority
+```
+
+> Esta es tu `MONGO_URL` para el `.env` del backend.
+> Para más detalle, consultá la sección "Configurar MongoDB Atlas" en el MANUAL_COMPRADOR.md
+
+---
+
 ### Paso 2: Subir código a GitHub (5 min)
 
 ```bash
@@ -91,12 +112,21 @@ REACT_APP_BACKEND_URL=https://tu-backend.railway.app
 
 ---
 
-### ¡Listo!
+### Listo!
 
-Tu bot está funcionando. Accedé al dashboard:
+Tu bot está funcionando. Ahora creá el usuario admin:
+
+```bash
+cd backend
+python init_admin.py
+```
+
+Accedé al dashboard:
 - **URL:** https://tu-frontend.railway.app
 - **Usuario:** admin@inmobot.com
 - **Password:** Admin123!
+
+> Cambiá la contraseña después del primer login.
 
 ---
 

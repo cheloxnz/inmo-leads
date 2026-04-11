@@ -178,10 +178,10 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **Meta WhatsApp Cloud API:** Comunicación del bot
 - **Stripe:** Procesamiento de pagos (SDK directo `stripe`)
 - **Resend:** Emails transaccionales
+- **MongoDB Atlas:** Base de datos en la nube (guía paso a paso incluida en docs)
 - **Cloudflare:** DNS, redirecciones, routing de email
 
-## Modelo de Negocio Actual
-- **Venta de código fuente (Self-Hosted):** Pago único $147 / $297 USD
-- **Sin suscripción mensual ni soporte post-venta incluido**
-- **Landing page comercial:** `/` y página de compra `/comprar`
-- **Documentación completa para el comprador en `/docs`**
+## Estado de Entrega del Código
+- **BD:** Completamente vacía (0 usuarios, 0 leads). El comprador ejecuta `init_admin.py` para crear su admin.
+- **`.env`:** Todas las keys vacías. El comprador configura sus propias credenciales.
+- **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas (crear cluster, usuario, connection string).

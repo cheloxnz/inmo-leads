@@ -228,6 +228,95 @@ Antes de comenzar, necesitarás:
 
 ---
 
+# Configurar MongoDB Atlas (Paso Previo Obligatorio)
+
+Antes de hacer deploy en cualquier plataforma, necesitas crear tu base de datos en MongoDB Atlas (gratis para empezar).
+
+## Paso 1: Crear Cuenta en MongoDB Atlas
+
+1. Andá a https://www.mongodb.com/atlas y hacé click en **"Try Free"**
+2. Registrate con tu email o cuenta de Google
+3. Completá el formulario inicial (podés poner cualquier cosa en "Organization" y "Project")
+
+## Paso 2: Crear un Cluster (Base de Datos)
+
+1. Una vez dentro del dashboard de Atlas, hacé click en **"Build a Database"** (o **"Create"**)
+2. Elegí el plan **"M0 FREE"** (gratis, perfecto para empezar)
+   - **Provider:** AWS, Google Cloud o Azure (cualquiera funciona)
+   - **Region:** Elegí la más cercana a tus clientes (ej: `South America - São Paulo` para LATAM)
+   - **Cluster Name:** Dejá el nombre por defecto o poné `inmobot-cluster`
+3. Click en **"Create Deployment"**
+4. Esperá 1-3 minutos mientras se crea el cluster
+
+## Paso 3: Crear Usuario de Base de Datos
+
+Inmediatamente después de crear el cluster, Atlas te pide crear un usuario:
+
+1. En la sección **"Database Access"** (menú lateral izquierdo), click en **"Add New Database User"**
+2. **Authentication Method:** Password
+3. Completá:
+   - **Username:** `inmobot_admin` (o el que quieras)
+   - **Password:** Generá una contraseña segura (click en "Autogenerate Secure Password" y **copiala en un lugar seguro**)
+4. **Database User Privileges:** Seleccioná **"Read and write to any database"**
+5. Click en **"Add User"**
+
+> **IMPORTANTE:** Guardá el usuario y la contraseña, los vas a necesitar para la connection string.
+
+## Paso 4: Configurar Acceso de Red (IP Whitelist)
+
+1. En el menú lateral, andá a **"Network Access"**
+2. Click en **"Add IP Address"**
+3. Click en **"Allow Access from Anywhere"** (agrega `0.0.0.0/0`)
+   - Esto permite que tu servidor se conecte desde cualquier IP
+   - Para mayor seguridad en producción, podés restringir a la IP de tu servidor después
+4. Click en **"Confirm"**
+
+## Paso 5: Obtener la Connection String (MONGO_URL)
+
+1. Volvé a **"Database"** en el menú lateral
+2. En tu cluster, hacé click en **"Connect"**
+3. Seleccioná **"Drivers"** (o "Connect your application")
+4. **Driver:** Python / Version 3.12 or later
+5. Copiá la connection string. Se ve así:
+
+```
+mongodb+srv://inmobot_admin:<password>@inmobot-cluster.xxxxx.mongodb.net/?retryWrites=true&w=majority
+```
+
+6. **Reemplazá** `<password>` por la contraseña real que creaste en el Paso 3
+7. **Agregá el nombre de la base de datos** antes de los parámetros:
+
+```
+mongodb+srv://inmobot_admin:TU_PASSWORD_REAL@inmobot-cluster.xxxxx.mongodb.net/inmobot_db?retryWrites=true&w=majority
+```
+
+> Esta es tu `MONGO_URL`. Copiala y usala en las variables de entorno del backend.
+
+## Paso 6: Crear el Usuario Admin de InmoBot
+
+Una vez que tu backend esté corriendo y conectado a MongoDB Atlas, ejecutá el script de inicialización:
+
+```bash
+cd backend
+python init_admin.py
+```
+
+Esto crea el usuario administrador del dashboard:
+- **Email:** admin@inmobot.com
+- **Password:** Admin123!
+
+> **Cambiá la contraseña** desde el dashboard después del primer login (Perfil → Cambiar Contraseña).
+
+## Resumen de lo que necesitás de Atlas
+
+| Dato | Dónde usarlo | Ejemplo |
+|------|-------------|---------|
+| **MONGO_URL** | Backend `.env` | `mongodb+srv://user:pass@cluster.mongodb.net/inmobot_db...` |
+| **DB_NAME** | Backend `.env` | `inmobot_db` |
+
+---
+
+
 # Opción 1: Deploy en Railway (Recomendado)
 
 Railway es la opción más simple. Deploy automático desde GitHub.
