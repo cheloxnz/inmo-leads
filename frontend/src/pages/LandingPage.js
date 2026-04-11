@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { 
   MessageSquare, Bot, Calendar, BarChart3, 
   Zap, Clock, CheckCircle, ArrowRight, Play,
-  Package, FileText, Video, Code, Download
+  Package, FileText, Video, Code, Download,
+  Terminal, Cloud, Server, Rocket, Timer, Globe
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -144,6 +145,108 @@ export default function LandingPage() {
             <CheckCircle className="feature-icon" />
             <h3>Auditoría Completa</h3>
             <p>Historial de todas las acciones del sistema.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Easy Deploy Section */}
+      <section className="landing-deploy">
+        <h2>Funcionando en minutos, no en semanas</h2>
+        <p className="deploy-subtitle">
+          Incluye todo listo para que tu app esté online con un par de comandos. Elegí la opción que más te sirva:
+        </p>
+        
+        <div className="deploy-options">
+          <div className="deploy-card deploy-recommended">
+            <div className="deploy-badge">Recomendado</div>
+            <div className="deploy-icon-wrap">
+              <Cloud className="deploy-icon" />
+            </div>
+            <h3>Railway</h3>
+            <div className="deploy-time">
+              <Timer className="w-4 h-4" />
+              <span>15 minutos</span>
+            </div>
+            <p>Deploy desde el navegador. Sin instalar nada. Ideal si no sos programador.</p>
+            <ul className="deploy-features-list">
+              <li><CheckCircle className="w-3 h-3" /> Todo visual, sin terminal</li>
+              <li><CheckCircle className="w-3 h-3" /> MongoDB incluido</li>
+              <li><CheckCircle className="w-3 h-3" /> SSL automatico</li>
+              <li><CheckCircle className="w-3 h-3" /> Dominio personalizado</li>
+            </ul>
+            <div className="deploy-cost">~$5-20 USD/mes</div>
+          </div>
+
+          <div className="deploy-card">
+            <div className="deploy-icon-wrap">
+              <Terminal className="deploy-icon" />
+            </div>
+            <h3>Docker</h3>
+            <div className="deploy-time">
+              <Timer className="w-4 h-4" />
+              <span>10 minutos</span>
+            </div>
+            <p>Un solo comando y todo corre. Backend, frontend y base de datos.</p>
+            <div className="deploy-code">
+              <code>docker compose up -d</code>
+            </div>
+            <ul className="deploy-features-list">
+              <li><CheckCircle className="w-3 h-3" /> Un comando levanta todo</li>
+              <li><CheckCircle className="w-3 h-3" /> Funciona en cualquier server</li>
+              <li><CheckCircle className="w-3 h-3" /> MongoDB incluido</li>
+            </ul>
+            <div className="deploy-cost">~$5-12 USD/mes en VPS</div>
+          </div>
+
+          <div className="deploy-card">
+            <div className="deploy-icon-wrap">
+              <Server className="deploy-icon" />
+            </div>
+            <h3>Manual</h3>
+            <div className="deploy-time">
+              <Timer className="w-4 h-4" />
+              <span>1-2 horas</span>
+            </div>
+            <p>Control total sobre tu infraestructura. Script de setup incluido.</p>
+            <div className="deploy-code">
+              <code>bash setup.sh</code>
+            </div>
+            <ul className="deploy-features-list">
+              <li><CheckCircle className="w-3 h-3" /> Control total del servidor</li>
+              <li><CheckCircle className="w-3 h-3" /> Script automatizado</li>
+              <li><CheckCircle className="w-3 h-3" /> El mas economico</li>
+            </ul>
+            <div className="deploy-cost">~$5 USD/mes en VPS</div>
+          </div>
+        </div>
+
+        <div className="deploy-includes">
+          <h4>Todo incluido en el codigo:</h4>
+          <div className="deploy-includes-grid">
+            <div className="deploy-include-item">
+              <Code className="w-4 h-4" />
+              <span>docker-compose.yml</span>
+            </div>
+            <div className="deploy-include-item">
+              <FileText className="w-4 h-4" />
+              <span>Dockerfiles optimizados</span>
+            </div>
+            <div className="deploy-include-item">
+              <Terminal className="w-4 h-4" />
+              <span>Script setup.sh</span>
+            </div>
+            <div className="deploy-include-item">
+              <FileText className="w-4 h-4" />
+              <span>Archivos .env.example</span>
+            </div>
+            <div className="deploy-include-item">
+              <Globe className="w-4 h-4" />
+              <span>Guia paso a paso (800+ lineas)</span>
+            </div>
+            <div className="deploy-include-item">
+              <Rocket className="w-4 h-4" />
+              <span>init_admin.py listo</span>
+            </div>
           </div>
         </div>
       </section>
