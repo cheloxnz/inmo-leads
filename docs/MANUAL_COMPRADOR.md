@@ -52,50 +52,29 @@ Este documento contiene todas las instrucciones necesarias para:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                    LO QUE RECIBÍS DEL VENDEDOR                       │   │
+│   │                    LO QUE RECIBÍS                                    │   │
 │   │                                                                      │   │
-│   │    📁 Acceso al Repositorio GitHub                                  │   │
-│   │    📄 Documentación completa                                        │   │
-│   │    📞 1 hora de videollamada (handoff)                              │   │
-│   │    🔑 Archivos .env.example con instrucciones                       │   │
+│   │    Acceso al Repositorio GitHub                                     │   │
+│   │    Documentación completa + Archivos .env.example                   │   │
+│   │    Dockerfiles + docker-compose.yml listos                          │   │
+│   │    Script de setup automático (setup.sh)                            │   │
 │   │                                                                      │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
-│                                    ▼                                         │
-│                         ┌─────────────────────┐                             │
-│                         │  ELEGÍ TU OPCIÓN    │                             │
-│                         └─────────────────────┘                             │
-│                          /                    \                              │
-│                         /                      \                             │
-│                        ▼                        ▼                            │
-│   ┌────────────────────────────┐    ┌────────────────────────────┐          │
-│   │     OPCIÓN A: RAILWAY      │    │  OPCIÓN B: DIGITALOCEAN    │          │
-│   │      (Recomendado)         │    │    + MONGODB ATLAS         │          │
-│   ├────────────────────────────┤    ├────────────────────────────┤          │
-│   │                            │    │                            │          │
-│   │  ✅ Fácil (10-15 min)      │    │  ⚠️  Media (1-2 horas)     │          │
-│   │  ✅ Todo en un lugar       │    │  ✅ Más control            │          │
-│   │  ✅ Deploy automático      │    │  ✅ Menor costo mensual    │          │
-│   │  💰 ~$20-40/mes            │    │  💰 ~$15-30/mes            │          │
-│   │                            │    │                            │          │
-│   │  Ideal si:                 │    │  Ideal si:                 │          │
-│   │  • No tenés desarrollador  │    │  • Tenés desarrollador     │          │
-│   │  • Querés simplicidad      │    │  • Querés control total    │          │
-│   │                            │    │                            │          │
-│   └────────────────────────────┘    └────────────────────────────┘          │
-│                │                                   │                         │
-│                ▼                                   ▼                         │
-│   ┌────────────────────────────┐    ┌────────────────────────────┐          │
-│   │        PASOS RAILWAY       │    │    PASOS DIGITALOCEAN      │          │
-│   ├────────────────────────────┤    ├────────────────────────────┤          │
-│   │                            │    │                            │          │
-│   │  1. Crear cuenta Railway   │    │  1. Crear Droplet ($12/mes)│          │
-│   │  2. Conectar GitHub        │    │  2. Crear DB en Atlas      │          │
-│   │  3. Crear MongoDB (1 clic) │    │  3. Clonar repo en servidor│          │
-│   │  4. Configurar variables   │    │  4. Instalar dependencias  │          │
-│   │  5. ¡Listo! ✅             │    │  5. Configurar Nginx + SSL │          │
-│   │                            │    │  6. ¡Listo! ✅             │          │
-│   └────────────────────────────┘    └────────────────────────────┘          │
+│                         ┌──────────┼──────────┐                             │
+│                         ▼          ▼          ▼                             │
+│   ┌──────────────────┐ ┌────────────────┐ ┌──────────────────┐             │
+│   │  A: RAILWAY       │ │  B: DOCKER     │ │  C: DIGITALOCEAN │             │
+│   │  (Recomendado)    │ │  (Un comando)  │ │  (Control total) │             │
+│   ├──────────────────┤ ├────────────────┤ ├──────────────────┤             │
+│   │                   │ │                │ │                   │             │
+│   │ Fácil (15 min)    │ │ Medio (10 min) │ │ Avanzado (1-2hs) │             │
+│   │ Todo en navegador │ │ Todo local     │ │ Servidor propio   │             │
+│   │ ~$5-20/mes        │ │ ~$5-12/mes VPS │ │ ~$12-30/mes       │             │
+│   │                   │ │                │ │                   │             │
+│   │ Sin programar     │ │ Necesita Docker│ │ Necesita Linux    │             │
+│   │                   │ │                │ │                   │             │
+│   └──────────────────┘ └────────────────┘ └──────────────────┘             │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -130,17 +109,21 @@ Este documento contiene todas las instrucciones necesarias para:
 ## Checklist Rápido
 
 ```
-□ Paso 1: Recibir acceso al repositorio GitHub
-□ Paso 2: Elegir plataforma (Railway o DigitalOcean)
-□ Paso 3: Crear cuentas en servicios externos:
-    □ Meta Business (WhatsApp)
-    □ OpenAI (Inteligencia Artificial)
-    □ Stripe (Pagos) - opcional
-□ Paso 4: Seguir guía de deploy de la opción elegida
-□ Paso 5: Configurar variables de entorno
-□ Paso 6: Configurar webhook de WhatsApp
-□ Paso 7: Conectar dominio personalizado
-□ Paso 8: ¡Probar el bot!
+1. Recibir acceso al repositorio GitHub
+2. Elegir plataforma:
+    - Railway (recomendado, sin programar)
+    - Docker (un comando, necesita VPS o PC)
+    - DigitalOcean manual (control total)
+3. Crear cuentas en servicios externos:
+    - Meta Business (WhatsApp)
+    - OpenAI (Inteligencia Artificial)
+    - Stripe (Pagos) - opcional
+4. Seguir guía de deploy de la opción elegida
+5. Configurar variables de entorno (.env)
+6. Crear usuario admin: python init_admin.py
+7. Configurar webhook de WhatsApp
+8. Conectar dominio personalizado (opcional)
+9. Probar el bot!
 ```
 
 ---
@@ -317,11 +300,14 @@ Esto crea el usuario administrador del dashboard:
 ---
 
 
-# Opción 1: Deploy en Railway (Recomendado)
+# Opción 1: Deploy en Railway (Recomendado - El más fácil)
 
-Railway es la opción más simple. Deploy automático desde GitHub.
+Railway es la opción más simple. No necesitás saber de servidores. Todo se configura desde el navegador.
 
-## Paso 1: Preparar el Repositorio
+**Tiempo estimado:** 15-20 minutos
+**Costo:** ~$5-20 USD/mes
+
+## Paso 1: Preparar el Repositorio en GitHub
 
 1. Creá una cuenta en GitHub: https://github.com
 2. Creá un repositorio privado llamado `inmobot`
@@ -337,48 +323,112 @@ git remote add origin https://github.com/TU_USUARIO/inmobot.git
 git push -u origin main
 ```
 
-## Paso 2: Crear Proyecto en Railway
+## Paso 2: Crear Cuenta en Railway
 
-1. Andá a https://railway.app y creá una cuenta
-2. Click en **"New Project"**
-3. Seleccioná **"Deploy from GitHub repo"**
-4. Conectá tu cuenta de GitHub y seleccioná el repositorio `inmobot`
+1. Andá a https://railway.app
+2. Hacé click en **"Login"** → Conectá con tu cuenta de GitHub
+3. Verificá tu cuenta (Railway te puede pedir verificar con tarjeta, no te cobra nada)
 
-## Paso 3: Configurar Servicios
+## Paso 3: Crear Proyecto Nuevo
 
-Necesitás crear 3 servicios en Railway:
+1. Click en **"New Project"** (botón morado arriba a la derecha)
+2. Seleccioná **"Empty Project"** (proyecto vacío)
+3. Te va a crear un proyecto en blanco. Acá vamos a agregar los 3 servicios.
 
-### Servicio 1: MongoDB
-1. Click en **"New"** → **"Database"** → **"MongoDB"**
-2. Railway te dará automáticamente una `MONGO_URL`
-3. Copiá esta URL para usarla en el backend
+## Paso 4: Agregar MongoDB
 
-### Servicio 2: Backend
-1. Click en **"New"** → **"GitHub Repo"**
-2. Seleccioná tu repo y configurá:
-   - **Root Directory:** `backend`
+1. Dentro de tu proyecto, click en **"+ New"** → **"Database"** → **"Add MongoDB"**
+2. Railway crea la base de datos automáticamente
+3. Hacé click en el servicio MongoDB → pestaña **"Variables"**
+4. Buscá la variable `MONGO_URL` y **copiala** (la vas a necesitar en el próximo paso)
+5. Agregá `/inmobot_db` al final de la URL. Ejemplo:
+   ```
+   mongodb://mongo:CONTRASEÑA@containers-us-west-xxx.railway.app:12345/inmobot_db
+   ```
+
+## Paso 5: Agregar el Backend
+
+1. Click en **"+ New"** → **"GitHub Repo"**
+2. Seleccioná tu repositorio `inmobot`
+3. Click en el servicio que se creó → **"Settings"**
+4. Configurá:
+   - **Root Directory:** escribí `backend`
    - **Start Command:** `uvicorn server:app --host 0.0.0.0 --port $PORT`
-3. En **Variables**, agregá todas las del archivo `.env` (ver sección de variables)
+5. Andá a la pestaña **"Variables"** y agregá una por una (click en "New Variable"):
 
-### Servicio 3: Frontend
-1. Click en **"New"** → **"GitHub Repo"**
-2. Seleccioná tu repo y configurá:
-   - **Root Directory:** `frontend`
+| Variable | Valor |
+|----------|-------|
+| `MONGO_URL` | La URL de MongoDB del paso anterior (con `/inmobot_db` al final) |
+| `DB_NAME` | `inmobot_db` |
+| `APP_SECRET` | Inventá una clave larga (ej: `mi-clave-super-secreta-2024-xyz`) |
+| `CORS_ORIGINS` | `*` (después lo cambiás por tu dominio) |
+| `OPENAI_API_KEY` | Tu API key de OpenAI |
+| `WHATSAPP_PHONE_NUMBER_ID` | Tu Phone Number ID de Meta |
+| `WHATSAPP_ACCESS_TOKEN` | Tu Access Token de Meta |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | Tu Business Account ID |
+| `WEBHOOK_VERIFY_TOKEN` | Inventá un token (ej: `mi_verificacion_secreta`) |
+
+> Las demás variables (STRIPE, RESEND, SMTP) son opcionales. Agregalas si las necesitás.
+
+6. Andá a **"Settings"** → **"Networking"** → **"Generate Domain"** para obtener la URL pública del backend
+7. **Copiá la URL** que te da Railway (ej: `https://inmobot-backend-production.up.railway.app`)
+
+## Paso 6: Agregar el Frontend
+
+1. Click en **"+ New"** → **"GitHub Repo"**
+2. Seleccioná tu repositorio `inmobot` otra vez
+3. Click en el servicio → **"Settings"**
+4. Configurá:
+   - **Root Directory:** escribí `frontend`
    - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npx serve -s build -l $PORT`
-3. En **Variables**, agregá:
-   - `REACT_APP_BACKEND_URL` = URL del servicio backend
+5. Andá a la pestaña **"Variables"** y agregá:
 
-## Paso 4: Configurar Dominio
+| Variable | Valor |
+|----------|-------|
+| `REACT_APP_BACKEND_URL` | La URL del backend del paso anterior |
+| `REACT_APP_LANDING_MODE` | `inmobiliaria` |
+| `REACT_APP_BUSINESS_NAME` | El nombre de tu inmobiliaria |
+| `REACT_APP_BUSINESS_TAGLINE` | Tu frase (ej: "Las mejores propiedades de Buenos Aires") |
+| `REACT_APP_WHATSAPP_NUMBER` | Tu número con código de país sin + (ej: `5491112345678`) |
 
-1. En el servicio Frontend, click en **"Settings"** → **"Domains"**
-2. Agregá tu dominio personalizado (ej: `app.tuinmobiliaria.com`)
-3. Configurá los DNS en tu proveedor de dominio (ver sección de dominio)
+6. Andá a **"Settings"** → **"Networking"** → **"Generate Domain"**
+
+## Paso 7: Crear el Usuario Admin
+
+1. En Railway, hacé click en el servicio **Backend**
+2. Andá a la pestaña **"Shell"** (terminal)
+3. Escribí:
+
+```bash
+python init_admin.py
+```
+
+4. Cuando pregunte si querés crear leads de ejemplo, poné `n`
+5. Tus credenciales de acceso:
+   - **Email:** admin@inmobot.com
+   - **Password:** Admin123!
+
+## Paso 8: Verificar que Funciona
+
+1. Abrí la URL del frontend en tu navegador
+2. Deberías ver la landing de tu inmobiliaria
+3. Hacé click en **"Acceder"** e ingresá con admin@inmobot.com / Admin123!
+4. **Cambiá la contraseña** desde el panel (Cambiar Contraseña)
+
+## Paso 9: Conectar Dominio Personalizado (Opcional)
+
+1. En el servicio Frontend → **"Settings"** → **"Domains"** → **"Custom Domain"**
+2. Escribí tu dominio (ej: `app.tuinmobiliaria.com`)
+3. Railway te va a dar un registro CNAME
+4. Andá al panel de tu dominio (GoDaddy, Namecheap, Cloudflare, etc.)
+5. Agregá un registro CNAME apuntando al valor que te dio Railway
 
 ## Costo Estimado Railway
 
-- **Hobby Plan:** $5/mes (incluye créditos)
+- **Hobby Plan:** $5/mes (incluye créditos suficientes para empezar)
 - **Pro Plan:** ~$20-40/mes según uso
+- MongoDB incluido, no necesitás MongoDB Atlas
 
 ---
 
@@ -528,6 +578,139 @@ certbot --nginx -d app.tudominio.com -d api.tudominio.com
 
 # Renovación automática (ya configurada por defecto)
 ```
+
+---
+
+# Opción 3: Deploy con Docker (Para tu propio servidor)
+
+Si ya tenés un servidor (VPS, dedicado, o tu propia computadora) y querés la forma más rápida de correr todo, Docker es tu opción.
+
+**Tiempo estimado:** 10-15 minutos (con Docker instalado)
+**Requisitos:** Docker y Docker Compose instalados
+
+## Paso 1: Instalar Docker
+
+Si todavía no tenés Docker:
+
+**En Ubuntu/Debian:**
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+```
+
+**En Mac:**
+Descargá Docker Desktop: https://www.docker.com/products/docker-desktop
+
+**En Windows:**
+Descargá Docker Desktop: https://www.docker.com/products/docker-desktop
+
+Verificá que funciona:
+```bash
+docker --version
+docker compose version
+```
+
+## Paso 2: Configurar Variables de Entorno
+
+```bash
+cd inmobot
+
+# Copiar archivos de ejemplo
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+Editá `backend/.env` con tus credenciales:
+```bash
+nano backend/.env
+```
+
+> **IMPORTANTE para Docker:** Cambiá `MONGO_URL` a:
+> ```
+> MONGO_URL=mongodb://mongodb:27017/inmobot_db
+> ```
+> (Usá `mongodb` como host, no `localhost`, porque Docker conecta los servicios por nombre)
+
+Editá `frontend/.env` con el nombre de tu inmobiliaria:
+```bash
+nano frontend/.env
+```
+
+## Paso 3: Levantar Todo con un Comando
+
+```bash
+docker compose up -d --build
+```
+
+Eso es todo. Docker va a:
+1. Descargar MongoDB
+2. Compilar el backend (Python)
+3. Compilar el frontend (React)
+4. Conectar todo automáticamente
+
+Esperá 2-3 minutos la primera vez (descarga imágenes y compila).
+
+## Paso 4: Crear el Usuario Admin
+
+```bash
+docker compose exec backend python init_admin.py
+```
+
+Cuando pregunte por leads de ejemplo, poné `n`.
+
+## Paso 5: Verificar
+
+- **Frontend:** Abrí http://localhost:3000
+- **Backend API:** Abrí http://localhost:8001/api/health (debería responder OK)
+- **Login:** admin@inmobot.com / Admin123!
+
+## Comandos Útiles de Docker
+
+```bash
+# Ver estado de los servicios
+docker compose ps
+
+# Ver logs en tiempo real
+docker compose logs -f
+
+# Ver solo logs del backend
+docker compose logs -f backend
+
+# Reiniciar todo
+docker compose restart
+
+# Parar todo
+docker compose down
+
+# Parar y borrar datos (cuidado, borra la base de datos)
+docker compose down -v
+
+# Reconstruir después de cambios en el código
+docker compose up -d --build
+```
+
+## Costo Estimado Docker
+
+- **VPS básico (DigitalOcean/Hetzner):** $5-12 USD/mes
+- **MongoDB incluido** en Docker, no necesitás Atlas ni pagar extra
+- Es la opción más barata a largo plazo
+
+---
+
+# Opción Rápida: Script de Setup Local
+
+Si querés correr el proyecto directamente en tu computadora sin Docker:
+
+```bash
+cd inmobot
+bash setup.sh
+```
+
+El script automáticamente:
+1. Verifica que tengas Python, Node.js y npm instalados
+2. Crea los archivos `.env` desde los `.env.example`
+3. Instala todas las dependencias del backend y frontend
+4. Te muestra los pasos finales para iniciar
 
 ---
 

@@ -134,6 +134,35 @@ Accedé al dashboard:
 
 ---
 
+## Alternativa: Setup con Docker (10 min)
+
+Si preferís Docker en vez de Railway:
+
+```bash
+# 1. Configurar variables
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# 2. Editar backend/.env con tus keys
+#    IMPORTANTE: Poner MONGO_URL=mongodb://mongodb:27017/inmobot_db
+nano backend/.env
+
+# 3. Editar frontend/.env con el nombre de tu inmobiliaria
+nano frontend/.env
+
+# 4. Levantar todo
+docker compose up -d --build
+
+# 5. Crear usuario admin
+docker compose exec backend python init_admin.py
+
+# Listo! Abrir http://localhost:3000
+```
+
+> Para más detalle, ver la sección "Opción 3: Docker" en el MANUAL_COMPRADOR.md
+
+---
+
 ## Checklist Post-Instalación
 
 - [ ] Cambiar contraseña del admin

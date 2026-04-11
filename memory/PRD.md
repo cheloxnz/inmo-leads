@@ -186,4 +186,6 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **`.env` backend:** Todas las keys vacías. El comprador configura sus propias credenciales.
 - **`.env` frontend:** `REACT_APP_LANDING_MODE=inmobiliaria` por defecto. El comprador personaliza nombre, tagline y WhatsApp.
 - **Landing dual:** Variable `REACT_APP_LANDING_MODE` alterna entre `venta` (para inmobot-ia.com) e `inmobiliaria` (para el comprador).
-- **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas y personalización de landing.
+- **Opciones de deploy:** Railway (1-click), Docker Compose, DigitalOcean manual. Documentado paso a paso.
+- **Archivos de deploy:** `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `railway.json`, `setup.sh`
+- **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas, personalización de landing, Railway detallado y Docker

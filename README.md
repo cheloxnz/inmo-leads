@@ -60,72 +60,57 @@
 
 ---
 
-## 🚀 Instalación Rápida
+## Instalacion Rapida
 
-### Prerequisitos
+Hay 3 formas de correr InmoBot. Elegi la que te quede mejor:
 
-- Node.js 18+
-- Python 3.11+
-- MongoDB (Atlas o local)
-- Cuentas en: Meta Business, OpenAI, Stripe
+### Opcion A: Railway (Recomendado - Sin programar)
 
-### 1. Clonar repositorio
+La mas facil. Todo desde el navegador, sin instalar nada.
+Ver guia completa: [docs/MANUAL_COMPRADOR.md](docs/MANUAL_COMPRADOR.md) → Opcion 1
 
-```bash
-git clone https://github.com/tu-usuario/inmobot.git
-cd inmobot
-```
-
-### 2. Configurar Backend
+### Opcion B: Docker (Un comando)
 
 ```bash
-cd backend
+# 1. Configurar variables de entorno
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# Editar ambos .env con tus credenciales
 
-# Crear entorno virtual
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# o: venv\Scripts\activate  # Windows
+# 2. Levantar todo
+docker compose up -d --build
 
-# Instalar dependencias
-pip install -r requirements.txt
+# 3. Crear usuario admin
+docker compose exec backend python init_admin.py
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales
+# Listo! Abrir http://localhost:3000
 ```
 
-### 3. Configurar Frontend
+### Opcion C: Setup manual
 
 ```bash
-cd frontend
+# 1. Ejecutar script de setup
+bash setup.sh
 
-# Instalar dependencias
-npm install
+# 2. Editar backend/.env y frontend/.env con tus credenciales
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con la URL del backend
+# 3. Crear usuario admin
+cd backend && source venv/bin/activate && python init_admin.py
+
+# 4. Iniciar backend (Terminal 1)
+cd backend && source venv/bin/activate
+uvicorn server:app --host 0.0.0.0 --port 8001
+
+# 5. Iniciar frontend (Terminal 2)
+cd frontend && npm start
+
+# Abrir http://localhost:3000
 ```
 
-### 4. Iniciar servicios
+### Credenciales por defecto
 
-```bash
-# Terminal 1 - Backend
-cd backend
-source venv/bin/activate
-uvicorn server:app --host 0.0.0.0 --port 8001 --reload
-
-# Terminal 2 - Frontend
-cd frontend
-npm start
-```
-
-### 5. Acceder
-
-- **Dashboard:** http://localhost:3000
-- **API:** http://localhost:8001/docs
-- **Usuario:** admin@inmobot.com
-- **Password:** Admin123!
+- **Email:** admin@inmobot.com
+- **Password:** Admin123! (cambiar despues del primer login)
 
 ---
 
@@ -163,6 +148,10 @@ NOTIFICATION_EMAILS=admin@tuempresa.com
 
 ```env
 REACT_APP_BACKEND_URL=http://localhost:8001
+REACT_APP_LANDING_MODE=inmobiliaria
+REACT_APP_BUSINESS_NAME=Tu Inmobiliaria
+REACT_APP_BUSINESS_TAGLINE=Encontra tu propiedad ideal
+REACT_APP_WHATSAPP_NUMBER=5491112345678
 ```
 
 ---
@@ -236,20 +225,29 @@ inmobot/
 
 ---
 
-## 🚢 Deploy en Producción
+## Deploy en Produccion
 
-### Opción 1: Railway (Recomendado)
+### Opcion 1: Railway (Recomendado)
 
-1. Conectar repositorio a Railway
-2. Crear servicio MongoDB
-3. Crear servicio Backend (root: `backend`)
-4. Crear servicio Frontend (root: `frontend`)
-5. Configurar variables de entorno
-6. Conectar dominio personalizado
+La opcion mas facil. Todo desde el navegador.
+Ver guia paso a paso: [docs/MANUAL_COMPRADOR.md](docs/MANUAL_COMPRADOR.md)
 
-### Opción 2: DigitalOcean
+### Opcion 2: Docker en tu servidor
 
-Ver guía completa en `docs/MANUAL_COMPRADOR.md`
+```bash
+# En tu VPS/servidor
+git clone https://github.com/TU_USUARIO/inmobot.git
+cd inmobot
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# Editar .env con credenciales de produccion
+docker compose up -d --build
+docker compose exec backend python init_admin.py
+```
+
+### Opcion 3: DigitalOcean manual
+
+Ver guia completa en [docs/MANUAL_COMPRADOR.md](docs/MANUAL_COMPRADOR.md)
 
 ---
 
