@@ -4167,7 +4167,18 @@ body {
   margin: 0 auto;
 }
 
-.faq-item {
+.faq-item p {
+  color: #64748b;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* CTA Updates */
+.cta-guarantee {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
+}
 
 /* Comprar Page */
 .comprar-page {
@@ -4401,12 +4412,6 @@ body {
 .checkout-methods img {
   height: 24px;
   opacity: 0.6;
-}
-
-
-  padding: 1.5rem;
-  background: #f8fafc;
-  border-radius: 12px;
 }
 
 .faq-item h4 {

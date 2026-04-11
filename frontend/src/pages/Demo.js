@@ -228,12 +228,11 @@ export default function Demo() {
         <h1>Mirá InmoBot en Acción</h1>
         <p>Explorá cada funcionalidad y descubrí cómo puede transformar tu inmobiliaria</p>
         <div className="hero-buttons">
-          <Button size="lg" onClick={() => navigate('/planes')} data-testid="btn-hero-planes">
-            Ver Planes y Precios
+          <Button size="lg" onClick={() => navigate('/comprar')} data-testid="btn-hero-planes">
+            Comprar Ahora - $147 USD
           </Button>
-          <Button size="lg" variant="outline" onClick={() => window.open('https://wa.me/5491159434074?text=Hola,%20quiero%20una%20demo%20de%20InmoBot', '_blank')}>
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Contactar
+          <Button size="lg" variant="outline" onClick={() => navigate('/')}>
+            Volver al Inicio
           </Button>
         </div>
       </section>
@@ -262,10 +261,10 @@ export default function Demo() {
           <Button 
             size="lg" 
             className="video-cta-button"
-            onClick={() => navigate('/planes')} 
+            onClick={() => navigate('/comprar')} 
             data-testid="btn-video-planes"
           >
-            Ver Planes y Precios
+            Comprar Ahora - $147 USD
           </Button>
         </div>
       </section>
@@ -368,12 +367,8 @@ export default function Demo() {
         <h2>¿Listo para automatizar tu inmobiliaria?</h2>
         <p>Empezá hoy y captá más leads mientras dormís</p>
         <div className="cta-buttons">
-          <Button size="lg" onClick={() => navigate('/planes')} data-testid="btn-ver-planes">
-            Ver Planes y Precios
-          </Button>
-          <Button size="lg" variant="outline" onClick={() => window.open('https://wa.me/5491159434074?text=Hola,%20quiero%20una%20demo%20de%20InmoBot', '_blank')}>
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Solicitar Demo en Vivo
+          <Button size="lg" onClick={() => navigate('/comprar')} data-testid="btn-ver-planes">
+            Comprar Ahora - $147 USD
           </Button>
         </div>
       </section>
