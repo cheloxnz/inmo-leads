@@ -4180,6 +4180,24 @@ body {
   color: rgba(255,255,255,0.7);
 }
 
+/* Dashboard Features Section */
+.landing-dashboard {
+  padding: 5rem 2rem;
+  background: #f8fafc;
+}
+
+.landing-dashboard h2 {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 3rem;
+  color: #1e293b;
+}
+
+.landing-dashboard .features-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 /* Comprar Page */
 .comprar-page {
   min-height: 100vh;
@@ -4391,6 +4409,13 @@ body {
 .checkout-button {
   font-size: 1.1rem;
   padding: 1rem;
+  background: #2563eb !important;
+  color: white !important;
+  border: none !important;
+}
+
+.checkout-button:hover {
+  background: #1d4ed8 !important;
 }
 
 .checkout-secure {

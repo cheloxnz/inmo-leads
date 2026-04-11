@@ -173,9 +173,15 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - Email: `admin@inmobot.com`
 - Password: `Admin123!`
 
-## Integrations
-- **OpenAI GPT-4:** Respuestas inteligentes del bot (Emergent LLM Key)
+## Integrations (Self-Hosted - Requiere API Keys del comprador)
+- **OpenAI GPT-4 / Whisper:** Respuestas inteligentes y transcripción de audio (SDK directo `openai`)
 - **Meta WhatsApp Cloud API:** Comunicación del bot
-- **Stripe:** Procesamiento de pagos
+- **Stripe:** Procesamiento de pagos (SDK directo `stripe`)
 - **Resend:** Emails transaccionales
 - **Cloudflare:** DNS, redirecciones, routing de email
+
+## Modelo de Negocio Actual
+- **Venta de código fuente (Self-Hosted):** Pago único $147 / $297 USD
+- **Sin suscripción mensual ni soporte post-venta incluido**
+- **Landing page comercial:** `/` y página de compra `/comprar`
+- **Documentación completa para el comprador en `/docs`**

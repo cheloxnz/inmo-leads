@@ -53,55 +53,92 @@ export default function LandingPage() {
           </div>
           <div className="included-item">
             <Bot className="included-icon" />
-            <h3>Bot de WhatsApp con IA</h3>
-            <p>Responde 24/7, califica leads, agenda visitas.</p>
+            <h3>Bot de WhatsApp con GPT-4</h3>
+            <p>Responde 24/7, califica leads, agenda visitas automáticamente.</p>
           </div>
           <div className="included-item">
             <BarChart3 className="included-icon" />
-            <h3>Dashboard de Gestión</h3>
-            <p>Kanban, métricas, calendario, reportes.</p>
+            <h3>Dashboard Completo</h3>
+            <p>Kanban, métricas, calendario, reportes PDF, auditoría.</p>
           </div>
           <div className="included-item">
             <FileText className="included-icon" />
             <h3>Documentación Completa</h3>
-            <p>Guía paso a paso de instalación y uso.</p>
+            <p>Manual de 800+ líneas paso a paso + FAQ.</p>
           </div>
           <div className="included-item">
             <Video className="included-icon" />
             <h3>Videos de Setup</h3>
-            <p>Tutoriales para configurar todo.</p>
+            <p>Tutoriales para configurar todo en minutos.</p>
           </div>
           <div className="included-item">
             <Package className="included-icon" />
-            <h3>Plantillas y Scripts</h3>
-            <p>Mensajes, flujos, configuraciones listas.</p>
+            <h3>Scripts y Plantillas</h3>
+            <p>Init admin, mensajes, .env.example listos.</p>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* AI Features Section */}
       <section className="landing-features">
-        <h2>¿Qué hace el bot?</h2>
+        <h2>Inteligencia Artificial Integrada</h2>
         <div className="features-grid">
           <div className="feature-card">
-            <Bot className="feature-icon" />
-            <h3>Respuestas 24/7</h3>
-            <p>Tu asistente nunca duerme. Responde consultas a cualquier hora.</p>
+            <Zap className="feature-icon" />
+            <h3>GPT-4 / OpenAI</h3>
+            <p>Respuestas inteligentes y naturales a cualquier consulta inmobiliaria.</p>
           </div>
           <div className="feature-card">
             <MessageSquare className="feature-icon" />
-            <h3>Calificación Automática</h3>
-            <p>Identifica leads calientes automáticamente.</p>
+            <h3>Clasificación de Intención</h3>
+            <p>Detecta automáticamente si quieren comprar, alquilar, vender o invertir.</p>
+          </div>
+          <div className="feature-card">
+            <Bot className="feature-icon" />
+            <h3>Extracción de Datos</h3>
+            <p>Identifica zona, presupuesto y tipo de propiedad del mensaje.</p>
+          </div>
+          <div className="feature-card">
+            <Clock className="feature-icon" />
+            <h3>Whisper (Audio a Texto)</h3>
+            <p>Transcribe mensajes de voz de WhatsApp automáticamente.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Dashboard Features */}
+      <section className="landing-dashboard">
+        <h2>Dashboard de Gestión Completo</h2>
+        <div className="features-grid">
+          <div className="feature-card">
+            <BarChart3 className="feature-icon" />
+            <h3>Métricas en Tiempo Real</h3>
+            <p>Leads por día, conversión, estado del pipeline.</p>
+          </div>
+          <div className="feature-card">
+            <Package className="feature-icon" />
+            <h3>Vista Kanban</h3>
+            <p>Arrastrá y soltá leads entre etapas del embudo.</p>
           </div>
           <div className="feature-card">
             <Calendar className="feature-icon" />
-            <h3>Agenda Visitas</h3>
-            <p>El bot agenda citas directamente sin intervención.</p>
+            <h3>Calendario Integrado</h3>
+            <p>Todas las citas agendadas en un solo lugar.</p>
           </div>
           <div className="feature-card">
-            <Zap className="feature-icon" />
-            <h3>IA Integrada (GPT)</h3>
-            <p>Respuestas inteligentes a preguntas complejas.</p>
+            <MessageSquare className="feature-icon" />
+            <h3>Broadcast Masivo</h3>
+            <p>Envía mensajes a múltiples leads a la vez.</p>
+          </div>
+          <div className="feature-card">
+            <FileText className="feature-icon" />
+            <h3>Reportes PDF</h3>
+            <p>Exportá informes profesionales con un click.</p>
+          </div>
+          <div className="feature-card">
+            <CheckCircle className="feature-icon" />
+            <h3>Auditoría Completa</h3>
+            <p>Historial de todas las acciones del sistema.</p>
           </div>
         </div>
       </section>
