@@ -99,6 +99,10 @@ NOTIFICATION_EMAILS=tu@email.com
 
 ```env
 REACT_APP_BACKEND_URL=https://tu-backend.railway.app
+REACT_APP_LANDING_MODE=inmobiliaria
+REACT_APP_BUSINESS_NAME=Tu Inmobiliaria
+REACT_APP_BUSINESS_TAGLINE=Encontra tu propiedad ideal
+REACT_APP_WHATSAPP_NUMBER=5491112345678
 ```
 
 ---

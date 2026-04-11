@@ -24,6 +24,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import LandingPage from './pages/LandingPage';
+import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import AuditLog from './pages/AuditLog';
 import Broadcast from './pages/Broadcast';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key } from 'lucide-react';
@@ -32,6 +33,10 @@ import '@/App.css';
 // Siempre usar la URL actual del navegador (mismo dominio)
 const BACKEND_URL = window.location.origin;
 export const API = `${BACKEND_URL}/api`;
+
+// Modo landing: "venta" = landing de venta del código, "inmobiliaria" = landing white-label para el comprador
+const LANDING_MODE = process.env.REACT_APP_LANDING_MODE || 'inmobiliaria';
+const LandingComponent = LANDING_MODE === 'venta' ? LandingPage : InmobiliariaLanding;
 
 // Hook para tema oscuro
 function useTheme() {
@@ -326,7 +331,7 @@ function AppContent() {
             <Route path="/login" element={
               isAuthenticated ? <Navigate to={isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
             } />
-            <Route path="/inicio" element={<LandingPage />} />
+            <Route path="/inicio" element={<LandingComponent />} />
             <Route path="/planes" element={<Pricing />} />
             <Route path="/comprar" element={<ComprarPage />} />
             <Route path="/demo" element={<Demo />} />

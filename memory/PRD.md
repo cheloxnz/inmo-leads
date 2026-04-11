@@ -183,5 +183,7 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Estado de Entrega del Código
 - **BD:** Completamente vacía (0 usuarios, 0 leads). El comprador ejecuta `init_admin.py` para crear su admin.
-- **`.env`:** Todas las keys vacías. El comprador configura sus propias credenciales.
-- **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas (crear cluster, usuario, connection string).
+- **`.env` backend:** Todas las keys vacías. El comprador configura sus propias credenciales.
+- **`.env` frontend:** `REACT_APP_LANDING_MODE=inmobiliaria` por defecto. El comprador personaliza nombre, tagline y WhatsApp.
+- **Landing dual:** Variable `REACT_APP_LANDING_MODE` alterna entre `venta` (para inmobot-ia.com) e `inmobiliaria` (para el comprador).
+- **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas y personalización de landing.

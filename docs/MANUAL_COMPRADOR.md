@@ -579,7 +579,25 @@ Crear archivo `/var/www/inmobot/frontend/.env`:
 
 ```env
 REACT_APP_BACKEND_URL=https://api.tudominio.com
+
+# Landing Page - Personalización de tu inmobiliaria
+REACT_APP_LANDING_MODE=inmobiliaria
+REACT_APP_BUSINESS_NAME=Mi Inmobiliaria
+REACT_APP_BUSINESS_TAGLINE=Encontra tu propiedad ideal con atencion inmediata
+REACT_APP_WHATSAPP_NUMBER=5491112345678
 ```
+
+### Variables de la Landing Page
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `REACT_APP_LANDING_MODE` | `inmobiliaria` = landing de tu negocio (default) | `inmobiliaria` |
+| `REACT_APP_BUSINESS_NAME` | Nombre de tu inmobiliaria | `Propiedades López` |
+| `REACT_APP_BUSINESS_TAGLINE` | Frase principal del hero | `Las mejores propiedades de Buenos Aires` |
+| `REACT_APP_WHATSAPP_NUMBER` | Número de WhatsApp con código de país (sin +) | `5491112345678` |
+
+> **Nota:** Si dejás `REACT_APP_WHATSAPP_NUMBER` vacío, el botón de WhatsApp no se muestra en la landing.
+> Después de cambiar estas variables, necesitás hacer rebuild: `cd frontend && npm run build`
 
 ---
 

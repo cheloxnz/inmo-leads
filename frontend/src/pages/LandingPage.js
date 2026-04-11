@@ -73,6 +73,11 @@ export default function LandingPage() {
           </div>
           <div className="included-item">
             <Package className="included-icon" />
+            <h3>Landing Page Personalizable</h3>
+            <p>Landing profesional para tu inmobiliaria, lista para usar con tu marca.</p>
+          </div>
+          <div className="included-item">
+            <Package className="included-icon" />
             <h3>Scripts y Plantillas</h3>
             <p>Init admin, mensajes, .env.example listos.</p>
           </div>
@@ -183,6 +188,7 @@ export default function LandingPage() {
             <li><CheckCircle className="w-4 h-4" /> Dashboard de gestión</li>
             <li><CheckCircle className="w-4 h-4" /> Documentación paso a paso</li>
             <li><CheckCircle className="w-4 h-4" /> Videos de instalación</li>
+            <li><CheckCircle className="w-4 h-4" /> Landing page personalizable</li>
             <li><CheckCircle className="w-4 h-4" /> Actualizaciones gratuitas</li>
             <li><CheckCircle className="w-4 h-4" /> Licencia comercial</li>
           </ul>
