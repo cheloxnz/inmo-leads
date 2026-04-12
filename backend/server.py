@@ -1412,6 +1412,57 @@ async def create_initial_admin():
     }
 
 
+# ============================================
+# App Version / Update Notification
+# ============================================
+
+@api_router.get("/app/version")
+async def get_app_version():
+    """Retorna la versión actual de la app y mensaje de actualización"""
+    config = await db.app_config.find_one({"key": "app_version"}, {"_id": 0})
+    if not config:
+        return {"version": "1.0.0", "update_message": None, "force_refresh": False}
+    return {
+        "version": config.get("version", "1.0.0"),
+        "update_message": config.get("update_message"),
+        "force_refresh": config.get("force_refresh", False)
+    }
+
+@api_router.post("/app/version")
+async def set_app_version(
+    body: dict,
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Notifica una nueva versión disponible a todos los clientes"""
+    version = body.get("version", "1.0.0")
+    update_message = body.get("update_message", "Hay una nueva version disponible. Presiona F5 para actualizar.")
+    force_refresh = body.get("force_refresh", False)
+
+    await db.app_config.update_one(
+        {"key": "app_version"},
+        {"$set": {
+            "key": "app_version",
+            "version": version,
+            "update_message": update_message,
+            "force_refresh": force_refresh
+        }},
+        upsert=True
+    )
+    return {"status": "ok", "version": version}
+
+@api_router.delete("/app/version")
+async def clear_update_notification(
+    current_user: dict = Depends(require_admin)
+):
+    """Admin: Limpia la notificación de actualización"""
+    await db.app_config.update_one(
+        {"key": "app_version"},
+        {"$set": {"update_message": None, "force_refresh": False}},
+        upsert=True
+    )
+    return {"status": "ok"}
+
+
 # Incluir routers
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1425,7 +1476,9 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
+# Incluir routers
+app.include_router(api_router)
+app.include_router(auth_router, prefix="/api")
 async def startup_event():
     """Inicia tareas programadas al arrancar el servidor"""
     global assignment_engine

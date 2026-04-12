@@ -3764,8 +3764,8 @@ body {
 }
 
 .cta-buttons button:first-child {
-  background: white;
-  color: var(--primary);
+  background: #2563eb;
+  color: #fff;
 }
 
 /* Responsive */
@@ -3951,17 +3951,17 @@ body {
 .landing-cta {
   padding: 5rem 2rem;
   text-align: center;
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
 
 .landing-cta h2 {
   font-size: 2.5rem;
-  color: var(--text-primary);
+  color: #fff;
   margin-bottom: 1rem;
 }
 
 .landing-cta > p {
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.7);
   font-size: 1.25rem;
   margin-bottom: 2rem;
 }
@@ -4106,6 +4106,13 @@ body {
 
 .pricing-featured:hover {
   transform: scale(1.03) translateY(-4px);
+}
+
+.pricing-featured button,
+.pricing-featured .w-full {
+  background: #2563eb !important;
+  color: #fff !important;
+  border-color: #2563eb !important;
 }
 
 .pricing-badge {
@@ -6635,6 +6642,83 @@ body {
   .immo-step-arrow {
     transform: rotate(90deg);
     padding-top: 0;
+
+/* ============================================ */
+/* Update Banner                                */
+/* ============================================ */
+
+.update-banner {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.update-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-size: 0.9rem;
+}
+
+.update-banner-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.update-banner-content span {
+  flex: 1;
+}
+
+.update-refresh-btn {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.update-refresh-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.update-dismiss-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.update-dismiss-btn:hover {
+  color: #fff;
+}
+
   }
   
   .immo-nav-links a:not(:last-child) {

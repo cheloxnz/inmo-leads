@@ -27,6 +27,7 @@ import LandingPage from './pages/LandingPage';
 import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import AuditLog from './pages/AuditLog';
 import Broadcast from './pages/Broadcast';
+import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key } from 'lucide-react';
 import '@/App.css';
 
@@ -350,6 +351,7 @@ function AppContent() {
     <div className="App">
       <Navigation />
       <main className="main-content">
+        <UpdateBanner />
         <AppHeader />
         <Routes>
           {/* Rutas Admin */}
