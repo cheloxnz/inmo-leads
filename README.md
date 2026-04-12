@@ -12,7 +12,7 @@
 [![WhatsApp](https://img.shields.io/badge/WhatsApp-Business%20API-25D366?logo=whatsapp)](https://business.whatsapp.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-412991?logo=openai)](https://openai.com/)
 
-[Demo en Vivo](https://app.inmobot-ia.com/demo) • [Documentación](#documentación) • [Instalación](#instalación-rápida)
+[Documentación](#documentación) • [Instalación](#instalación-rápida)
 
 </div>
 
@@ -287,10 +287,10 @@ Ver términos completos en `docs/PROPUESTA_COMERCIAL.md`
 
 ---
 
-## 🤝 Soporte
+## Soporte
 
-- **Email:** [tu-email@ejemplo.com]
-- **WhatsApp:** [+XX XXX XXX XXXX]
+- **Email:** hola@inmobot-ia.com
+- **WhatsApp:** +54 11-4025-2271
 - **Documentación:** [docs/](docs/)
 
 ---
