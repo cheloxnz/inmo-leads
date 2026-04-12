@@ -57,55 +57,81 @@ Las inmobiliarias pierden **hasta el 40% de sus leads** porque:
 
 ## Planes Disponibles
 
-### 📦 Plan Completo — USD $7,500
+### Plan Código Solo — USD $147
 
-**Ideal para:** Inmobiliarias que tienen equipo técnico propio o quieren empezar a operar de inmediato.
+**Ideal para:** Desarrolladores o inmobiliarias con equipo técnico que quieren hacerlo por su cuenta.
 
 **Incluye:**
-- ✅ Código fuente completo (React + Python + MongoDB)
-- ✅ Dominio profesional (inmobot-ia.com)
-- ✅ Instalación en servidor (Railway o DigitalOcean)
-- ✅ **30 minutos de videollamada de handoff/entrega**
-- ✅ Documentación técnica completa
-- ✅ Script de inicialización para empezar de cero
-- ❌ Sin soporte post-entrega
+- Código fuente completo (React + Python + MongoDB)
+- Bot de WhatsApp con IA (GPT-4 + Whisper)
+- Dashboard de gestión completo
+- Landing page personalizable
+- Docker, Railway y scripts de setup listos
+- Documentación paso a paso (800+ líneas)
+- Licencia comercial incluida
+- 7 días de garantía
 
-*El comprador configura las integraciones (WhatsApp, OpenAI, Stripe) siguiendo la documentación.*
-
-**Entrega:** 5-7 días hábiles
+*El comprador configura las integraciones siguiendo la documentación.*
 
 ---
 
-### 🚀 Plan Premium — USD $12,000
+### Plan Código + Instalación — USD $497 (Más vendido)
 
-**Ideal para:** Inmobiliarias que quieren una solución personalizada y respaldo durante los primeros meses.
+**Ideal para:** Inmobiliarias que quieren todo funcionando sin tocar código.
 
-**Incluye todo lo del Plan Completo, más:**
-- ✅ **Personalización de marca** (logo, colores, mensajes del bot)
-- ✅ **Flujos de conversación personalizados** según tu operación
-- ✅ **Integración con tu CRM actual** (si aplica)
-- ✅ **Landing page personalizada** para captar leads
-- ✅ **1 hora de capacitación** para tu equipo
-- ✅ **3 meses de actualizaciones y corrección de bugs** (si se requieren)
+**Incluye todo del plan Código Solo, más:**
+- Instalación completa por nosotros
+- Deploy en Railway, Docker o tu servidor
+- Configuración de WhatsApp Business API
+- Dominio personalizado + SSL
+- Bot funcionando y testeado
+- Videollamada de entrega (30 min)
 
-**Entrega:** 10-15 días hábiles
+**Entrega:** 3-5 días hábiles
+
+---
+
+### Plan Soporte + Actualizaciones — USD $100/mes
+
+**Ideal para:** Quienes quieren mantenerse actualizados y tener respaldo técnico.
+
+**Requiere:** Plan Código Solo o Código + Instalación previo.
+
+**Incluye:**
+- Actualizaciones automáticas del código
+- Nuevas funcionalidades incluidas
+- Soporte técnico por WhatsApp
+- Corrección de bugs prioritaria
+- Mejoras de IA incluidas
+
+**Descuentos por pago adelantado:**
+
+| Período | Precio/mes | Descuento | Total |
+|---------|-----------|-----------|-------|
+| Mensual | $100/mes | — | $100/mes |
+| 6 meses | $85/mes | 15% | $510 |
+| 12 meses | $80/mes | 20% | $960 |
+| 24 meses | $70/mes | 30% | $1,680 |
 
 ---
 
 ## Comparativa de Planes
 
-| Característica | Completo | Premium |
-|----------------|:--------:|:-------:|
-| Código fuente completo | ✅ | ✅ |
-| Dominio incluido | ✅ | ✅ |
-| Instalación en servidor | ✅ | ✅ |
-| Documentación completa | ✅ | ✅ |
-| Videollamada handoff | 30 min | 1 hora |
-| Personalización de marca | ❌ | ✅ |
-| Flujos personalizados | ❌ | ✅ |
-| Landing page | ❌ | ✅ |
-| Updates y bugs (3 meses) | ❌ | ✅ |
-| **Precio** | **$7,500** | **$12,000** |
+| Característica | Código Solo | + Instalación | + Soporte |
+|----------------|:-----------:|:-------------:|:---------:|
+| Código fuente completo | Si | Si | Si |
+| Bot WhatsApp + IA | Si | Si | Si |
+| Dashboard completo | Si | Si | Si |
+| Landing personalizable | Si | Si | Si |
+| Docker + Railway listos | Si | Si | Si |
+| Documentación 800+ líneas | Si | Si | Si |
+| Licencia comercial | Si | Si | Si |
+| Instalación por nosotros | No | Si | Si |
+| Deploy + dominio + SSL | No | Si | Si |
+| Videollamada de entrega | No | Si | Si |
+| Actualizaciones continuas | No | No | Si |
+| Soporte técnico WhatsApp | No | No | Si |
+| **Precio** | **$147** | **$497** | **$100/mes** |
 
 ---
 
@@ -121,18 +147,23 @@ Con la documentación incluida, el comprador configura:
 
 ---
 
-## ¿Qué pasa después de la entrega?
+## Qué pasa después de la entrega?
 
-### Plan Completo
-- Recibís el sistema funcionando y la documentación
-- Vos (o tu desarrollador) se encarga del mantenimiento
-- Sin comunicación post-entrega
+### Plan Código Solo
+- Recibís acceso al repositorio con toda la documentación
+- Vos (o tu desarrollador) se encarga de la instalación y mantenimiento
+- Podés agregar soporte mensual en cualquier momento
 
-### Plan Premium
-- Durante 3 meses: si hay bugs o necesitás updates, los resuelvo
-- Después de 3 meses: mismo que Plan Completo
+### Plan Código + Instalación
+- Recibís todo funcionando + videollamada de entrega
+- Vos te encargás del mantenimiento
+- Podés agregar soporte mensual en cualquier momento
 
-*Ambos planes son licencia exclusiva: no venderé este sistema a otras inmobiliarias.*
+### Con Soporte Activo
+- Recibís actualizaciones automáticas en tu repo
+- Soporte técnico por WhatsApp para consultas
+- Corrección de bugs prioritaria
+- Si dejás de pagar: tu app sigue funcionando, pero no recibís más updates
 
 ---
 

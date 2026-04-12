@@ -30,16 +30,16 @@ export default function LandingPage() {
             Bot de WhatsApp + Dashboard completo + Código fuente incluido
           </p>
           <div className="landing-hero-buttons">
-            <Button size="lg" onClick={() => navigate('/comprar')} data-testid="btn-comprar">
+            <Button size="lg" onClick={() => navigate('/comprar?plan=instalacion')} data-testid="btn-comprar">
               <Download className="w-4 h-4 mr-2" />
-              Comprar Ahora - $147 USD
+              Empezar - Desde $147 USD
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate('/demo')} data-testid="btn-ver-demo">
               <Play className="w-4 h-4 mr-2" />
               Ver Demo
             </Button>
           </div>
-          <p className="hero-note">Un solo pago. Sin mensualidades. 100% tuyo.</p>
+          <p className="hero-note">Pago único. Sin mensualidades. 100% tuyo.</p>
         </div>
       </section>
 
@@ -275,30 +275,85 @@ export default function LandingPage() {
 
       {/* Pricing Section */}
       <section className="landing-pricing">
-        <h2>Precio único</h2>
-        <div className="pricing-card-single">
-          <div className="pricing-badge">Más vendido</div>
-          <h3>InmoBot Completo</h3>
-          <div className="pricing-price">
-            <span className="price-old">$297</span>
-            <span className="price-current">$147</span>
-            <span className="price-currency">USD</span>
+        <h2>Elegí tu plan</h2>
+        <p className="pricing-subtitle">Un solo pago por el código. Soporte opcional mes a mes.</p>
+        
+        <div className="pricing-grid-3">
+          {/* Plan 1: Código Solo */}
+          <div className="pricing-card-v2">
+            <h3>Código Solo</h3>
+            <p className="pricing-desc">Para los que quieren hacerlo por su cuenta</p>
+            <div className="pricing-price-v2">
+              <span className="price-current">$147</span>
+              <span className="price-currency">USD</span>
+            </div>
+            <p className="pricing-note">Pago único</p>
+            <ul className="pricing-features">
+              <li><CheckCircle className="w-4 h-4" /> Código fuente completo</li>
+              <li><CheckCircle className="w-4 h-4" /> Bot de WhatsApp con IA</li>
+              <li><CheckCircle className="w-4 h-4" /> Dashboard de gestión</li>
+              <li><CheckCircle className="w-4 h-4" /> Landing personalizable</li>
+              <li><CheckCircle className="w-4 h-4" /> Documentación paso a paso</li>
+              <li><CheckCircle className="w-4 h-4" /> Docker + Railway listos</li>
+              <li><CheckCircle className="w-4 h-4" /> Licencia comercial</li>
+            </ul>
+            <Button size="lg" variant="outline" className="w-full" onClick={() => navigate('/comprar?plan=codigo')}>
+              Comprar Código
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
-          <p className="pricing-note">Un solo pago - Tuyo para siempre</p>
-          <ul className="pricing-features">
-            <li><CheckCircle className="w-4 h-4" /> Código fuente completo</li>
-            <li><CheckCircle className="w-4 h-4" /> Bot de WhatsApp con IA</li>
-            <li><CheckCircle className="w-4 h-4" /> Dashboard de gestión</li>
-            <li><CheckCircle className="w-4 h-4" /> Documentación paso a paso</li>
-            <li><CheckCircle className="w-4 h-4" /> Videos de instalación</li>
-            <li><CheckCircle className="w-4 h-4" /> Landing page personalizable</li>
-            <li><CheckCircle className="w-4 h-4" /> Actualizaciones gratuitas</li>
-            <li><CheckCircle className="w-4 h-4" /> Licencia comercial</li>
-          </ul>
-          <Button size="lg" className="w-full" onClick={() => navigate('/comprar')}>
-            Comprar Ahora
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+
+          {/* Plan 2: Código + Instalación */}
+          <div className="pricing-card-v2 pricing-featured">
+            <div className="pricing-badge">Más vendido</div>
+            <h3>Código + Instalación</h3>
+            <p className="pricing-desc">Te lo dejamos funcionando</p>
+            <div className="pricing-price-v2">
+              <span className="price-current">$497</span>
+              <span className="price-currency">USD</span>
+            </div>
+            <p className="pricing-note">Pago único</p>
+            <ul className="pricing-features">
+              <li><CheckCircle className="w-4 h-4" /> Todo del plan Código Solo</li>
+              <li><CheckCircle className="w-4 h-4" /> Instalación completa por nosotros</li>
+              <li><CheckCircle className="w-4 h-4" /> Deploy en Railway o tu servidor</li>
+              <li><CheckCircle className="w-4 h-4" /> Configuración de WhatsApp API</li>
+              <li><CheckCircle className="w-4 h-4" /> Dominio y SSL configurados</li>
+              <li><CheckCircle className="w-4 h-4" /> Bot funcionando y testeado</li>
+              <li><CheckCircle className="w-4 h-4" /> Videollamada de entrega</li>
+            </ul>
+            <Button size="lg" className="w-full" onClick={() => navigate('/comprar?plan=instalacion')}>
+              Comprar con Instalación
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+
+          {/* Plan 3: Soporte + Actualizaciones */}
+          <div className="pricing-card-v2">
+            <h3>Soporte + Updates</h3>
+            <p className="pricing-desc">Mantenimiento y mejoras continuas</p>
+            <div className="pricing-price-v2">
+              <span className="price-current">$100</span>
+              <span className="price-currency">USD/mes</span>
+            </div>
+            <p className="pricing-note">Requiere plan Código o Instalación</p>
+            <ul className="pricing-features">
+              <li><CheckCircle className="w-4 h-4" /> Actualizaciones automáticas</li>
+              <li><CheckCircle className="w-4 h-4" /> Nuevas funcionalidades</li>
+              <li><CheckCircle className="w-4 h-4" /> Soporte técnico por WhatsApp</li>
+              <li><CheckCircle className="w-4 h-4" /> Corrección de bugs prioritaria</li>
+              <li><CheckCircle className="w-4 h-4" /> Mejoras de IA incluidas</li>
+            </ul>
+            <div className="pricing-discounts">
+              <div className="discount-row"><span>6 meses</span><span className="discount-tag">15% OFF</span><span>$510</span></div>
+              <div className="discount-row"><span>12 meses</span><span className="discount-tag">20% OFF</span><span>$960</span></div>
+              <div className="discount-row"><span>24 meses</span><span className="discount-tag best">30% OFF</span><span>$1,680</span></div>
+            </div>
+            <Button size="lg" variant="outline" className="w-full" onClick={() => navigate('/comprar?plan=soporte')}>
+              Ver Opciones
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -308,23 +363,23 @@ export default function LandingPage() {
         <div className="faq-grid">
           <div className="faq-item">
             <h4>¿Necesito saber programar?</h4>
-            <p>No. Viene con guía paso a paso y videos. Si sabés seguir instrucciones, podés instalarlo.</p>
+            <p>No. Con el plan de $497, nosotros te lo instalamos todo. Con el de $147, viene documentación paso a paso.</p>
           </div>
           <div className="faq-item">
-            <h4>¿Incluye soporte?</h4>
-            <p>Es un producto self-service con documentación completa. No incluye soporte personalizado.</p>
+            <h4>¿Qué diferencia hay entre los planes?</h4>
+            <p>$147 = código solo (vos lo instalás). $497 = te lo dejamos funcionando. Soporte = actualizaciones y ayuda mes a mes.</p>
           </div>
           <div className="faq-item">
-            <h4>¿Puedo modificarlo?</h4>
-            <p>Sí, recibís el código fuente completo. Podés personalizarlo como quieras.</p>
+            <h4>¿Puedo empezar sin soporte y agregarlo después?</h4>
+            <p>Sí. Comprá el código ahora y cuando quieras, sumás el plan de soporte mensual.</p>
           </div>
           <div className="faq-item">
             <h4>¿Qué costos tiene después?</h4>
-            <p>Solo hosting (~$20/mes) y APIs (WhatsApp, OpenAI). Estimado: $50-100/mes.</p>
+            <p>Solo hosting (~$5-20/mes) y APIs (WhatsApp, OpenAI). Estimado: $30-80/mes.</p>
           </div>
           <div className="faq-item">
-            <h4>¿Puedo revenderlo?</h4>
-            <p>Sí, incluye licencia comercial. Podés usarlo para tus clientes.</p>
+            <h4>¿Puedo modificar el código?</h4>
+            <p>Sí, recibís el código fuente completo. Podés personalizarlo como quieras.</p>
           </div>
           <div className="faq-item">
             <h4>¿Hay garantía?</h4>
@@ -338,12 +393,15 @@ export default function LandingPage() {
         <h2>Automatizá tus ventas hoy</h2>
         <p>Dejá de perder leads. Empezá a cerrar más ventas con IA.</p>
         <div className="cta-buttons">
-          <Button size="lg" onClick={() => navigate('/comprar')} data-testid="btn-empezar">
-            Comprar Ahora - $147 USD
+          <Button size="lg" onClick={() => navigate('/comprar?plan=instalacion')} data-testid="btn-empezar">
+            Empezar con Instalación - $497
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
+          <Button size="lg" variant="outline" className="cta-outline-btn" onClick={() => navigate('/comprar?plan=codigo')} data-testid="btn-solo-codigo">
+            Solo Código - $147
+          </Button>
         </div>
-        <p className="cta-guarantee">✓ 7 días de garantía &nbsp; ✓ Pago seguro con Stripe</p>
+        <p className="cta-guarantee">7 días de garantía &middot; Pago seguro con Stripe</p>
       </section>
 
       {/* Footer */}

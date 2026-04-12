@@ -189,3 +189,11 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **Opciones de deploy:** Railway (1-click), Docker Compose, DigitalOcean manual. Documentado paso a paso.
 - **Archivos de deploy:** `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`, `railway.json`, `setup.sh`
 - **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas, personalización de landing, Railway detallado y Docker
+
+
+## Modelo de Negocio
+- **Plan Código Solo:** $147 USD (pago único)
+- **Plan Código + Instalación:** $497 USD (pago único, más vendido)
+- **Plan Soporte + Actualizaciones:** $100 USD/mes (descuentos: 15% x 6m, 20% x 12m, 30% x 24m)
+- **Script `push_updates.py`:** Gestión de repos de clientes y distribución de actualizaciones
+- **`clients.json`:** Base de datos de clientes activos/inactivos
