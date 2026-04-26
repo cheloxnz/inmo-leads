@@ -20,10 +20,11 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import InmobiliariaLanding from './pages/InmobiliariaLanding';
+import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2 } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
@@ -68,7 +69,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
 
 function Navigation() {
   const location = useLocation();
-  const { user, logout, isAdmin, isAuthenticated } = useAuth();
+  const { user, logout, isAdmin, isSuperAdmin, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true';
@@ -108,6 +109,17 @@ function Navigation() {
       </button>
 
       <div className="nav-links">
+        {isSuperAdmin && (
+          <Link
+            to="/superadmin"
+            className={`nav-link sa-nav-link ${isActive('/superadmin') ? 'active' : ''}`}
+            data-testid="nav-superadmin"
+            title="Panel SuperAdmin"
+          >
+            <span className="icon"><Building2 size={16} /></span>
+            {!isCollapsed && <span>SuperAdmin</span>}
+          </Link>
+        )}
         {isAdmin ? (
           <>
             <Link
@@ -253,7 +265,7 @@ function Navigation() {
             </div>
             <div className="user-details">
               <span className="user-name">{user?.name || 'Usuario'}</span>
-              <span className="user-role">{isAdmin ? 'Administrador' : 'Asesor'}</span>
+              <span className="user-role">{isSuperAdmin ? 'SuperAdmin' : isAdmin ? 'Administrador' : 'Asesor'}</span>
             </div>
           </div>
         )}
@@ -303,7 +315,7 @@ function MyLeadsPage() {
 }
 
 function AppContent() {
-  const { isAuthenticated, loading, isAdmin } = useAuth();
+  const { isAuthenticated, loading, isAdmin, isSuperAdmin } = useAuth();
   const location = useLocation();
   
   // Páginas públicas que no necesitan el layout del dashboard
@@ -321,7 +333,7 @@ function AppContent() {
         <main className="main-content full-width">
           <Routes>
             <Route path="/login" element={
-              isAuthenticated ? <Navigate to={isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
+              isAuthenticated ? <Navigate to={isSuperAdmin ? "/superadmin" : isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
             } />
             <Route path="/inicio" element={<InmobiliariaLanding />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -341,6 +353,12 @@ function AppContent() {
         <UpdateBanner />
         <AppHeader />
         <Routes>
+          {/* Ruta SuperAdmin */}
+          <Route path="/superadmin" element={
+            <ProtectedRoute adminOnly>
+              <SuperAdminPanel />
+            </ProtectedRoute>
+          } />
           {/* Rutas Admin */}
           <Route path="/" element={
             <ProtectedRoute adminOnly>
