@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import BillingSection from '../components/BillingSection';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -220,6 +221,8 @@ export default function Configuration() {
           {saving ? 'Guardando...' : 'Guardar Configuración'}
         </Button>
       </div>
+
+      <BillingSection />
     </div>
   );
 }

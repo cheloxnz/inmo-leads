@@ -1004,73 +1004,49 @@ async def get_inactive_leads(current_user: User = Depends(get_current_user)):
 
 
 # ==============================================
-# PAYMENT ENDPOINTS (Stripe)
+# PAYMENT & BILLING ENDPOINTS (Stripe Subscriptions)
 # ==============================================
-class CheckoutRequest(BaseModel):
-    plan_id: str
-    customer_email: str
-    customer_name: str
-    origin_url: str
-
 
 @api_router.get("/plans")
 async def get_plans():
-    """Obtiene los planes de suscripción disponibles"""
+    """Obtiene los planes de suscripcion disponibles"""
     return SUBSCRIPTION_PLANS
 
 
-@api_router.post("/checkout")
-async def create_checkout(request: CheckoutRequest):
-    """Crea una sesión de checkout de Stripe"""
+@api_router.post("/billing/subscribe")
+async def create_subscription(
+    body: dict,
+    current_user: User = Depends(require_admin)
+):
+    """Admin: Crea suscripcion para su tenant"""
+    plan_id = body.get("plan_id", "basic")
+    origin_url = body.get("origin_url", "")
+
     try:
-        result = await payment_service.create_checkout_session(
-            plan_id=request.plan_id,
-            customer_email=request.customer_email,
-            customer_name=request.customer_name,
-            origin_url=request.origin_url
+        result = await payment_service.create_subscription_checkout(
+            plan_id=plan_id,
+            tenant_id=current_user.tenant_id,
+            customer_email=current_user.email,
+            origin_url=origin_url
         )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error en checkout: {e}")
-        raise HTTPException(status_code=500, detail="Error creando sesión de pago")
+        logger.error(f"Error en billing subscribe: {e}")
+        raise HTTPException(status_code=500, detail="Error creando sesion de pago")
 
 
-@api_router.get("/checkout/status/{session_id}")
-async def get_checkout_status(session_id: str):
-    """Obtiene el estado de una sesión de checkout"""
-    try:
-        status = await payment_service.get_checkout_status(session_id)
-        
-        # Si el pago fue exitoso, enviar email de bienvenida
-        if status.get("payment_status") == "paid":
-            transaction = await db.payment_transactions.find_one(
-                {"session_id": session_id},
-                {"_id": 0}
-            )
-            
-            # Solo enviar si no se envió antes
-            if transaction and not transaction.get("welcome_email_sent"):
-                email_result = await send_welcome_email(
-                    customer_email=transaction.get("customer_email"),
-                    customer_name=transaction.get("customer_name"),
-                    plan_name=transaction.get("plan_name"),
-                    amount=transaction.get("amount")
-                )
-                
-                # Marcar como enviado
-                if email_result.get("status") == "success":
-                    await db.payment_transactions.update_one(
-                        {"session_id": session_id},
-                        {"$set": {"welcome_email_sent": True}}
-                    )
-                    logger.info(f"Email de bienvenida enviado a {transaction.get('customer_email')}")
-        
-        return status
-    except Exception as e:
-        logger.error(f"Error obteniendo status: {e}")
-        raise HTTPException(status_code=500, detail="Error obteniendo estado del pago")
+@api_router.get("/billing")
+async def get_billing(current_user: User = Depends(require_admin)):
+    """Admin: Obtiene info de billing de su tenant"""
+    return await payment_service.get_billing_info(current_user.tenant_id)
+
+
+@api_router.post("/billing/cancel")
+async def cancel_billing(current_user: User = Depends(require_admin)):
+    """Admin: Cancela suscripcion al final del periodo"""
+    return await payment_service.cancel_subscription(current_user.tenant_id)
 
 
 @api_router.post("/webhook/stripe")
@@ -1080,24 +1056,6 @@ async def stripe_webhook(request: Request):
         body = await request.body()
         signature = request.headers.get("Stripe-Signature", "")
         result = await payment_service.handle_webhook(body, signature)
-        
-        # Enviar email de bienvenida si el pago fue exitoso
-        if result.get("payment_status") == "paid":
-            # Obtener datos del cliente desde la transacción
-            transaction = await db.payment_transactions.find_one(
-                {"session_id": result.get("session_id")},
-                {"_id": 0}
-            )
-            
-            if transaction:
-                await send_welcome_email(
-                    customer_email=transaction.get("customer_email"),
-                    customer_name=transaction.get("customer_name"),
-                    plan_name=transaction.get("plan_name"),
-                    amount=transaction.get("amount")
-                )
-                logger.info(f"Email de bienvenida enviado a {transaction.get('customer_email')}")
-        
         return result
     except Exception as e:
         logger.error(f"Error en webhook Stripe: {e}")
@@ -1106,8 +1064,14 @@ async def stripe_webhook(request: Request):
 
 @api_router.get("/transactions")
 async def get_transactions(current_user: User = Depends(require_admin)):
-    """Obtiene todas las transacciones (solo admin)"""
-    return await payment_service.get_all_transactions()
+    """Admin/SuperAdmin: Obtiene transacciones"""
+    if current_user.role == "superadmin":
+        return await payment_service.get_all_transactions()
+    # Tenant admin sees only their own
+    txns = await db.payment_transactions.find(
+        {"tenant_id": current_user.tenant_id}, {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    return txns
 
 
 # ==============================================

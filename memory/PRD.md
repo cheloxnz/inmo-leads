@@ -200,7 +200,13 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **Init:** `init_admin.py` crea superadmin + tenant de ejemplo opcional
 - **OpenAI:** UNA sola key del dueño del SaaS para todos los clientes
 
-## Templates de Rubro (Generalización A)
+## Billing con Stripe Subscriptions (Fase 4)
+- 3 planes: Basic ($49/mes), Pro ($99/mes), Enterprise ($249/mes)
+- Checkout con Stripe en modo `subscription` (recurrente mensual)
+- Webhooks para: checkout completado, invoice pagada, pago fallido, suscripción actualizada/cancelada
+- Auto-actualiza `subscription_status` y límites del tenant según el plan
+- Endpoints: `POST /api/billing/subscribe`, `GET /api/billing`, `POST /api/billing/cancel`
+- UI: Sección "Facturación y Plan" en Configuración con plan actual, status, límites, historial de pagos, y comparador de planes
 - 5 templates disponibles: inmobiliaria, clinica, restaurante, servicios, ecommerce
 - Cada template define: flujo de preguntas, botones, scoring, labels, mensajes, FAQ
 - Motor genérico (`generic_flow.py`) procesa cualquier template
