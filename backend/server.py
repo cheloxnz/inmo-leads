@@ -800,6 +800,88 @@ async def update_whatsapp_config(
 
 
 
+# ============================================
+# Custom Flow Builder (per tenant)
+# ============================================
+
+@api_router.get("/flow/config")
+async def get_flow_config(current_user: User = Depends(get_current_user)):
+    """Obtiene la config del flujo del tenant (custom o template base)"""
+    from flow_templates import get_template
+
+    # Get tenant info
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    template_id = tenant.get("template_id", "servicios") if tenant else "servicios"
+    base_template = get_template(template_id)
+
+    # Get custom overrides
+    config = await db.bot_config.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+
+    return {
+        "template_id": template_id,
+        "template_name": base_template.get("name", ""),
+        "is_customized": bool(config and config.get("custom_flow_steps")),
+        "welcome_message": (config or {}).get("custom_welcome_message") or base_template.get("welcome_message", ""),
+        "welcome_buttons": (config or {}).get("custom_welcome_buttons") or base_template.get("welcome_buttons", []),
+        "flow_steps": (config or {}).get("custom_flow_steps") or base_template.get("flow_steps", []),
+        "scoring": (config or {}).get("custom_scoring") or base_template.get("scoring", {}),
+        "appointment_message": (config or {}).get("custom_appointment_message") or base_template.get("appointment_message", ""),
+        "appointment_buttons": (config or {}).get("custom_appointment_buttons") or base_template.get("appointment_buttons", []),
+        "completion_message": (config or {}).get("custom_completion_message") or base_template.get("completion_message", ""),
+        "faq": (config or {}).get("custom_faq") or base_template.get("faq", {}),
+        "labels": (config or {}).get("custom_labels") or base_template.get("labels", {})
+    }
+
+
+@api_router.put("/flow/config")
+async def update_flow_config(body: dict, current_user: User = Depends(require_admin)):
+    """Admin: Guarda config custom del flujo"""
+    update = {"tenant_id": current_user.tenant_id}
+    
+    fields_map = {
+        "welcome_message": "custom_welcome_message",
+        "welcome_buttons": "custom_welcome_buttons",
+        "flow_steps": "custom_flow_steps",
+        "scoring": "custom_scoring",
+        "appointment_message": "custom_appointment_message",
+        "appointment_buttons": "custom_appointment_buttons",
+        "completion_message": "custom_completion_message",
+        "faq": "custom_faq",
+        "labels": "custom_labels"
+    }
+
+    for key, db_key in fields_map.items():
+        if key in body:
+            update[db_key] = body[key]
+
+    update["updated_at"] = datetime.utcnow().isoformat()
+
+    await db.bot_config.update_one(
+        {"tenant_id": current_user.tenant_id},
+        {"$set": update},
+        upsert=True
+    )
+    return {"message": "Flujo actualizado"}
+
+
+@api_router.post("/flow/reset")
+async def reset_flow_config(current_user: User = Depends(require_admin)):
+    """Admin: Resetea el flujo custom al template base"""
+    custom_fields = [
+        "custom_flow_steps", "custom_welcome_message", "custom_welcome_buttons",
+        "custom_scoring", "custom_appointment_message", "custom_appointment_buttons",
+        "custom_completion_message", "custom_faq", "custom_labels"
+    ]
+    unset = {f: "" for f in custom_fields}
+    
+    await db.bot_config.update_one(
+        {"tenant_id": current_user.tenant_id},
+        {"$unset": unset}
+    )
+    return {"message": "Flujo reseteado al template base"}
+
+
+
 
 @api_router.get("/agents", response_model=List[Agent])
 async def get_agents(current_user: User = Depends(get_current_user)):

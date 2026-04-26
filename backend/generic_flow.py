@@ -31,17 +31,42 @@ class GenericFlowEngine:
         return any(kw in message_lower for kw in URGENCY_KEYWORDS)
 
     async def get_tenant_template(self, tenant_id: str, db) -> dict:
-        """Obtiene el template del tenant"""
+        """Obtiene el template del tenant. Prioridad: custom flow en DB > template base"""
         tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
         if not tenant:
             return get_template("servicios")
+
         template_id = tenant.get("template_id", "servicios")
-        template = get_template(template_id)
-        # Override FAQ and messages with tenant-specific values
-        if tenant.get("business_name"):
-            template["welcome_message"] = template["welcome_message"].replace(
-                "{business_name}", tenant["business_name"]
-            )
+        template = get_template(template_id).copy()
+
+        # Check if tenant has custom flow in bot_config
+        config = await db.bot_config.find_one({"tenant_id": tenant_id}, {"_id": 0})
+        if config:
+            # Override with custom flow steps if defined
+            if config.get("custom_flow_steps"):
+                template["flow_steps"] = config["custom_flow_steps"]
+            if config.get("custom_welcome_message"):
+                template["welcome_message"] = config["custom_welcome_message"]
+            if config.get("custom_welcome_buttons"):
+                template["welcome_buttons"] = config["custom_welcome_buttons"]
+            if config.get("custom_scoring"):
+                template["scoring"] = config["custom_scoring"]
+            if config.get("custom_appointment_message"):
+                template["appointment_message"] = config["custom_appointment_message"]
+            if config.get("custom_appointment_buttons"):
+                template["appointment_buttons"] = config["custom_appointment_buttons"]
+            if config.get("custom_completion_message"):
+                template["completion_message"] = config["custom_completion_message"]
+            if config.get("custom_faq"):
+                template["faq"] = config["custom_faq"]
+            if config.get("custom_labels"):
+                template["labels"] = config["custom_labels"]
+
+        # Replace {business_name} placeholder
+        bname = tenant.get("business_name", "")
+        if bname:
+            template["welcome_message"] = template["welcome_message"].replace("{business_name}", bname)
+
         return template
 
     async def process_message(self, lead, message_text: str, db, tenant_id: str = "", tenant_wa=None) -> None:

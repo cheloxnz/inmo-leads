@@ -22,9 +22,10 @@ import DataDeletion from './pages/DataDeletion';
 import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
+import FlowBuilder from './components/FlowBuilder';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2 } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
@@ -238,13 +239,25 @@ function Navigation() {
 
         {isAdmin && (
           <Link
+            to="/flujo"
+            className={`nav-link ${isActive('/flujo') ? 'active' : ''}`}
+            data-testid="nav-flow-builder"
+            title="Editor de Flujo"
+          >
+            <span className="icon"><Settings size={16} /></span>
+            {!isCollapsed && <span>Editor de Flujo</span>}
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link
             to="/config"
             className={`nav-link ${isActive('/config') ? 'active' : ''}`}
             data-testid="nav-config"
             title="Configuración"
           >
-            <span className="icon">⚙️</span>
-            {!isCollapsed && <span>Configuración</span>}
+            <span className="icon"><Settings size={16} /></span>
+            {!isCollapsed && <span>Configuracion</span>}
           </Link>
         )}
       </div>
@@ -383,6 +396,11 @@ function AppContent() {
           <Route path="/config" element={
             <ProtectedRoute adminOnly>
               <Configuration />
+            </ProtectedRoute>
+          } />
+          <Route path="/flujo" element={
+            <ProtectedRoute adminOnly>
+              <FlowBuilder />
             </ProtectedRoute>
           } />
           <Route path="/broadcast" element={

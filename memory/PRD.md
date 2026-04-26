@@ -213,3 +213,13 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - Motor legacy (`bot_flow.py`) mantiene compatibilidad con inmobiliarias
 - Endpoint público `GET /api/templates` lista todos los rubros
 - Leads usan `custom_fields` (dict genérico) en vez de campos hardcodeados
+
+## Flujo Configurable desde Dashboard (Generalización B)
+- Editor visual en `/flujo`: Editar preguntas, tipo (texto/botones), campo, IA toggle y prompt
+- Agregar/eliminar/reordenar pasos
+- Editor de scoring: reglas custom con campo, condición, valor, puntos
+- Editor de mensajes: bienvenida, cita, confirmación, labels
+- "Restaurar template" para volver al flujo base del rubro
+- Config custom en `bot_config` por tenant (sobreescribe template base)
+- Endpoints: `GET/PUT /api/flow/config`, `POST /api/flow/reset`
+
