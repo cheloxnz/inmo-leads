@@ -44,8 +44,12 @@ class GenericFlowEngine:
             )
         return template
 
-    async def process_message(self, lead, message_text: str, db, tenant_id: str = "") -> None:
+    async def process_message(self, lead, message_text: str, db, tenant_id: str = "", tenant_wa=None) -> None:
         """Procesa un mensaje según el template del tenant"""
+
+        # Use tenant-specific WA service if provided
+        if tenant_wa:
+            self.wa = tenant_wa
 
         template = await self.get_tenant_template(tenant_id, db)
 

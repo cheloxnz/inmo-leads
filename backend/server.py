@@ -17,7 +17,7 @@ from models import (
     Lead, LeadCreate, LeadUpdate, Agent, BotConfig,
     LeadStatus, FlowStage, User
 )
-from whatsapp_service import WhatsAppService
+from whatsapp_service import WhatsAppService, create_wa_service_for_tenant
 from llm_service import LLMService
 from bot_flow import BotFlowManager
 from scoring import calculate_score
@@ -145,20 +145,28 @@ async def get_template_detail(template_id: str):
 
 
 @api_router.get("/webhook")
-async def verify_webhook(
-    request: Request,
-):
-    """Verificación de webhook de WhatsApp"""
+async def verify_webhook(request: Request):
+    """Verificación de webhook de WhatsApp (multi-tenant)"""
     params = dict(request.query_params)
     hub_mode = params.get("hub.mode")
     hub_challenge = params.get("hub.challenge")
     hub_verify_token = params.get("hub.verify_token")
     
-    verify_token = os.getenv("WEBHOOK_VERIFY_TOKEN")
-    
-    if hub_mode == "subscribe" and hub_verify_token == verify_token:
-        logger.info("Webhook verificado exitosamente")
+    # First try default verify token from .env
+    default_token = os.getenv("WEBHOOK_VERIFY_TOKEN")
+    if hub_mode == "subscribe" and hub_verify_token == default_token:
+        logger.info("Webhook verificado (default token)")
         return Response(content=hub_challenge, status_code=200)
+    
+    # Then try tenant-specific tokens
+    if hub_mode == "subscribe" and hub_verify_token:
+        tenant = await db.tenants.find_one(
+            {"webhook_verify_token": hub_verify_token, "active": True},
+            {"_id": 0}
+        )
+        if tenant:
+            logger.info(f"Webhook verificado (tenant: {tenant['tenant_id']})")
+            return Response(content=hub_challenge, status_code=200)
     
     logger.warning("Verificación de webhook fallida")
     return Response(content="Unauthorized", status_code=403)
@@ -167,13 +175,10 @@ async def verify_webhook(
 @api_router.get("/debug-token")
 async def debug_token():
     """Debug: verificar token configurado"""
-    from whatsapp_service import WhatsAppService
-    # Crear instancia temporal para ver el token que usaría
     ws = WhatsAppService(db)
     return {
         "token_start": ws.access_token[:50] + "..." if ws.access_token else "NO_TOKEN",
-        "token_length": len(ws.access_token) if ws.access_token else 0,
-        "token_from": "hardcoded" if "EAAMSvSefVHQBQv05eAfa5NrQ8" in (ws.access_token or "") else "env_or_old"
+        "token_length": len(ws.access_token) if ws.access_token else 0
     }
 
 
@@ -239,9 +244,7 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
         # Use tenant-specific WhatsApp service if tenant has its own token
         active_wa = wa_service
         if tenant and tenant.get("whatsapp_access_token"):
-            active_wa = WhatsAppService(db, 
-                access_token=tenant.get("whatsapp_access_token"),
-                phone_number_id=tenant.get("whatsapp_phone_number_id"))
+            active_wa = create_wa_service_for_tenant(db, tenant)
         
         await active_wa.record_customer_message(sender)
         
@@ -315,7 +318,7 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                     use_generic = False  # Use legacy flow for inmobiliaria
             
             if use_generic:
-                await generic_flow.process_message(lead, message_text, db, tenant_id)
+                await generic_flow.process_message(lead, message_text, db, tenant_id, tenant_wa=active_wa)
             else:
                 updated_lead = await bot_flow.process_message(lead, message_text, db)
             
@@ -751,6 +754,51 @@ async def update_config(config: BotConfig, current_user: User = Depends(require_
     )
     
     return {"message": "Configuración actualizada"}
+
+
+# ============================================
+# WhatsApp Config per Tenant
+# ============================================
+
+@api_router.get("/config/whatsapp")
+async def get_whatsapp_config(current_user: User = Depends(require_admin)):
+    """Admin: Obtiene config de WhatsApp del tenant"""
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    return {
+        "whatsapp_phone_number_id": tenant.get("whatsapp_phone_number_id", ""),
+        "whatsapp_access_token": "***" + tenant.get("whatsapp_access_token", "")[-10:] if tenant.get("whatsapp_access_token") else "",
+        "whatsapp_business_account_id": tenant.get("whatsapp_business_account_id", ""),
+        "webhook_verify_token": tenant.get("webhook_verify_token", ""),
+        "webhook_url": f"{os.getenv('REACT_APP_BACKEND_URL', '')}/api/webhook",
+        "configured": bool(tenant.get("whatsapp_access_token") and tenant.get("whatsapp_phone_number_id"))
+    }
+
+@api_router.put("/config/whatsapp")
+async def update_whatsapp_config(
+    config: dict,
+    current_user: User = Depends(require_admin)
+):
+    """Admin: Actualiza config de WhatsApp del tenant"""
+    update_fields = {}
+    allowed = ["whatsapp_phone_number_id", "whatsapp_access_token", "whatsapp_business_account_id", "webhook_verify_token"]
+    for key in allowed:
+        if key in config:
+            update_fields[key] = config[key]
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+
+    update_fields["updated_at"] = datetime.utcnow().isoformat()
+    
+    await db.tenants.update_one(
+        {"tenant_id": current_user.tenant_id},
+        {"$set": update_fields}
+    )
+    return {"message": "Configuracion de WhatsApp actualizada"}
+
+
 
 
 @api_router.get("/agents", response_model=List[Agent])
