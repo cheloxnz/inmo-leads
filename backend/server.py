@@ -25,7 +25,7 @@ from google_services import GoogleSheetsService, GoogleCalendarService
 from email_service import EmailService
 from scheduler import ScheduledTasks
 from auth import decode_access_token
-from auth_routes import router as auth_router, get_current_user, require_admin
+from auth_routes import router as auth_router, get_current_user, require_admin, require_superadmin, tenant_filter
 from assignment import AssignmentEngine
 from audio_service import AudioTranscriptionService
 from payment_service import PaymentService, SUBSCRIPTION_PLANS
@@ -180,12 +180,27 @@ async def receive_webhook(
             entry = data.get("entry", [{}])[0]
             changes = entry.get("changes", [])
             
+            # Identify tenant by WhatsApp phone_number_id
+            phone_number_id = ""
+            for change in changes:
+                value = change.get("value", {})
+                metadata = value.get("metadata", {})
+                phone_number_id = metadata.get("phone_number_id", "")
+                break
+            
+            # Find tenant for this phone_number_id
+            tenant = await db.tenants.find_one(
+                {"whatsapp_phone_number_id": phone_number_id, "active": True},
+                {"_id": 0}
+            ) if phone_number_id else None
+            tenant_id = tenant["tenant_id"] if tenant else ""
+            
             for change in changes:
                 value = change.get("value", {})
                 messages = value.get("messages", [])
                 
                 for message in messages:
-                    await handle_incoming_message(message)
+                    await handle_incoming_message(message, tenant_id, tenant)
         
         return Response(status_code=200)
     
@@ -194,19 +209,26 @@ async def receive_webhook(
         return Response(status_code=500)
 
 
-async def handle_incoming_message(message: dict):
-    """Procesa mensaje entrante"""
+async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: dict = None):
+    """Procesa mensaje entrante (tenant-aware)"""
     try:
         sender = message.get("from")
         message_type = message.get("type")
         
-        await wa_service.record_customer_message(sender)
+        # Use tenant-specific WhatsApp service if tenant has its own token
+        active_wa = wa_service
+        if tenant and tenant.get("whatsapp_access_token"):
+            active_wa = WhatsAppService(db, 
+                access_token=tenant.get("whatsapp_access_token"),
+                phone_number_id=tenant.get("whatsapp_phone_number_id"))
         
-        lead = await db.leads.find_one({"phone": sender}, {"_id": 0})
+        await active_wa.record_customer_message(sender)
+        
+        lead = await db.leads.find_one({"phone": sender, "tenant_id": tenant_id}, {"_id": 0})
         previous_status = lead.get("status") if lead else None
         
         if not lead:
-            lead = Lead(phone=sender)
+            lead = Lead(phone=sender, tenant_id=tenant_id)
             lead_dict = lead.model_dump()
             lead_dict["last_message_at"] = lead.last_message_at.isoformat()
             lead_dict["created_at"] = lead.created_at.isoformat()
@@ -337,10 +359,11 @@ async def handle_incoming_message(message: dict):
 @api_router.get("/leads", response_model=List[Lead])
 async def get_leads(
     status: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
+    current_user: User = Depends(get_current_user)
 ):
-    """Obtiene lista de leads"""
-    query = {}
+    """Obtiene lista de leads (filtrado por tenant)"""
+    query = tenant_filter(current_user)
     if status:
         query["status"] = status
     
@@ -363,8 +386,10 @@ async def get_leads(
 # NOTE: These routes MUST be BEFORE /leads/{phone} to avoid path parameter matching
 @api_router.get("/leads/kanban")
 async def get_kanban_data(current_user: User = Depends(get_current_user)):
-    """Obtiene leads organizados para vista Kanban"""
+    """Obtiene leads organizados para vista Kanban (filtrado por tenant)"""
+    match_stage = tenant_filter(current_user)
     pipeline = [
+        {"$match": match_stage},
         {"$group": {
             "_id": "$status",
             "leads": {"$push": {
@@ -413,7 +438,7 @@ async def get_my_leads(
     limit: int = 100
 ):
     """Obtiene leads asignados al asesor actual"""
-    query = {"assigned_agent": current_user.email}
+    query = tenant_filter(current_user, {"assigned_agent": current_user.email})
     if status:
         query["status"] = status
     
@@ -434,9 +459,10 @@ async def get_my_leads(
 
 
 @api_router.get("/leads/{phone}")
-async def get_lead(phone: str):
-    """Obtiene un lead específico"""
-    lead = await db.leads.find_one({"phone": phone}, {"_id": 0})
+async def get_lead(phone: str, current_user: User = Depends(get_current_user)):
+    """Obtiene un lead específico (filtrado por tenant)"""
+    query = tenant_filter(current_user, {"phone": phone})
+    lead = await db.leads.find_one(query, {"_id": 0})
     
     if not lead:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
@@ -452,17 +478,15 @@ async def get_lead(phone: str):
 
 
 @api_router.put("/leads/{phone}")
-async def update_lead(phone: str, lead_update: LeadUpdate):
-    """Actualiza un lead"""
+async def update_lead(phone: str, lead_update: LeadUpdate, current_user: User = Depends(get_current_user)):
+    """Actualiza un lead (filtrado por tenant)"""
     update_data = {k: v for k, v in lead_update.model_dump(exclude_unset=True).items() if v is not None}
     
     if not update_data:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
     
-    result = await db.leads.update_one(
-        {"phone": phone},
-        {"$set": update_data}
-    )
+    query = tenant_filter(current_user, {"phone": phone})
+    result = await db.leads.update_one(query, {"$set": update_data})
     
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
@@ -471,9 +495,10 @@ async def update_lead(phone: str, lead_update: LeadUpdate):
 
 
 @api_router.delete("/leads/{phone}")
-async def delete_lead(phone: str):
-    """Elimina un lead permanentemente"""
-    result = await db.leads.delete_one({"phone": phone})
+async def delete_lead(phone: str, current_user: User = Depends(get_current_user)):
+    """Elimina un lead (filtrado por tenant)"""
+    query = tenant_filter(current_user, {"phone": phone})
+    result = await db.leads.delete_one(query)
     
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
@@ -482,22 +507,24 @@ async def delete_lead(phone: str):
 
 
 @api_router.get("/leads/stats/summary")
-async def get_stats():
-    """Obtiene estadísticas de leads"""
-    total = await db.leads.count_documents({})
-    hot = await db.leads.count_documents({"status": "hot"})
-    warm = await db.leads.count_documents({"status": "warm"})
-    cold = await db.leads.count_documents({"status": "cold"})
+async def get_stats(current_user: User = Depends(get_current_user)):
+    """Obtiene estadísticas de leads (filtrado por tenant)"""
+    tf = tenant_filter(current_user)
+    total = await db.leads.count_documents(tf)
+    hot = await db.leads.count_documents({**tf, "status": "hot"})
+    warm = await db.leads.count_documents({**tf, "status": "warm"})
+    cold = await db.leads.count_documents({**tf, "status": "cold"})
     
-    with_appointment = await db.leads.count_documents({"appointment_datetime": {"$exists": True, "$ne": None}})
+    with_appointment = await db.leads.count_documents({**tf, "appointment_datetime": {"$exists": True, "$ne": None}})
     
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_leads = await db.leads.count_documents({"created_at": {"$gte": today.isoformat()}})
+    today_leads = await db.leads.count_documents({**tf, "created_at": {"$gte": today.isoformat()}})
     
     week_ago = datetime.utcnow() - timedelta(days=7)
-    week_leads = await db.leads.count_documents({"created_at": {"$gte": week_ago.isoformat()}})
+    week_leads = await db.leads.count_documents({**tf, "created_at": {"$gte": week_ago.isoformat()}})
     
     avg_score_pipeline = [
+        {"$match": tf},
         {"$group": {"_id": None, "avg_score": {"$avg": "$score"}}}
     ]
     avg_result = await db.leads.aggregate(avg_score_pipeline).to_list(1)
@@ -518,16 +545,12 @@ async def get_stats():
 
 # Tags endpoints
 @api_router.post("/leads/{phone}/tags")
-async def add_tag(phone: str, tag_data: dict):
-    """Agrega un tag a un lead"""
+async def add_tag(phone: str, tag_data: dict, current_user: User = Depends(get_current_user)):
     tag = tag_data.get("tag", "").strip()
     if not tag:
         raise HTTPException(status_code=400, detail="Tag vacío")
-    
-    result = await db.leads.update_one(
-        {"phone": phone},
-        {"$addToSet": {"tags": tag}}
-    )
+    query = tenant_filter(current_user, {"phone": phone})
+    result = await db.leads.update_one(query, {"$addToSet": {"tags": tag}})
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
@@ -536,12 +559,9 @@ async def add_tag(phone: str, tag_data: dict):
 
 
 @api_router.delete("/leads/{phone}/tags/{tag}")
-async def remove_tag(phone: str, tag: str):
-    """Elimina un tag de un lead"""
-    result = await db.leads.update_one(
-        {"phone": phone},
-        {"$pull": {"tags": tag}}
-    )
+async def remove_tag(phone: str, tag: str, current_user: User = Depends(get_current_user)):
+    query = tenant_filter(current_user, {"phone": phone})
+    result = await db.leads.update_one(query, {"$pull": {"tags": tag}})
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Lead o tag no encontrado")
@@ -550,9 +570,10 @@ async def remove_tag(phone: str, tag: str):
 
 
 @api_router.get("/tags")
-async def get_all_tags():
-    """Obtiene todos los tags únicos usados"""
+async def get_all_tags(current_user: User = Depends(get_current_user)):
+    tf = tenant_filter(current_user)
     pipeline = [
+        {"$match": tf},
         {"$unwind": "$tags"},
         {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}}
@@ -563,12 +584,11 @@ async def get_all_tags():
 
 # Métricas para gráficos
 @api_router.get("/metrics/leads-by-day")
-async def get_leads_by_day(days: int = 30):
-    """Obtiene cantidad de leads por día"""
+async def get_leads_by_day(days: int = 30, current_user: User = Depends(get_current_user)):
     start_date = datetime.utcnow() - timedelta(days=days)
-    
+    tf = tenant_filter(current_user, {"created_at": {"$gte": start_date.isoformat()}})
     pipeline = [
-        {"$match": {"created_at": {"$gte": start_date.isoformat()}}},
+        {"$match": tf},
         {"$addFields": {
             "date": {"$substr": ["$created_at", 0, 10]}
         }},
@@ -581,9 +601,10 @@ async def get_leads_by_day(days: int = 30):
 
 
 @api_router.get("/metrics/leads-by-status")
-async def get_leads_by_status():
-    """Obtiene distribución de leads por estado"""
+async def get_leads_by_status(current_user: User = Depends(get_current_user)):
+    tf = tenant_filter(current_user)
     pipeline = [
+        {"$match": tf},
         {"$group": {"_id": "$status", "count": {"$sum": 1}}}
     ]
     result = await db.leads.aggregate(pipeline).to_list(10)
@@ -591,9 +612,10 @@ async def get_leads_by_status():
 
 
 @api_router.get("/metrics/leads-by-intent")
-async def get_leads_by_intent():
-    """Obtiene distribución de leads por intención"""
+async def get_leads_by_intent(current_user: User = Depends(get_current_user)):
+    tf = tenant_filter(current_user)
     pipeline = [
+        {"$match": tf},
         {"$group": {"_id": "$intent", "count": {"$sum": 1}}}
     ]
     result = await db.leads.aggregate(pipeline).to_list(10)
@@ -601,12 +623,12 @@ async def get_leads_by_intent():
 
 
 @api_router.get("/metrics/conversion-funnel")
-async def get_conversion_funnel():
-    """Obtiene métricas del funnel de conversión"""
-    total = await db.leads.count_documents({})
-    qualified = await db.leads.count_documents({"score": {"$gte": 30}})
-    with_appointment = await db.leads.count_documents({"appointment_datetime": {"$exists": True, "$ne": None}})
-    hot = await db.leads.count_documents({"status": "hot"})
+async def get_conversion_funnel(current_user: User = Depends(get_current_user)):
+    tf = tenant_filter(current_user)
+    total = await db.leads.count_documents(tf)
+    qualified = await db.leads.count_documents({**tf, "score": {"$gte": 30}})
+    with_appointment = await db.leads.count_documents({**tf, "appointment_datetime": {"$exists": True, "$ne": None}})
+    hot = await db.leads.count_documents({**tf, "status": "hot"})
     
     return {
         "total_leads": total,
@@ -620,12 +642,12 @@ async def get_conversion_funnel():
 
 
 @api_router.get("/metrics/messages")
-async def get_messages_metrics(days: int = 30):
-    """Obtiene métricas de mensajes procesados"""
+async def get_messages_metrics(days: int = 30, current_user: User = Depends(get_current_user)):
     start_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    tf = tenant_filter(current_user)
     
-    # Contar mensajes desde conversation_history de cada lead
     pipeline = [
+        {"$match": tf},
         {"$unwind": "$conversation_history"},
         {"$group": {
             "_id": None,
@@ -643,6 +665,7 @@ async def get_messages_metrics(days: int = 30):
     
     # Mensajes por día (últimos N días)
     pipeline_by_day = [
+        {"$match": tf},
         {"$unwind": "$conversation_history"},
         {"$match": {"conversation_history.timestamp": {"$gte": start_date}}},
         {"$addFields": {"date": {"$substr": ["$conversation_history.timestamp", 0, 10]}}},
@@ -652,7 +675,7 @@ async def get_messages_metrics(days: int = 30):
     by_day = await db.leads.aggregate(pipeline_by_day).to_list(100)
     
     # Total de leads
-    total_leads = await db.leads.count_documents({})
+    total_leads = await db.leads.count_documents(tf)
     
     stats = result[0] if result else {"total": 0, "from_customer": 0, "from_bot": 0}
     recent_count = sum(d["count"] for d in by_day)
@@ -670,12 +693,13 @@ async def get_messages_metrics(days: int = 30):
 
 
 @api_router.get("/config")
-async def get_config():
-    """Obtiene configuración del bot"""
-    config = await db.bot_config.find_one({}, {"_id": 0})
+async def get_config(current_user: User = Depends(get_current_user)):
+    """Obtiene configuración del bot (por tenant)"""
+    tf = tenant_filter(current_user)
+    config = await db.bot_config.find_one(tf, {"_id": 0})
     
     if not config:
-        config = BotConfig().model_dump()
+        config = BotConfig(tenant_id=current_user.tenant_id).model_dump()
         config["updated_at"] = config["updated_at"].isoformat()
         await db.bot_config.insert_one(config)
     
@@ -683,13 +707,14 @@ async def get_config():
 
 
 @api_router.put("/config")
-async def update_config(config: BotConfig):
-    """Actualiza configuración del bot"""
+async def update_config(config: BotConfig, current_user: User = Depends(require_admin)):
+    """Actualiza configuración del bot (por tenant)"""
     config_dict = config.model_dump()
+    config_dict["tenant_id"] = current_user.tenant_id
     config_dict["updated_at"] = datetime.utcnow().isoformat()
     
     await db.bot_config.update_one(
-        {},
+        {"tenant_id": current_user.tenant_id},
         {"$set": config_dict},
         upsert=True
     )
@@ -698,9 +723,10 @@ async def update_config(config: BotConfig):
 
 
 @api_router.get("/agents", response_model=List[Agent])
-async def get_agents():
-    """Obtiene lista de agentes"""
-    agents = await db.agents.find({}, {"_id": 0}).to_list(100)
+async def get_agents(current_user: User = Depends(get_current_user)):
+    """Obtiene lista de agentes (por tenant)"""
+    tf = tenant_filter(current_user)
+    agents = await db.agents.find(tf, {"_id": 0, "password_hash": 0}).to_list(100)
     
     for agent in agents:
         if isinstance(agent.get("created_at"), str):
@@ -831,15 +857,18 @@ async def get_daily_goals(current_user: User = Depends(get_current_user)):
     
     # Leads de hoy por status
     hot_today = await db.leads.count_documents({
+        **tenant_filter(current_user),
         "created_at": {"$gte": today.isoformat()},
         "status": "hot"
     })
     
     total_today = await db.leads.count_documents({
+        **tenant_filter(current_user),
         "created_at": {"$gte": today.isoformat()}
     })
     
     appointments_today = await db.leads.count_documents({
+        **tenant_filter(current_user),
         "appointment_datetime": {
             "$gte": today.isoformat(),
             "$lt": (today + timedelta(days=1)).isoformat()
@@ -862,6 +891,7 @@ async def get_upcoming_appointments(current_user: User = Depends(get_current_use
     one_hour_later = now + timedelta(hours=1)
     
     query = {
+        **tenant_filter(current_user),
         "appointment_datetime": {
             "$gte": now.isoformat(),
             "$lte": one_hour_later.isoformat()
@@ -869,8 +899,7 @@ async def get_upcoming_appointments(current_user: User = Depends(get_current_use
         "appointment_reminder_sent": False
     }
     
-    # Si es asesor, filtrar por sus leads
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "superadmin"):
         query["assigned_agent"] = current_user.email
     
     appointments = await db.leads.find(query, {"_id": 0}).to_list(20)
@@ -883,12 +912,12 @@ async def get_inactive_leads(current_user: User = Depends(get_current_user)):
     three_days_ago = datetime.utcnow() - timedelta(days=3)
     
     query = {
+        **tenant_filter(current_user),
         "status": "warm",
         "last_message_at": {"$lte": three_days_ago.isoformat()}
     }
     
-    # Si es asesor, filtrar por sus leads
-    if current_user.role != "admin":
+    if current_user.role not in ("admin", "superadmin"):
         query["assigned_agent"] = current_user.email
     
     inactive = await db.leads.find(query, {"_id": 0}).to_list(20)
@@ -1062,23 +1091,15 @@ async def bulk_action(request: BulkActionRequest, current_user: User = Depends(r
     
     for phone in request.lead_phones:
         try:
+            tf = tenant_filter(current_user, {"phone": phone})
             if request.action == "tag" and request.value:
-                await db.leads.update_one(
-                    {"phone": phone},
-                    {"$addToSet": {"tags": request.value}}
-                )
+                await db.leads.update_one(tf, {"$addToSet": {"tags": request.value}})
             elif request.action == "assign" and request.value:
-                await db.leads.update_one(
-                    {"phone": phone},
-                    {"$set": {"assigned_to": request.value}}
-                )
+                await db.leads.update_one(tf, {"$set": {"assigned_to": request.value}})
             elif request.action == "status" and request.value:
-                await db.leads.update_one(
-                    {"phone": phone},
-                    {"$set": {"status": request.value}}
-                )
+                await db.leads.update_one(tf, {"$set": {"status": request.value}})
             elif request.action == "delete":
-                await db.leads.delete_one({"phone": phone})
+                await db.leads.delete_one(tf)
             
             updated_count += 1
         except Exception as e:
@@ -1097,9 +1118,10 @@ async def bulk_action(request: BulkActionRequest, current_user: User = Depends(r
 # ==============================================
 # HISTORIAL DE AUDITORÍA
 # ==============================================
-async def log_audit_event(action: str, user_email: str, details: dict = None, lead_phone: str = None):
+async def log_audit_event(action: str, user_email: str, details: dict = None, lead_phone: str = None, tenant_id: str = ""):
     """Registra evento de auditoría"""
     await db.audit_log.insert_one({
+        "tenant_id": tenant_id,
         "action": action,
         "user_email": user_email,
         "lead_phone": lead_phone,
@@ -1115,7 +1137,7 @@ async def get_audit_log(
     current_user: User = Depends(require_admin)
 ):
     """Obtiene historial de auditoría"""
-    query = {}
+    query = tenant_filter(current_user)
     if action:
         query["action"] = action
     
@@ -1134,7 +1156,9 @@ async def get_audit_log(
 @api_router.get("/metrics/nps")
 async def get_nps_metrics(current_user: User = Depends(require_admin)):
     """Obtiene métricas de NPS"""
+    tf = tenant_filter(current_user)
     pipeline = [
+        {"$match": tf},
         {"$group": {
             "_id": "$category",
             "count": {"$sum": 1},

@@ -49,14 +49,12 @@ class FlowStage(str, Enum):
     HANDOFF = "handoff"
     COMPLETED = "completed"
     DISQUALIFIED = "disqualified"
-    # Reagendamiento
     RESCHEDULE_CONFIRM = "reschedule_confirm"
     RESCHEDULE_DAY = "reschedule_day"
     RESCHEDULE_TIME = "reschedule_time"
-    # Cancelación
     CANCEL_CONFIRM = "cancel_confirm"
-    # Consultas con IA
     CONSULTING = "consulting"
+    SCHEDULE_DAY = "schedule_day"
 
 class UrgencyLevel(str, Enum):
     URGENTE = "urgente"
@@ -78,9 +76,62 @@ class EmailType(str, Enum):
     WARM_LEAD_REACTIVATION = "warm_lead_reactivation"
     TEST = "test"
 
+
+# ============================================
+# MULTI-TENANT: Tenant Model
+# ============================================
+
+class Tenant(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    tenant_id: str  # unique slug (ej: "inmobiliaria-lopez")
+    name: str  # "Inmobiliaria López"
+    plan: str = "basic"  # basic, pro, enterprise
+    active: bool = True
+    # WhatsApp config per tenant
+    whatsapp_phone_number_id: str = ""
+    whatsapp_access_token: str = ""
+    whatsapp_business_account_id: str = ""
+    webhook_verify_token: str = ""
+    # Limits
+    max_leads: int = 500
+    max_agents: int = 5
+    # Subscription
+    subscription_status: str = "active"  # active, trial, suspended, cancelled
+    subscription_plan: str = "basic"
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    # Contact
+    contact_email: str = ""
+    contact_phone: str = ""
+    country: str = ""
+    # Branding
+    business_name: str = ""
+    business_tagline: str = ""
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class TenantCreate(BaseModel):
+    tenant_id: str
+    name: str
+    contact_email: str
+    contact_phone: str = ""
+    country: str = ""
+    plan: str = "basic"
+    admin_email: str
+    admin_password: str
+    admin_name: str = "Administrador"
+
+
+# ============================================
+# Lead Models (with tenant_id)
+# ============================================
+
 class Lead(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
+    tenant_id: str = ""
     phone: str
     name: Optional[str] = None
     flow_stage: FlowStage = FlowStage.WELCOME
@@ -129,14 +180,20 @@ class LeadUpdate(BaseModel):
     status: Optional[LeadStatus] = None
     notes: Optional[str] = None
 
+
+# ============================================
+# Agent Models (with tenant_id)
+# ============================================
+
 class Agent(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
+    tenant_id: str = ""
     name: str
     email: str
     phone: str
     password_hash: Optional[str] = None
-    role: str = "asesor"
+    role: str = "asesor"  # superadmin, admin, asesor
     specialties: List[str] = Field(default_factory=list)
     zones: List[str] = Field(default_factory=list)
     max_concurrent_leads: int = 15
@@ -157,15 +214,22 @@ class AgentLogin(BaseModel):
 
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     email: str
     name: str
     role: str
+    tenant_id: str = ""
     agent_data: Optional[dict] = None
+
+
+# ============================================
+# Bot Config (with tenant_id)
+# ============================================
 
 class BotConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
+    tenant_id: str = ""
     business_hours_start: int = 9
     business_hours_end: int = 20
     business_days: List[str] = Field(default_factory=lambda: ["lunes", "martes", "miercoles", "jueves", "viernes"])
@@ -175,12 +239,17 @@ class BotConfig(BaseModel):
     auto_handoff_score: int = 7
     warm_lead_reactivation_days: int = 3
     appointment_reminder_hours: int = 24
-    welcome_message: str = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy acá para ayudarte a encontrar tu propiedad ideal 🏡"
+    welcome_message: str = "Hola! Soy el asistente virtual de la inmobiliaria. Estoy aca para ayudarte a encontrar tu propiedad ideal"
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ============================================
+# Other Models
+# ============================================
 
 class ConversationWindow(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     customer_phone: str
     last_message_timestamp: datetime
     window_expires_at: datetime
@@ -189,7 +258,8 @@ class ConversationWindow(BaseModel):
 
 class EmailLog(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
+    tenant_id: str = ""
     email_type: EmailType
     recipient_emails: List[str]
     lead_phone: Optional[str] = None
@@ -200,7 +270,8 @@ class EmailLog(BaseModel):
 
 class WhatsAppTemplate(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
+    tenant_id: str = ""
     name: str
     category: str
     language: str = "es"

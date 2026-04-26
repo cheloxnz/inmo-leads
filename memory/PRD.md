@@ -191,9 +191,16 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **Documentación:** MANUAL_COMPRADOR.md incluye guía paso a paso de MongoDB Atlas, personalización de landing, Railway detallado y Docker
 
 
-## Modelo de Negocio
-- **Plan Código Solo:** $147 USD (pago único)
-- **Plan Código + Instalación:** $497 USD (pago único, más vendido)
-- **Plan Soporte + Actualizaciones:** $100 USD/mes (descuentos: 15% x 6m, 20% x 12m, 30% x 24m)
-- **Script `push_updates.py`:** Gestión de repos de clientes y distribución de actualizaciones
-- **`clients.json`:** Base de datos de clientes activos/inactivos
+## Arquitectura Multi-Tenant (SaaS)
+- **Modelo:** Multi-tenant con `tenant_id` en todas las colecciones
+- **Roles:** `superadmin` (dueño SaaS) → `admin` (dueño inmobiliaria) → `asesor`
+- **Tenant isolation:** Todas las queries filtran por `tenant_id`. Superadmin ve todo.
+- **Webhook routing:** Identifica tenant por `whatsapp_phone_number_id` del mensaje entrante
+- **Endpoints de gestión:** POST/GET/PUT/DELETE `/api/auth/tenants` (solo superadmin)
+- **Init:** `init_admin.py` crea superadmin + tenant de ejemplo opcional
+- **OpenAI:** UNA sola key del dueño del SaaS para todos los clientes
+
+### Fases pendientes:
+- **Fase 2:** Webhook routing con WhatsApp service por tenant (token por tenant)
+- **Fase 3:** Config UI por tenant (branding, horarios, etc.)
+- **Fase 4:** Billing con Stripe subscriptions + control de acceso por plan

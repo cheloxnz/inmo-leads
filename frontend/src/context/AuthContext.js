@@ -59,8 +59,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
   const isAsesor = user?.role === 'asesor';
+  const tenantId = user?.tenant_id || '';
 
   return (
     <AuthContext.Provider value={{
@@ -70,7 +72,9 @@ export function AuthProvider({ children }) {
       login,
       logout,
       isAdmin,
+      isSuperAdmin,
       isAsesor,
+      tenantId,
       isAuthenticated: !!user
     }}>
       {children}
