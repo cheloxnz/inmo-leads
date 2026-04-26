@@ -1,89 +1,63 @@
-from models import Lead, LeadStatus, UrgencyLevel, FinancingType, LeadIntent, FlowStage
+"""
+InmoBot SaaS - Motor de scoring genérico basado en templates
+"""
 import logging
 
 logger = logging.getLogger(__name__)
 
-class ScoringEngine:
-    """Motor de scoring para calificación de leads"""
-    
-    @staticmethod
-    def calculate_score(lead: Lead) -> int:
-        """Calcula el score del lead basado en sus respuestas"""
-        score = 0
-        
-        # Presupuesto definido: +2
-        if lead.budget_text:
-            score += 2
-            logger.info(f"Lead {lead.phone}: +2 puntos por presupuesto definido")
-        
-        # Zona definida: +2
-        if lead.zone:
-            score += 2
-            logger.info(f"Lead {lead.phone}: +2 puntos por zona definida")
-        
-        # Tipo de propiedad definido: +1
-        if lead.property_type:
-            score += 1
-            logger.info(f"Lead {lead.phone}: +1 punto por tipo de propiedad")
-        
-        # Urgencia alta: +3
-        if lead.urgency == UrgencyLevel.URGENTE:
-            score += 3
-            logger.info(f"Lead {lead.phone}: +3 puntos por urgencia alta")
-        elif lead.urgency == UrgencyLevel.PROXIMO_MES:
-            score += 2
-            logger.info(f"Lead {lead.phone}: +2 puntos por urgencia media")
-        elif lead.urgency == UrgencyLevel.MESES:
-            score += 1
-            logger.info(f"Lead {lead.phone}: +1 punto por urgencia baja")
-        elif lead.urgency == UrgencyLevel.SOLO_MIRANDO:
-            score += 0
-            logger.info(f"Lead {lead.phone}: 0 puntos - solo mirando")
-        
-        # Financiamiento definido: +1
-        if lead.financing and lead.financing != FinancingType.NO_SE:
-            score += 1
-            logger.info(f"Lead {lead.phone}: +1 punto por financiamiento definido")
-        
-        # Intención de compra (vs alquiler): +1
-        if lead.intent == LeadIntent.COMPRAR:
-            score += 1
-            logger.info(f"Lead {lead.phone}: +1 punto por intención de compra")
-        
-        # Tiene requisitos específicos: +1
-        if lead.must_have and len(lead.must_have) > 0:
-            score += 1
-            logger.info(f"Lead {lead.phone}: +1 punto por requisitos específicos")
-        
-        logger.info(f"Lead {lead.phone}: Score total = {score}")
-        return score
-    
-    @staticmethod
-    def classify_lead(score: int) -> LeadStatus:
-        """Clasifica el lead según su score"""
-        if score >= 7:
-            return LeadStatus.HOT
-        elif score >= 4:
-            return LeadStatus.WARM
+
+def get_nested_value(lead_dict: dict, field_path: str):
+    """Obtiene valor de un campo, soporta dot notation (custom_fields.zone)"""
+    parts = field_path.split(".")
+    value = lead_dict
+    for part in parts:
+        if isinstance(value, dict):
+            value = value.get(part)
         else:
-            return LeadStatus.COLD
-    
-    @staticmethod
-    def should_handoff_to_human(lead: Lead) -> bool:
-        """Determina si el lead debe pasar a asesor humano"""
-        # Lead caliente (score >= 7)
-        if lead.score >= 7:
-            logger.info(f"Handoff: Lead {lead.phone} tiene score alto ({lead.score})")
-            return True
-        
-        # Ha llegado al final del flujo y acepto agendar
-        if lead.flow_stage in [FlowStage.CONFIRMATION, FlowStage.HANDOFF]:
-            logger.info(f"Handoff: Lead {lead.phone} completó flujo")
-            return True
-        
-        # Tiene cita agendada
-        if lead.appointment_datetime:
-            logger.info(f"Handoff: Lead {lead.phone} tiene cita agendada")
-            return True
-        
-        return False
+            return None
+    return value
+
+
+def calculate_score(lead_dict: dict, scoring_config: dict) -> tuple:
+    """
+    Calcula score basado en la config del template.
+    Retorna (score, status)
+    """
+    score = 0
+    criteria = scoring_config.get("criteria", [])
+    hot_threshold = scoring_config.get("hot_threshold", 7)
+    warm_threshold = scoring_config.get("warm_threshold", 4)
+
+    for criterion in criteria:
+        field = criterion.get("field", "")
+        points = criterion.get("points", 0)
+        condition = criterion.get("condition", "not_empty")
+        expected_value = criterion.get("value", "")
+
+        actual_value = get_nested_value(lead_dict, field)
+
+        if condition == "not_empty":
+            if actual_value and str(actual_value).strip():
+                score += points
+        elif condition == "equals":
+            if str(actual_value).lower() == str(expected_value).lower():
+                score += points
+        elif condition == "not_equals":
+            if actual_value and str(actual_value).lower() != str(expected_value).lower():
+                score += points
+        elif condition == "greater_than":
+            try:
+                if float(actual_value) > float(expected_value):
+                    score += points
+            except (TypeError, ValueError):
+                pass
+
+    # Determine status
+    if score >= hot_threshold:
+        status = "hot"
+    elif score >= warm_threshold:
+        status = "warm"
+    else:
+        status = "cold"
+
+    return score, status

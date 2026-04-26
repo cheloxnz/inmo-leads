@@ -20,7 +20,7 @@ from models import (
 from whatsapp_service import WhatsAppService
 from llm_service import LLMService
 from bot_flow import BotFlowManager
-from scoring import ScoringEngine
+from scoring import calculate_score
 from google_services import GoogleSheetsService, GoogleCalendarService
 from email_service import EmailService
 from scheduler import ScheduledTasks
@@ -111,6 +111,10 @@ wa_service = WhatsAppService(db)
 llm_service = LLMService()
 email_service = EmailService(db)
 bot_flow = BotFlowManager(wa_service, llm_service, email_service)
+
+from generic_flow import GenericFlowEngine
+generic_flow = GenericFlowEngine(wa_service, llm_service, email_service)
+
 sheets_service = GoogleSheetsService()
 calendar_service = GoogleCalendarService()
 scheduler = ScheduledTasks(db, email_service, wa_service)
@@ -120,7 +124,24 @@ payment_service = PaymentService(db)
 
 @api_router.get("/")
 async def root():
-    return {"message": "Inmobiliaria WhatsApp Bot API"}
+    return {"message": "InmoBot SaaS API"}
+
+
+@api_router.get("/templates")
+async def list_templates():
+    """Lista todos los templates de rubro disponibles"""
+    from flow_templates import get_all_templates
+    return get_all_templates()
+
+
+@api_router.get("/templates/{template_id}")
+async def get_template_detail(template_id: str):
+    """Obtiene detalle de un template"""
+    from flow_templates import get_template
+    template = get_template(template_id)
+    if template["id"] != template_id and template_id != "servicios":
+        raise HTTPException(status_code=404, detail="Template no encontrado")
+    return template
 
 
 @api_router.get("/webhook")
@@ -286,7 +307,17 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                     return
         
         if message_text:
-            updated_lead = await bot_flow.process_message(lead, message_text, db)
+            # Determine which flow engine to use based on tenant template
+            use_generic = True
+            if tenant:
+                template_id = tenant.get("template_id", "servicios")
+                if template_id == "inmobiliaria":
+                    use_generic = False  # Use legacy flow for inmobiliaria
+            
+            if use_generic:
+                await generic_flow.process_message(lead, message_text, db, tenant_id)
+            else:
+                updated_lead = await bot_flow.process_message(lead, message_text, db)
             
             # Asignación automática cuando lead se vuelve HOT
             if updated_lead.status == LeadStatus.HOT and previous_status != "hot":

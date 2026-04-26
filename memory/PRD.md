@@ -200,7 +200,10 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - **Init:** `init_admin.py` crea superadmin + tenant de ejemplo opcional
 - **OpenAI:** UNA sola key del dueño del SaaS para todos los clientes
 
-### Fases pendientes:
-- **Fase 2:** Webhook routing con WhatsApp service por tenant (token por tenant)
-- **Fase 3:** Config UI por tenant (branding, horarios, etc.)
-- **Fase 4:** Billing con Stripe subscriptions + control de acceso por plan
+## Templates de Rubro (Generalización A)
+- 5 templates disponibles: inmobiliaria, clinica, restaurante, servicios, ecommerce
+- Cada template define: flujo de preguntas, botones, scoring, labels, mensajes, FAQ
+- Motor genérico (`generic_flow.py`) procesa cualquier template
+- Motor legacy (`bot_flow.py`) mantiene compatibilidad con inmobiliarias
+- Endpoint público `GET /api/templates` lista todos los rubros
+- Leads usan `custom_fields` (dict genérico) en vez de campos hardcodeados

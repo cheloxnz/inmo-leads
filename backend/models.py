@@ -87,6 +87,7 @@ class Tenant(BaseModel):
     tenant_id: str  # unique slug (ej: "inmobiliaria-lopez")
     name: str  # "Inmobiliaria López"
     plan: str = "basic"  # basic, pro, enterprise
+    template_id: str = "servicios"  # inmobiliaria, clinica, restaurante, servicios, ecommerce
     active: bool = True
     # WhatsApp config per tenant
     whatsapp_phone_number_id: str = ""
@@ -134,17 +135,13 @@ class Lead(BaseModel):
     tenant_id: str = ""
     phone: str
     name: Optional[str] = None
-    flow_stage: FlowStage = FlowStage.WELCOME
-    intent: Optional[LeadIntent] = None
-    zone: Optional[str] = None
-    budget_text: Optional[str] = None
-    property_type: Optional[PropertyType] = None
-    bedrooms: Optional[int] = None
-    must_have: List[str] = Field(default_factory=list)
-    urgency: Optional[UrgencyLevel] = None
-    financing: Optional[FinancingType] = None
+    flow_stage: str = "welcome"
+    current_step_index: int = 0  # Index in the template flow_steps
+    intent: Optional[str] = None
+    urgency: Optional[str] = None
+    custom_fields: dict = Field(default_factory=dict)  # Generic fields defined by template
     score: int = 0
-    status: LeadStatus = LeadStatus.COLD
+    status: str = "cold"
     appointment_type: Optional[str] = None
     appointment_datetime: Optional[datetime] = None
     appointment_reminder_sent: bool = False
