@@ -121,9 +121,9 @@ catalog_service = CatalogService(db)
 
 sheets_service = GoogleSheetsService()
 calendar_service = GoogleCalendarService()
-scheduler = ScheduledTasks(db, email_service, wa_service)
 audio_service = AudioTranscriptionService()
 payment_service = PaymentService(db)
+scheduler = ScheduledTasks(db, email_service, wa_service, payment_service=payment_service)
 
 
 @api_router.get("/")
@@ -940,87 +940,9 @@ async def confirm_pack_purchase(body: dict, current_user: User = Depends(require
 
 
 # ============================================
-# Catalog / Products Endpoints
+# Catalog / Products Endpoints -> routers/catalog.py
 # ============================================
-
-@api_router.get("/catalog")
-async def get_catalog(category: Optional[str] = None, current_user: User = Depends(get_current_user)):
-    """Obtiene productos del catalogo del tenant"""
-    return await catalog_service.get_products(current_user.tenant_id, category=category)
-
-
-@api_router.get("/catalog/categories")
-async def get_catalog_categories(current_user: User = Depends(get_current_user)):
-    """Obtiene categorias del catalogo"""
-    return await catalog_service.get_categories(current_user.tenant_id)
-
-
-@api_router.post("/catalog")
-async def create_product(body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Crea un producto en el catalogo"""
-    return await catalog_service.create_product(current_user.tenant_id, body)
-
-
-@api_router.put("/catalog/{product_name}")
-async def update_product(product_name: str, body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Actualiza un producto"""
-    success = await catalog_service.update_product(current_user.tenant_id, product_name, body)
-    if not success:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return {"message": "Producto actualizado"}
-
-
-@api_router.delete("/catalog/{product_name}")
-async def delete_product(product_name: str, current_user: User = Depends(require_admin)):
-    """Admin: Elimina un producto del catalogo"""
-    success = await catalog_service.delete_product(current_user.tenant_id, product_name)
-    if not success:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return {"message": "Producto eliminado"}
-
-
-@api_router.post("/catalog/send/{phone}")
-async def send_catalog_to_lead(phone: str, body: dict, current_user: User = Depends(get_current_user)):
-    """Envia catalogo o producto a un lead por WhatsApp"""
-    category = body.get("category")
-    product_name = body.get("product_name")
-
-    # Get tenant WA service
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    active_wa = create_wa_service_for_tenant(db, tenant)
-
-    if product_name:
-        # Send single product detail
-        products = await catalog_service.get_products(current_user.tenant_id)
-        product = next((p for p in products if p["name"] == product_name), None)
-        if not product:
-            raise HTTPException(status_code=404, detail="Producto no encontrado")
-        msg = catalog_service.build_single_product_message(product)
-        result = active_wa.send_text_message(phone, msg)
-    else:
-        # Send catalog as carousel (3 products) or list
-        products = await catalog_service.get_products(current_user.tenant_id, category=category)
-        if not products:
-            raise HTTPException(status_code=404, detail="No hay productos en el catalogo")
-
-        if len(products) <= 3:
-            # Use buttons (carousel style)
-            body_text, buttons = catalog_service.build_carousel_buttons(products)
-            result = active_wa.send_interactive_buttons(phone, body_text, buttons)
-        else:
-            # Use list message
-            list_data = catalog_service.build_product_list_message(products)
-            result = active_wa.send_list_message(
-                phone,
-                list_data["body"]["text"],
-                list_data["action"]["button"],
-                list_data["action"]["sections"],
-                header_text=list_data["header"]["text"]
-            )
-
-    return {"message": "Catalogo enviado", "result": result}
-
-
+# Endpoints movidos a routers/catalog.py e incluidos al final del archivo
 
 
 
@@ -1310,94 +1232,9 @@ async def get_inactive_leads(current_user: User = Depends(get_current_user)):
 
 
 # ==============================================
-# PAYMENT & BILLING ENDPOINTS (Stripe Subscriptions)
+# PAYMENT & BILLING ENDPOINTS -> routers/billing.py
 # ==============================================
-
-@api_router.get("/plans")
-async def get_plans():
-    """Obtiene los planes de suscripcion disponibles"""
-    return SUBSCRIPTION_PLANS
-
-
-@api_router.post("/billing/subscribe")
-async def create_subscription(
-    body: dict,
-    current_user: User = Depends(require_admin)
-):
-    """Admin: Crea suscripcion para su tenant"""
-    plan_id = body.get("plan_id", "basic")
-    origin_url = body.get("origin_url", "")
-
-    try:
-        result = await payment_service.create_subscription_checkout(
-            plan_id=plan_id,
-            tenant_id=current_user.tenant_id,
-            customer_email=current_user.email,
-            origin_url=origin_url
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error en billing subscribe: {e}")
-        raise HTTPException(status_code=500, detail="Error creando sesion de pago")
-
-
-@api_router.get("/billing")
-async def get_billing(current_user: User = Depends(require_admin)):
-    """Admin: Obtiene info de billing de su tenant"""
-    return await payment_service.get_billing_info(current_user.tenant_id)
-
-
-@api_router.post("/billing/cancel")
-async def cancel_billing(current_user: User = Depends(require_admin)):
-    """Admin: Cancela suscripcion al final del periodo"""
-    return await payment_service.cancel_subscription(current_user.tenant_id)
-
-
-@api_router.post("/billing/bill-overage")
-async def bill_overage_endpoint(body: dict = None, current_user: User = Depends(get_current_user)):
-    """SuperAdmin: factura el overage de IA del periodo (todos los tenants o uno).
-
-    Body opcional:
-    - period: "YYYY-MM" (default: mes anterior si dia<=3, sino mes actual)
-    - tenant_id: si se especifica, solo factura ese tenant
-    """
-    if current_user.role != "superadmin":
-        raise HTTPException(status_code=403, detail="Solo superadmin")
-
-    body = body or {}
-    period = body.get("period")
-    tenant_id = body.get("tenant_id")
-
-    if tenant_id:
-        return await payment_service.bill_overage_for_tenant(tenant_id, period)
-    return await payment_service.bill_all_overages(period)
-
-
-@api_router.post("/webhook/stripe")
-async def stripe_webhook(request: Request):
-    """Webhook para eventos de Stripe"""
-    try:
-        body = await request.body()
-        signature = request.headers.get("Stripe-Signature", "")
-        result = await payment_service.handle_webhook(body, signature)
-        return result
-    except Exception as e:
-        logger.error(f"Error en webhook Stripe: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@api_router.get("/transactions")
-async def get_transactions(current_user: User = Depends(require_admin)):
-    """Admin/SuperAdmin: Obtiene transacciones"""
-    if current_user.role == "superadmin":
-        return await payment_service.get_all_transactions()
-    # Tenant admin sees only their own
-    txns = await db.payment_transactions.find(
-        {"tenant_id": current_user.tenant_id}, {"_id": 0}
-    ).sort("created_at", -1).limit(20).to_list(20)
-    return txns
+# Endpoints movidos a routers/billing.py e incluidos al final del archivo
 
 
 # ==============================================
@@ -1857,8 +1694,13 @@ async def clear_update_notification(
 
 
 # Incluir routers
+from routers.catalog import router as catalog_router
+from routers.billing import router as billing_router
+
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
+app.include_router(catalog_router, prefix="/api")
+app.include_router(billing_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1869,9 +1711,7 @@ app.add_middleware(
 )
 
 
-# Incluir routers
-app.include_router(api_router)
-app.include_router(auth_router, prefix="/api")
+@app.on_event("startup")
 async def startup_event():
     """Inicia tareas programadas al arrancar el servidor"""
     global assignment_engine

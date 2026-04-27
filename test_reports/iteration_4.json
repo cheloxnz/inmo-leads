@@ -1,0 +1,56 @@
+{
+  "summary": "Iter_4: Validados product_id UUID + backfill, cross-tenant validation en /catalog/send/{phone}, refactor a routers/ (catalog.py y billing.py), scheduler bill_monthly_overage, y regresion de endpoints no movidos. 29/29 tests backend pasados. UI catalogo carga correctamente con product_id (GET /api/catalog devuelve 200, 1 producto con product_id).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/leads/stats/summary",
+        "issue": "Retorna 500 Internal Server Error para tenant demo-inmobiliaria. Probable causa: round(avg_score, 2) cuando avg_score es None (total de leads = 0, pipeline aggregate devuelve vacio). Preexistente (NO introducido por este iter_4). La UI llama este endpoint desde la landing page tras login y genera 'Error fetching stats: Gn' en consola. No afecta feature nuevo de este iter (catalog/billing refactor)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Post-login dashboard stats",
+        "issue": "GET /api/leads/stats/summary devuelve 500 -> consola muestra 'Error fetching stats'. No rompe navegacion pero oculta metricas de home. Preexistente, no regresion de iter_4.",
+        "affected_selectors": []
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_catalog_billing.py",
+    "/app/test_reports/pytest/catalog_billing_iter4.xml"
+  ],
+  "action_items": [
+    "Fix /api/leads/stats/summary: reemplazar `round(avg_score, 2)` por `round(avg_score or 0, 2)` o early-return cuando total==0. Esto corrigira el error de consola del dashboard. Linea ~560 en /app/backend/server.py."
+  ],
+  "critical_code_review_comments": [
+    "routers/catalog.py y routers/billing.py usan `_db = get_db()` a nivel modulo, funciona pero acopla el router a la db singleton. Aceptable para este size de app.",
+    "Cross-tenant validation en /catalog/send/{phone}: logica correcta (si `other_tenant_lead and not lead` -> 403). Edge case OK: si el mismo phone existe en ambos tenants (caso raro) se permite envio al tenant actual, que es el comportamiento deseado.",
+    "Backfill de product_id en catalog_service.get_products: hace un update_one por cada producto sin id. Correcto pero ligeramente ineficiente. Es una operacion one-time por producto, asi que no es problema. Considera un $set masivo con bulk_write si la coleccion crece.",
+    "Scheduler bill_monthly_overage: duerme 60s al startup + chequea cada 3600s. Logica dia<=3 y hora==4 UTC + last_run_period key-guard es correcta. Puede perder la ventana si hay restart entre 04:00-05:00, aceptable porque la ventana dura 3 dias.",
+    "Preexistente (no iter_4): /api/leads/stats/summary da 500 cuando no hay leads (avg_score=None). Necesita `round(avg_score or 0, 2)`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_catalog_billing.py (reescrito para iter_4: 29 tests, pymongo para setup/teardown)"
+  ],
+  "success_rate": {
+    "backend": "100% (29/29)",
+    "frontend": "100% (login + /catalogo carga con product_id, GET /api/catalog via token 200)"
+  },
+  "test_credentials": {
+    "tenant_admin_email": "demo@inmobot.com",
+    "tenant_admin_password": "Demo123!",
+    "tenant_id": "demo-inmobiliaria",
+    "superadmin_email": "admin@inmobot.com",
+    "superadmin_password": "Admin123!"
+  },
+  "seed_data_creation": "Productos TEST_* y leads con tenant OTRO_TENANT_TEST creados durante tests y limpiados al final (test_zz_cleanup). Producto 'Casa con jardin' en demo-inmobiliaria no fue tocado y recibio product_id via backfill automatico.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter_4 validado: (1) POST /api/catalog retorna product_id UUID; (2) GET aplica backfill a productos legacy (verificado insertando producto sin product_id y verificando que GET posterior lo asigna y lo persiste); (3) PUT/DELETE /api/catalog/{product_id} funcionan por UUID y dan 404 con id invalido; (4) POST /api/catalog/send/{phone} bloquea cross-tenant con 403 correcto, permite phone del propio tenant y phones desconocidos; (5) Refactor a routers: /api/plans, /api/billing, /api/billing/subscribe, /api/billing/cancel, /api/billing/bill-overage, /api/webhook/stripe, /api/transactions responden correctamente; (6) Endpoints no movidos (/api/leads, /api/usage, /api/templates, /api/flow/config, /api/agents) siguen 200; (7) Scheduler.bill_monthly_overage existe y se inicializa sin romper startup. UI: login demo@inmobot.com + /catalogo carga correctamente (producto 'Casa con jardin' visible). BUG PREEXISTENTE A REPORTAR AL MAIN AGENT: /api/leads/stats/summary devuelve 500 (no es regresion de iter_4, pero es visible en consola del navegador tras login).",
+  "rca_issue_stats_summary": "GET /api/leads/stats/summary devuelve 500 cuando el aggregate pipeline retorna vacio (no hay leads en el tenant con campo score). `avg_score = avg_result[0]['avg_score'] if avg_result else 0` -> avg_result puede tener un doc con `avg_score: None` cuando hay docs pero ninguno con `score`. Luego `round(None, 2)` lanza TypeError. Fix: `avg_score = (avg_result[0]['avg_score'] if avg_result and avg_result[0].get('avg_score') is not None else 0)` o mas simple: `round(avg_score or 0, 2)` en la linea de retorno."
+}

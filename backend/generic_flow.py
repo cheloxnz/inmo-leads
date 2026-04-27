@@ -436,21 +436,28 @@ class GenericFlowEngine:
         from catalog_service import CatalogService
 
         catalog = CatalogService(db)
-        products = await catalog.get_products(tenant_id)
-
-        if not products:
-            self.wa.send_text_message(lead.phone, "No tengo informacion disponible en este momento.")
-            return
-
-        # Match by normalized id
         msg_id = message_text.strip().lower()
+
+        # Extraer product_id del prefijo (formato: prod_<uuid_30chars>)
         selected = None
-        for p in products:
-            pid_full = f"prod_{p['name'][:20].replace(' ', '_').lower()}"
-            pid_short = f"product_{p['name'][:15].replace(' ', '_').lower()}"
-            if msg_id == pid_full or msg_id == pid_short or p['name'].lower() in msg_id:
-                selected = p
-                break
+        if msg_id.startswith("prod_"):
+            pid_prefix = msg_id[5:]  # quitar "prod_"
+            # Buscar producto cuyo product_id empiece con este prefijo
+            products = await catalog.get_products(tenant_id)
+            for p in products:
+                pid = (p.get("product_id") or "")[:30].lower()
+                if pid == pid_prefix or pid.startswith(pid_prefix):
+                    selected = p
+                    break
+        elif msg_id.startswith("product_"):
+            # Backward compat con prefijo viejo
+            products = await catalog.get_products(tenant_id)
+            name_prefix = msg_id[8:]
+            for p in products:
+                pname = p["name"][:15].replace(" ", "_").lower()
+                if pname == name_prefix:
+                    selected = p
+                    break
 
         if not selected:
             self.wa.send_text_message(lead.phone, "No encontre ese producto. Escribi 'catalogo' para ver opciones.")

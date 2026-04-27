@@ -205,11 +205,11 @@ class PaymentService:
     async def _handle_checkout_completed(self, session):
         """Checkout completado: activar suscripcion del tenant"""
         tenant_id = session.metadata.get("tenant_id", "")
-        plan_id = session.metadata.get("plan_id", "basic")
+        plan_id = session.metadata.get("plan_id", "pro")
         subscription_id = session.subscription
 
         if tenant_id and subscription_id:
-            plan = SUBSCRIPTION_PLANS.get(plan_id, SUBSCRIPTION_PLANS["basic"])
+            plan = SUBSCRIPTION_PLANS.get(plan_id) or SUBSCRIPTION_PLANS.get("pro")
             await self.db.tenants.update_one(
                 {"tenant_id": tenant_id},
                 {"$set": {
@@ -342,8 +342,8 @@ class PaymentService:
         if not tenant:
             return {"error": "Tenant no encontrado"}
 
-        plan_id = tenant.get("subscription_plan", "basic")
-        plan = SUBSCRIPTION_PLANS.get(plan_id, SUBSCRIPTION_PLANS["basic"])
+        plan_id = tenant.get("subscription_plan", "pro")
+        plan = SUBSCRIPTION_PLANS.get(plan_id) or SUBSCRIPTION_PLANS.get("pro")
 
         # Get recent transactions
         transactions = await self.db.payment_transactions.find(

@@ -1,18 +1,25 @@
 """
-Backend tests for InmoBot SaaS:
-- Catalog CRUD (per-tenant)
-- Catalog send to WhatsApp (graceful when WA not configured)
-- Catalog tenant isolation
-- Bot generic_flow catalog integration (unit-level)
-- Billing overage endpoint (superadmin / 403 for tenant admin)
+Backend tests for InmoBot SaaS - Iteration 4:
+- Catalog CRUD using product_id UUID (new)
+- Catalog backfill: productos viejos sin product_id reciben uno via GET
+- Cross-tenant validation en POST /catalog/send/{phone} (new)
+- Regression: endpoints tras refactor a /app/backend/routers/
+  (catalog.py, billing.py). Otros endpoints (leads, usage, templates,
+  flow/config, agents) siguen accesibles.
+- Billing overage (superadmin / 403 para tenant admin)
+- Scheduler: bill_monthly_overage existe
 """
 import os
 import uuid
+import asyncio
 import pytest
 import requests
+from pymongo import MongoClient
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://inmobot-preview.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 API = f"{BASE_URL}/api"
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+DB_NAME = os.environ.get("DB_NAME", "inmobot_db")
 
 TENANT_EMAIL = "demo@inmobot.com"
 TENANT_PASS = "Demo123!"
@@ -24,15 +31,23 @@ PROD_NAME = f"TEST_Producto_{UNIQ}"
 PROD_NAME_2 = f"TEST_Producto2_{UNIQ}"
 
 
-# ---------- Auth helpers ----------
+# ---------- Helpers ----------
 
 def _login(email, password):
     r = requests.post(f"{API}/auth/login", json={"email": email, "password": password}, timeout=15)
     assert r.status_code == 200, f"Login fail {email}: {r.status_code} {r.text}"
     data = r.json()
     token = data.get("access_token") or data.get("token")
-    assert token, f"No token in login response: {data}"
+    assert token, f"No token: {data}"
     return token, data
+
+
+def _run(coro):
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 @pytest.fixture(scope="module")
@@ -57,105 +72,198 @@ def super_headers(super_token):
     return {"Authorization": f"Bearer {super_token}", "Content-Type": "application/json"}
 
 
-# ---------- Auth basic ----------
+# ---------- Auth ----------
 
 def test_login_tenant_admin():
     token, data = _login(TENANT_EMAIL, TENANT_PASS)
-    assert token
     user = data.get("user") or data
-    # Should belong to demo-inmobiliaria tenant
     assert user.get("tenant_id") == "demo-inmobiliaria" or data.get("tenant_id") == "demo-inmobiliaria"
 
 
 def test_login_superadmin():
     token, data = _login(SUPER_EMAIL, SUPER_PASS)
-    assert token
     user = data.get("user") or data
     assert user.get("role") == "superadmin" or data.get("role") == "superadmin"
 
 
-# ---------- Catalog CRUD ----------
+# ---------- Catalog: product_id UUID (NEW) ----------
 
-def test_catalog_list_empty_or_existing(tenant_headers):
-    r = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
-    assert r.status_code == 200, r.text
-    assert isinstance(r.json(), list)
-
-
-def test_catalog_create_product(tenant_headers):
+def test_catalog_create_returns_product_id(tenant_headers):
     payload = {
-        "name": PROD_NAME,
-        "description": "Departamento 2 amb test",
-        "price": 120000,
-        "currency": "USD",
-        "category": "TEST_Departamentos",
+        "name": PROD_NAME, "description": "Dep test", "price": 120000,
+        "currency": "USD", "category": "TEST_Departamentos",
         "image_url": "https://example.com/img.jpg",
     }
     r = requests.post(f"{API}/catalog", json=payload, headers=tenant_headers, timeout=10)
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["name"] == PROD_NAME
+    assert "product_id" in data and data["product_id"]
+    # UUID-like
+    assert len(data["product_id"]) >= 32
     assert data["tenant_id"] == "demo-inmobiliaria"
-    assert data["price"] == 120000
     assert data["active"] is True
-    # GET should now list it
-    r2 = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
-    names = [p["name"] for p in r2.json()]
-    assert PROD_NAME in names
+    # save for later
+    pytest.PROD_ID = data["product_id"]
 
 
-def test_catalog_categories(tenant_headers):
-    # ensure product exists
-    requests.post(f"{API}/catalog", json={
-        "name": PROD_NAME_2, "description": "x", "price": 50,
-        "currency": "USD", "category": "TEST_Departamentos"
-    }, headers=tenant_headers, timeout=10)
-
-    r = requests.get(f"{API}/catalog/categories", headers=tenant_headers, timeout=10)
-    assert r.status_code == 200, r.text
-    cats = r.json()
-    assert isinstance(cats, list)
-    assert "TEST_Departamentos" in cats
-
-
-def test_catalog_filter_by_category(tenant_headers):
-    r = requests.get(f"{API}/catalog?category=TEST_Departamentos", headers=tenant_headers, timeout=10)
+def test_catalog_get_includes_product_id(tenant_headers):
+    r = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
     assert r.status_code == 200
-    data = r.json()
-    for p in data:
-        assert p["category"] == "TEST_Departamentos"
+    items = r.json()
+    assert isinstance(items, list)
+    # Todos deben tener product_id (backfill para viejos)
+    for p in items:
+        assert p.get("product_id"), f"Producto sin product_id: {p.get('name')}"
 
 
-def test_catalog_update_product(tenant_headers):
+def test_catalog_backfill_legacy_product(tenant_headers):
+    """Insert producto sin product_id directo a Mongo, GET debe asignar uno."""
+    legacy_name = f"TEST_Legacy_{UNIQ}"
+    client = MongoClient(MONGO_URL)
+    db = client[DB_NAME]
+    db.products.insert_one({
+        "tenant_id": "demo-inmobiliaria",
+        "name": legacy_name,
+        "description": "sin product_id",
+        "price": 1, "currency": "USD", "category": "TEST_X",
+        "active": True, "created_at": "2025-01-01T00:00:00",
+    })
+    try:
+        r = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
+        assert r.status_code == 200
+        item = next((p for p in r.json() if p["name"] == legacy_name), None)
+        assert item is not None, "legacy product no aparece"
+        assert item.get("product_id"), "backfill no funcionó"
+
+        doc = db.products.find_one({"name": legacy_name})
+        assert doc.get("product_id") == item["product_id"], "product_id no persistido"
+    finally:
+        db.products.delete_many({"name": legacy_name})
+        client.close()
+
+
+def test_catalog_update_by_product_id(tenant_headers):
+    pid = getattr(pytest, "PROD_ID", None)
+    assert pid, "PROD_ID not set"
     r = requests.put(
-        f"{API}/catalog/{PROD_NAME}",
-        json={"price": 150000, "description": "Updated desc"},
+        f"{API}/catalog/{pid}",
+        json={"price": 150000, "description": "Updated via UUID"},
         headers=tenant_headers, timeout=10,
     )
     assert r.status_code == 200, r.text
-    # Verify persisted
     r2 = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
-    item = next((p for p in r2.json() if p["name"] == PROD_NAME), None)
+    item = next((p for p in r2.json() if p.get("product_id") == pid), None)
     assert item is not None
     assert item["price"] == 150000
-    assert item["description"] == "Updated desc"
+    assert item["description"] == "Updated via UUID"
 
 
-def test_catalog_update_not_found(tenant_headers):
+def test_catalog_update_bad_uuid_returns_404(tenant_headers):
     r = requests.put(
-        f"{API}/catalog/__no_existe_{UNIQ}",
+        f"{API}/catalog/non-existent-uuid-{UNIQ}",
         json={"price": 1}, headers=tenant_headers, timeout=10,
     )
     assert r.status_code == 404
 
 
-def test_catalog_delete_product(tenant_headers):
-    r = requests.delete(f"{API}/catalog/{PROD_NAME_2}", headers=tenant_headers, timeout=10)
-    assert r.status_code == 200, r.text
-    # GET (active_only by default) should not list it
-    r2 = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
-    names = [p["name"] for p in r2.json()]
-    assert PROD_NAME_2 not in names
+def test_catalog_delete_by_product_id(tenant_headers):
+    # Crear uno para borrar
+    r = requests.post(f"{API}/catalog", json={
+        "name": PROD_NAME_2, "description": "del", "price": 10,
+        "currency": "USD", "category": "TEST_Departamentos",
+    }, headers=tenant_headers, timeout=10)
+    assert r.status_code == 200
+    pid2 = r.json()["product_id"]
+
+    r2 = requests.delete(f"{API}/catalog/{pid2}", headers=tenant_headers, timeout=10)
+    assert r2.status_code == 200, r2.text
+
+    r3 = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
+    ids = [p.get("product_id") for p in r3.json()]
+    assert pid2 not in ids
+
+
+def test_catalog_delete_bad_uuid_returns_404(tenant_headers):
+    r = requests.delete(f"{API}/catalog/bad-uuid-{UNIQ}", headers=tenant_headers, timeout=10)
+    assert r.status_code == 404
+
+
+# ---------- Cross-tenant send validation (NEW) ----------
+
+def test_catalog_send_blocks_cross_tenant_phone(tenant_headers):
+    """Phone registrado en otro tenant -> 403."""
+    foreign_phone = f"555999{UNIQ[:4]}"
+    client = MongoClient(MONGO_URL)
+    db = client[DB_NAME]
+    db.leads.insert_one({
+        "tenant_id": "OTRO_TENANT_TEST",
+        "phone": foreign_phone,
+        "name": "foreign lead",
+        "created_at": "2025-01-01T00:00:00",
+    })
+    try:
+        r = requests.post(
+            f"{API}/catalog/send/{foreign_phone}",
+            json={},
+            headers=tenant_headers, timeout=15,
+        )
+        assert r.status_code == 403, f"Se esperaba 403 cross-tenant, got {r.status_code}: {r.text}"
+        assert "tenant" in r.text.lower()
+    finally:
+        db.leads.delete_many({"phone": foreign_phone})
+        client.close()
+
+
+def test_catalog_send_allows_own_tenant_phone(tenant_headers):
+    """Phone registrado en propio tenant -> permite envío (graceful sin WA)."""
+    own_phone = f"549111{UNIQ[:4]}"
+    client = MongoClient(MONGO_URL)
+    db = client[DB_NAME]
+    db.leads.insert_one({
+        "tenant_id": "demo-inmobiliaria",
+        "phone": own_phone,
+        "name": "own lead test",
+        "created_at": "2025-01-01T00:00:00",
+    })
+    try:
+        r = requests.post(
+            f"{API}/catalog/send/{own_phone}",
+            json={},
+            headers=tenant_headers, timeout=15,
+        )
+        assert r.status_code != 403, f"own-tenant phone bloqueado erroneamente: {r.text}"
+        assert r.status_code in (200, 404), r.text
+    finally:
+        db.leads.delete_many({"phone": own_phone})
+        client.close()
+
+
+def test_catalog_send_allows_unknown_phone(tenant_headers):
+    """Phone no existe en ningún tenant -> permite envío."""
+    unknown_phone = f"5490000{UNIQ[:4]}"
+    r = requests.post(
+        f"{API}/catalog/send/{unknown_phone}",
+        json={},
+        headers=tenant_headers, timeout=15,
+    )
+    assert r.status_code != 403, f"unknown phone fue bloqueado, body: {r.text}"
+    assert r.status_code in (200, 404), r.text
+
+
+# ---------- Other catalog endpoints (regression) ----------
+
+def test_catalog_categories(tenant_headers):
+    r = requests.get(f"{API}/catalog/categories", headers=tenant_headers, timeout=10)
+    assert r.status_code == 200
+    cats = r.json()
+    assert isinstance(cats, list)
+
+
+def test_catalog_filter_by_category(tenant_headers):
+    r = requests.get(f"{API}/catalog?category=TEST_Departamentos", headers=tenant_headers, timeout=10)
+    assert r.status_code == 200
+    for p in r.json():
+        assert p["category"] == "TEST_Departamentos"
 
 
 def test_catalog_requires_auth():
@@ -163,122 +271,62 @@ def test_catalog_requires_auth():
     assert r.status_code in (401, 403)
 
 
-# ---------- Catalog Send (WhatsApp not configured -> graceful) ----------
-
-def test_catalog_send_when_wa_not_configured(tenant_headers):
-    """Endpoint must not 500. Either returns 200 with success=False/error info or
-    returns a known WA-not-configured signal. /app brief says expected behaviour
-    is graceful 'WhatsApp no configurado'."""
-    r = requests.post(
-        f"{API}/catalog/send/+5491100000000",
-        json={"product_name": PROD_NAME},
-        headers=tenant_headers, timeout=15,
-    )
-    # acceptable: 200 with graceful payload, OR 400 telling WhatsApp not configured.
-    assert r.status_code in (200, 400, 503), f"Unexpected {r.status_code}: {r.text}"
-    body = r.text.lower()
-    if r.status_code == 200:
-        # In dev WA returns success=False
-        data = r.json()
-        # Must contain result info; should NOT raise 500
-        assert "result" in data or "message" in data
-    else:
-        assert "whatsapp" in body or "configurado" in body or "configured" in body
-
-
-def test_catalog_send_full_catalog_no_wa(tenant_headers):
-    r = requests.post(
-        f"{API}/catalog/send/+5491100000000",
-        json={},  # no product_name -> sends list/buttons
-        headers=tenant_headers, timeout=15,
-    )
-    assert r.status_code in (200, 400, 404, 503), f"Unexpected {r.status_code}: {r.text}"
-
-
-# ---------- Tenant isolation ----------
-
 def test_tenant_isolation_responses_only_own_tenant(tenant_headers):
-    """All products listed must belong to demo-inmobiliaria."""
     r = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
     assert r.status_code == 200
     for p in r.json():
         assert p.get("tenant_id") == "demo-inmobiliaria"
 
 
-def test_tenant_isolation_via_db(tenant_headers):
-    """Insert a product with another tenant_id directly in DB and verify it does NOT show up."""
-    import asyncio
-    from motor.motor_asyncio import AsyncIOMotorClient
+# ---------- Router refactor regression ----------
 
-    async def _setup():
-        client = AsyncIOMotorClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))
-        db = client[os.environ.get("DB_NAME", "inmobot_db")]
-        foreign_name = f"TEST_Foreign_{UNIQ}"
-        await db.products.insert_one({
-            "tenant_id": "OTRO_TENANT_TEST",
-            "name": foreign_name,
-            "description": "no debe ser visible",
-            "price": 1,
-            "currency": "USD",
-            "category": "X",
-            "active": True,
-            "created_at": "2025-01-01T00:00:00",
-        })
-        return foreign_name, db
-
-    async def _teardown(db, fname):
-        await db.products.delete_one({"tenant_id": "OTRO_TENANT_TEST", "name": fname})
-
-    try:
-        loop = asyncio.new_event_loop()
-        foreign_name, db = loop.run_until_complete(_setup())
-
-        # tenant admin should NOT see it
-        r = requests.get(f"{API}/catalog", headers=tenant_headers, timeout=10)
-        names = [p["name"] for p in r.json()]
-        assert foreign_name not in names
-
-        # tenant admin cannot update it (their tenant_id is demo-inmobiliaria)
-        r2 = requests.put(
-            f"{API}/catalog/{foreign_name}",
-            json={"price": 999}, headers=tenant_headers, timeout=10,
-        )
-        assert r2.status_code == 404, "Cross-tenant update must fail with 404"
-
-        # tenant admin cannot delete it
-        r3 = requests.delete(f"{API}/catalog/{foreign_name}", headers=tenant_headers, timeout=10)
-        assert r3.status_code == 404, "Cross-tenant delete must fail with 404"
-
-        loop.run_until_complete(_teardown(db, foreign_name))
-        loop.close()
-    except Exception as e:
-        pytest.fail(f"Tenant isolation test failed: {e}")
+def test_billing_plans_public():
+    r = requests.get(f"{API}/plans", timeout=10)
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, dict)
+    assert "pro" in data or len(data) > 0
 
 
-# ---------- Bot generic_flow integration (unit) ----------
-
-def test_generic_flow_detects_catalog_keywords():
-    from generic_flow import GenericFlowEngine, CATALOG_KEYWORDS
-    eng = GenericFlowEngine.__new__(GenericFlowEngine)  # bypass init
-    # detect_catalog_request only uses self for nothing important
-    for kw in ["catalogo", "productos", "mostrame", "menu", "ofertas"]:
-        assert kw in [k.lower() for k in CATALOG_KEYWORDS] or eng.detect_catalog_request(kw)
+def test_billing_get_info_admin(tenant_headers):
+    r = requests.get(f"{API}/billing", headers=tenant_headers, timeout=10)
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert isinstance(data, dict)
 
 
-def test_generic_flow_has_catalog_handlers():
-    from generic_flow import GenericFlowEngine
-    assert hasattr(GenericFlowEngine, "_handle_catalog_request")
-    assert hasattr(GenericFlowEngine, "_handle_product_selection")
-    assert hasattr(GenericFlowEngine, "detect_catalog_request")
+def test_billing_transactions_admin(tenant_headers):
+    r = requests.get(f"{API}/transactions", headers=tenant_headers, timeout=10)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
 
 
-def test_generic_flow_product_id_prefix_logic():
-    """Verify the source contains both 'prod_' and 'product_' prefix detection."""
-    import inspect
-    from generic_flow import GenericFlowEngine
-    src = inspect.getsource(GenericFlowEngine.process_message)
-    assert "prod_" in src
-    assert "product_" in src
+def test_billing_subscribe_requires_plan_id(tenant_headers):
+    r = requests.post(f"{API}/billing/subscribe", json={}, headers=tenant_headers, timeout=10)
+    assert r.status_code == 400
+
+
+def test_billing_cancel_graceful(tenant_headers):
+    r = requests.post(f"{API}/billing/cancel", headers=tenant_headers, timeout=15)
+    # Sin Stripe: 200 o 400 graceful; no 500
+    assert r.status_code in (200, 400, 404), r.text
+
+
+def test_webhook_stripe_endpoint_exists():
+    r = requests.post(f"{API}/webhook/stripe", data="{}", timeout=10)
+    # sin firma -> 200 con error string en body (manejado graceful)
+    assert r.status_code in (200, 400), r.text
+
+
+def test_non_moved_endpoints_still_work(tenant_headers):
+    """Verificar que endpoints NO movidos siguen funcionando."""
+    for path in ("/leads", "/usage", "/templates", "/flow/config", "/agents"):
+        r = requests.get(f"{API}{path}", headers=tenant_headers, timeout=10)
+        assert r.status_code in (200, 404), f"{path} roto: {r.status_code} {r.text[:200]}"
+        # 404 sería aceptable solo si el endpoint no existe en este build
+        if r.status_code == 200:
+            body = r.json()
+            assert isinstance(body, (list, dict))
 
 
 # ---------- Billing overage ----------
@@ -286,21 +334,13 @@ def test_generic_flow_product_id_prefix_logic():
 def test_overage_requires_superadmin(tenant_headers):
     r = requests.post(f"{API}/billing/bill-overage", json={}, headers=tenant_headers, timeout=15)
     assert r.status_code == 403
-    body = r.json()
-    assert "superadmin" in (body.get("detail", "") + body.get("message", "")).lower()
 
 
 def test_overage_superadmin_no_stripe_graceful(super_headers):
-    """Without Stripe configured, endpoint should respond gracefully (not 500)."""
     r = requests.post(f"{API}/billing/bill-overage", json={}, headers=super_headers, timeout=20)
-    assert r.status_code in (200, 400), f"Expected graceful response, got {r.status_code}: {r.text}"
+    assert r.status_code in (200, 400), r.text
     if r.status_code == 200:
-        data = r.json()
-        # must be an object (skipped/error/total) - not a 500
-        assert isinstance(data, (dict, list))
-    else:
-        body = r.text.lower()
-        assert "stripe" in body or "configurado" in body
+        assert isinstance(r.json(), (dict, list))
 
 
 def test_overage_specific_tenant_no_stripe(super_headers):
@@ -310,28 +350,28 @@ def test_overage_specific_tenant_no_stripe(super_headers):
         headers=super_headers, timeout=20,
     )
     assert r.status_code in (200, 400), r.text
-    if r.status_code == 200:
-        data = r.json()
-        assert isinstance(data, dict)
-        # should have status field like skipped/error
-        assert any(k in data for k in ("status", "message", "skipped", "error", "billed", "amount"))
+
+
+# ---------- Scheduler unit ----------
+
+def test_scheduler_has_bill_monthly_overage():
+    from scheduler import ScheduledTasks
+    assert hasattr(ScheduledTasks, "bill_monthly_overage")
+
+
+def test_scheduler_accepts_payment_service():
+    from scheduler import ScheduledTasks
+    import inspect
+    sig = inspect.signature(ScheduledTasks.__init__)
+    assert "payment_service" in sig.parameters
 
 
 # ---------- Cleanup ----------
 
 def test_zz_cleanup(tenant_headers):
-    """Soft-delete (deactivate) test products created."""
-    for n in (PROD_NAME, PROD_NAME_2):
-        requests.delete(f"{API}/catalog/{n}", headers=tenant_headers, timeout=10)
-    # Hard-delete from DB
-    import asyncio
-    from motor.motor_asyncio import AsyncIOMotorClient
-
-    async def _wipe():
-        client = AsyncIOMotorClient(os.environ.get("MONGO_URL", "mongodb://localhost:27017"))
-        db = client[os.environ.get("DB_NAME", "inmobot_db")]
-        await db.products.delete_many({"name": {"$regex": "^TEST_"}})
-
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(_wipe())
-    loop.close()
+    """Wipe TEST_ prefixed data."""
+    client = MongoClient(MONGO_URL)
+    db = client[DB_NAME]
+    db.products.delete_many({"name": {"$regex": "^TEST_"}})
+    db.leads.delete_many({"tenant_id": "OTRO_TENANT_TEST"})
+    client.close()

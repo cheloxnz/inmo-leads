@@ -9,10 +9,11 @@ logger = logging.getLogger(__name__)
 class ScheduledTasks:
     """Gestor de tareas programadas para recordatorios y reactivaciones"""
     
-    def __init__(self, db: AsyncIOMotorDatabase, email_service: EmailService, wa_service=None):
+    def __init__(self, db: AsyncIOMotorDatabase, email_service: EmailService, wa_service=None, payment_service=None):
         self.db = db
         self.email = email_service
         self.wa = wa_service
+        self.payment = payment_service
         self.running = False
     
     async def start(self):
@@ -23,6 +24,37 @@ class ScheduledTasks:
         asyncio.create_task(self.check_appointment_reminders())
         asyncio.create_task(self.check_warm_lead_reactivation())
         asyncio.create_task(self.check_whatsapp_appointment_reminders())
+        asyncio.create_task(self.bill_monthly_overage())
+    
+    async def bill_monthly_overage(self):
+        """Factura overage de IA al inicio del mes (dia 1, 04:00 UTC).
+        bill_all_overages factura el mes anterior si dia<=3.
+        """
+        # Esperar 60s al inicio para evitar race con startup
+        await asyncio.sleep(60)
+        last_run_period = None
+        while self.running:
+            try:
+                if not self.payment:
+                    await asyncio.sleep(3600)
+                    continue
+                now = datetime.utcnow()
+                # Ejecutar entre dia 1 y dia 3 del mes, hora 4-5 UTC, una vez por periodo
+                if now.day <= 3 and now.hour == 4:
+                    period_key = now.strftime("%Y-%m")
+                    if last_run_period != period_key:
+                        logger.info(f"[Scheduler] Iniciando facturacion overage del mes anterior")
+                        try:
+                            results = await self.payment.bill_all_overages()
+                            logger.info(f"[Scheduler] Overage billing completo: {results.get('billed')} facturados, {results.get('skipped')} skipped, {results.get('errors')} errores")
+                            last_run_period = period_key
+                        except Exception as e:
+                            logger.error(f"[Scheduler] Error facturando overage: {e}")
+                # Revisar cada hora
+                await asyncio.sleep(3600)
+            except Exception as e:
+                logger.error(f"Error en bill_monthly_overage: {str(e)}")
+                await asyncio.sleep(3600)
     
     async def check_whatsapp_appointment_reminders(self):
         """Envía recordatorios por WhatsApp 24hs antes de la cita"""

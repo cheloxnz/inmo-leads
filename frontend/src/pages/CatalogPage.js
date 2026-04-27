@@ -41,10 +41,10 @@ export default function CatalogPage() {
 
   useEffect(() => { fetchProducts(); fetchCategories(); }, [fetchProducts, fetchCategories]);
 
-  const handleDelete = async (name) => {
-    if (!window.confirm(`Eliminar "${name}"?`)) return;
+  const handleDelete = async (product) => {
+    if (!window.confirm(`Eliminar "${product.name}"?`)) return;
     try {
-      await axios.delete(`${API}/catalog/${encodeURIComponent(name)}`);
+      await axios.delete(`${API}/catalog/${product.product_id}`);
       toast.success('Producto eliminado');
       fetchProducts();
     } catch (err) {
@@ -103,7 +103,7 @@ export default function CatalogPage() {
           </div>
         ) : (
           filteredProducts.map(product => (
-            <Card key={product.name} className="catalog-product-card" data-testid={`product-${product.name}`}>
+            <Card key={product.product_id || product.name} className="catalog-product-card" data-testid={`product-${product.name}`}>
               <CardContent className="catalog-product-content">
                 {product.image_url ? (
                   <div className="catalog-product-img" style={{ backgroundImage: `url(${product.image_url})` }} />
@@ -132,7 +132,7 @@ export default function CatalogPage() {
                   <button onClick={() => { setEditingProduct(product); setShowForm(true); }} title="Editar">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(product.name)} title="Eliminar">
+                  <button onClick={() => handleDelete(product)} title="Eliminar">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -164,7 +164,7 @@ function ProductForm({ product, onSaved, onCancel }) {
     try {
       const data = { ...form, price: parseFloat(form.price) || 0 };
       if (product) {
-        await axios.put(`${API}/catalog/${encodeURIComponent(product.name)}`, data);
+        await axios.put(`${API}/catalog/${product.product_id}`, data);
         toast.success('Producto actualizado');
       } else {
         await axios.post(`${API}/catalog`, data);
