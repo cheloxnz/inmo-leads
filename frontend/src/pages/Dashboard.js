@@ -3,6 +3,7 @@ import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MetricsCharts from '../components/MetricsCharts';
+import UsagePanel from '../components/UsagePanel';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
@@ -220,6 +221,9 @@ export default function Dashboard() {
         )}
       </div>
       
+      {/* Uso del mes */}
+      <UsagePanel />
+
       {/* Gráficos de métricas */}
       <MetricsCharts />
     </div>
