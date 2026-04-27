@@ -23,9 +23,10 @@ import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
+import CatalogPage from './pages/CatalogPage';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
 import '@/App.css';
 
 // Siempre usar la URL actual del navegador (mismo dominio)
@@ -181,6 +182,17 @@ function Navigation() {
             >
               <span className="icon">📢</span>
               {!isCollapsed && <span>Broadcast</span>}
+            </Link>
+
+
+            <Link
+              to="/catalogo"
+              className={`nav-link ${isActive('/catalogo') ? 'active' : ''}`}
+              data-testid="nav-catalog"
+              title="Catálogo"
+            >
+              <span className="icon"><Package size={16} /></span>
+              {!isCollapsed && <span>Catalogo</span>}
             </Link>
 
             <Link
@@ -396,6 +408,11 @@ function AppContent() {
           <Route path="/config" element={
             <ProtectedRoute adminOnly>
               <Configuration />
+            </ProtectedRoute>
+          } />
+          <Route path="/catalogo" element={
+            <ProtectedRoute adminOnly>
+              <CatalogPage />
             </ProtectedRoute>
           } />
           <Route path="/flujo" element={
