@@ -34,7 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2025-02-12 (Sesión Actual)
+### 2026-04-27 (Sesión Actual - Catálogo + Overage Billing)
+- **P0 Catálogo de Productos (COMPLETADO):**
+  - Backend CRUD `/api/catalog` (GET/POST/PUT/DELETE) con tenant isolation estricto
+  - `/api/catalog/categories` lista categorías únicas del tenant
+  - `/api/catalog/send/{phone}` envía catálogo/producto a WhatsApp como Interactive Message (List o Carrusel-Buttons según cantidad)
+  - **Bot integration en `generic_flow.py`:**
+    - `CATALOG_KEYWORDS`: detecta mensajes "catalogo", "productos", "mostrame", "menu", "ofertas", etc.
+    - `_handle_catalog_request`: envía automáticamente Interactive Message con productos del tenant
+    - `_handle_product_selection`: detecta IDs `prod_*` / `product_*` y responde con detalle del producto + CTA buttons
+  - UI `/catalogo` (CatalogPage.js): grid de productos, filtros por categoría/búsqueda, modal CRUD
+- **P1 Overage Billing en Stripe (COMPLETADO):**
+  - `payment_service.bill_overage_for_tenant(tenant_id, period)`: crea `stripe.InvoiceItem` con el costo de overage del periodo
+  - `payment_service.bill_all_overages(period)`: itera tenants activos. Si día <=3 del mes, factura el mes anterior (cron-friendly).
+  - Idempotencia: marca `overage_billed=true` en `usage` para no facturar dos veces
+  - Endpoint `POST /api/billing/bill-overage` (solo superadmin) con body opcional `{period, tenant_id}`
+- **Testing 100% PASS (21/21 backend + UI E2E):** ver `/app/test_reports/iteration_3.json`
+- **Refactor pendiente:** dividir `server.py` (1900+ líneas) en routers → backlog
+
+### 2025-02-12 (Sesión Anterior)
 - **Tarea Completada:**
   - Generación de Propuesta Comercial en PDF (`/app/docs/PROPUESTA_COMERCIAL.pdf`)
   - Script Python con ReportLab para convertir MD a PDF profesional
@@ -116,6 +134,8 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 - [x] Historial de auditoría (UI)
 - [x] Mensajes broadcast (UI)
 - [x] Propuesta comercial PDF para venta
+- [x] Catálogo + Carruseles WhatsApp (UI + bot integration)
+- [x] Facturación de overage de IA en Stripe (InvoiceItem)
 
 ### P1 (Alto) - Pendiente
 - [ ] Tareas programadas (scheduler) - Testing real con citas
