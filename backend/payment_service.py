@@ -378,3 +378,147 @@ class PaymentService:
             {}, {"_id": 0}
         ).sort("created_at", -1).limit(limit).to_list(limit)
         return transactions
+
+    async def bill_overage_for_tenant(self, tenant_id: str, period: str = None) -> Dict:
+        """
+        Crea un InvoiceItem en Stripe por el overage de IA del periodo.
+        Se aplica a la proxima factura recurrente del tenant.
+
+        Logica:
+        - Lee overage_messages del periodo actual
+        - Multiplica por OVERAGE_PRICE segun el plan
+        - Crea InvoiceItem (se cobra en proximo billing cycle)
+        - Marca el overage como facturado (reset)
+        """
+        if not self.api_key:
+            return {"status": "error", "message": "Stripe no configurado"}
+
+        from usage_service import OVERAGE_PRICE
+        from datetime import datetime, timezone
+
+        if not period:
+            period = datetime.now(timezone.utc).strftime("%Y-%m")
+
+        tenant = await self.db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+        if not tenant:
+            return {"status": "error", "message": "Tenant no encontrado"}
+
+        if not tenant.get("stripe_customer_id") or not tenant.get("stripe_subscription_id"):
+            return {"status": "skipped", "message": "Sin suscripcion Stripe activa"}
+
+        # Skip if has own OpenAI key (sin overage)
+        if tenant.get("openai_api_key"):
+            return {"status": "skipped", "message": "Tenant tiene su propia OpenAI key"}
+
+        usage = await self.db.usage.find_one(
+            {"tenant_id": tenant_id, "period": period},
+            {"_id": 0}
+        )
+        overage_count = usage.get("overage_messages", 0) if usage else 0
+        if overage_count <= 0:
+            return {"status": "skipped", "message": "Sin overage en el periodo"}
+
+        # Idempotency: skip if ya facturado
+        if usage.get("overage_billed"):
+            return {"status": "skipped", "message": "Overage ya facturado este periodo"}
+
+        plan_id = tenant.get("subscription_plan", "pro")
+        rate = OVERAGE_PRICE.get(plan_id, 0.05)
+        amount_usd = round(overage_count * rate, 2)
+        amount_cents = int(round(overage_count * rate * 100))
+
+        if amount_cents <= 0:
+            return {"status": "skipped", "message": "Monto demasiado bajo"}
+
+        try:
+            invoice_item = stripe.InvoiceItem.create(
+                customer=tenant["stripe_customer_id"],
+                amount=amount_cents,
+                currency="usd",
+                description=f"IA overage {period}: {overage_count} mensajes x ${rate} = ${amount_usd}",
+                subscription=tenant["stripe_subscription_id"],
+                metadata={
+                    "tenant_id": tenant_id,
+                    "period": period,
+                    "overage_messages": str(overage_count),
+                    "rate": str(rate),
+                    "type": "ai_overage"
+                }
+            )
+
+            # Mark as billed in DB (idempotency)
+            await self.db.usage.update_one(
+                {"tenant_id": tenant_id, "period": period},
+                {"$set": {
+                    "overage_billed": True,
+                    "overage_billed_at": datetime.utcnow().isoformat(),
+                    "overage_invoice_item_id": invoice_item.id,
+                    "overage_amount_billed": amount_usd
+                }}
+            )
+
+            # Save transaction record
+            await self.db.payment_transactions.insert_one({
+                "tenant_id": tenant_id,
+                "type": "ai_overage",
+                "period": period,
+                "amount": amount_usd,
+                "currency": "usd",
+                "overage_messages": overage_count,
+                "rate": rate,
+                "stripe_invoice_item_id": invoice_item.id,
+                "stripe_subscription_id": tenant["stripe_subscription_id"],
+                "payment_status": "pending",
+                "created_at": datetime.utcnow().isoformat()
+            })
+
+            logger.info(f"Overage facturado: tenant={tenant_id} period={period} msgs={overage_count} amount=${amount_usd}")
+            return {
+                "status": "ok",
+                "tenant_id": tenant_id,
+                "period": period,
+                "overage_messages": overage_count,
+                "amount": amount_usd,
+                "invoice_item_id": invoice_item.id
+            }
+
+        except Exception as e:
+            logger.error(f"Error facturando overage tenant {tenant_id}: {e}")
+            return {"status": "error", "message": str(e)}
+
+    async def bill_all_overages(self, period: str = None) -> Dict:
+        """
+        Itera todos los tenants activos y factura el overage del periodo.
+        Para correr al final del mes (cron) o manualmente desde superadmin.
+        """
+        from datetime import datetime, timezone
+        if not period:
+            # Default: facturar el mes anterior cuando se corre el primer dia del mes
+            now = datetime.now(timezone.utc)
+            if now.day <= 3:
+                # Use previous month
+                prev_month = now.month - 1 if now.month > 1 else 12
+                prev_year = now.year if now.month > 1 else now.year - 1
+                period = f"{prev_year:04d}-{prev_month:02d}"
+            else:
+                period = now.strftime("%Y-%m")
+
+        tenants = await self.db.tenants.find(
+            {"subscription_status": "active"},
+            {"_id": 0, "tenant_id": 1}
+        ).to_list(1000)
+
+        results = {"period": period, "processed": 0, "billed": 0, "skipped": 0, "errors": 0, "details": []}
+
+        for t in tenants:
+            res = await self.bill_overage_for_tenant(t["tenant_id"], period)
+            results["processed"] += 1
+            if res.get("status") == "ok":
+                results["billed"] += 1
+            elif res.get("status") == "skipped":
+                results["skipped"] += 1
+            else:
+                results["errors"] += 1
+            results["details"].append({"tenant_id": t["tenant_id"], **res})
+
+        return results

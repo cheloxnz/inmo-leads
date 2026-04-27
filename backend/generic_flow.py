@@ -17,6 +17,15 @@ URGENCY_KEYWORDS = [
     "es para hoy", "muy urgente", "super urgente"
 ]
 
+CATALOG_KEYWORDS = [
+    "catalogo", "catálogo", "catalog",
+    "productos", "ver productos", "lista de productos",
+    "ofertas", "precios", "ver precios",
+    "que tienen", "que ofrecen", "mostrame",
+    "ver propiedades", "propiedades disponibles",
+    "menu", "menú", "carta", "servicios disponibles"
+]
+
 
 class GenericFlowEngine:
     """Motor de flujo genérico que lee templates"""
@@ -29,6 +38,11 @@ class GenericFlowEngine:
     def detect_urgency(self, message: str) -> bool:
         message_lower = message.lower()
         return any(kw in message_lower for kw in URGENCY_KEYWORDS)
+
+    def detect_catalog_request(self, message: str) -> bool:
+        """Detecta si el usuario pide ver el catalogo de productos"""
+        msg_lower = message.lower().strip()
+        return any(kw in msg_lower for kw in CATALOG_KEYWORDS)
 
     async def get_tenant_template(self, tenant_id: str, db) -> dict:
         """Obtiene el template del tenant. Prioridad: custom flow en DB > template base"""
@@ -92,8 +106,21 @@ class GenericFlowEngine:
         flow_stage = lead.flow_stage or "welcome"
         logger.info(f"[GenericFlow] {lead.phone} stage={flow_stage} msg='{message_text[:50]}'")
 
+        # Catalog: detect product selection from buttons/list (id starts with prod_ or product_)
+        catalog_handled = False
+        msg_id_check = message_text.strip().lower()
+        if msg_id_check.startswith("prod_") or msg_id_check.startswith("product_"):
+            await self._handle_product_selection(lead, message_text, db, tenant_id)
+            catalog_handled = True
+        # Catalog: detect catalog/products request keyword (only outside appointment flow)
+        elif flow_stage not in ("select_day", "select_time", "appointment_offer") \
+                and self.detect_catalog_request(message_text):
+            catalog_handled = await self._handle_catalog_request(lead, db, tenant_id)
+
         # Special stages (appointment, reschedule, cancel, etc.)
-        if flow_stage == "appointment_offer":
+        if catalog_handled:
+            pass  # ya respondio catalogo, saltar flujo regular
+        elif flow_stage == "appointment_offer":
             await self._handle_appointment_offer(lead, message_text, template, db)
         elif flow_stage == "select_day":
             await self._handle_select_day(lead, message_text, db)
@@ -365,6 +392,82 @@ class GenericFlowEngine:
 
         self.wa.send_text_message(lead.phone, response)
         self._add_bot_message(lead, response)
+
+    async def _handle_catalog_request(self, lead, db, tenant_id: str) -> bool:
+        """Envia el catalogo de productos del tenant via WhatsApp interactive message.
+
+        Retorna True si se envio el catalogo (debe saltarse el flujo regular).
+        """
+        # Importar aqui para evitar circular import
+        from catalog_service import CatalogService
+
+        catalog = CatalogService(db)
+        products = await catalog.get_products(tenant_id)
+
+        if not products:
+            return False  # no hay catalogo, dejar al flujo regular continuar
+
+        try:
+            if len(products) <= 3:
+                body_text, buttons = catalog.build_carousel_buttons(products)
+                self.wa.send_interactive_buttons(
+                    lead.phone,
+                    body_text or "Mira nuestros productos:",
+                    buttons,
+                    header_text="Catalogo"
+                )
+            else:
+                list_data = catalog.build_product_list_message(products)
+                self.wa.send_list_message(
+                    lead.phone,
+                    list_data["body"]["text"],
+                    list_data["action"]["button"],
+                    list_data["action"]["sections"],
+                    header_text=list_data["header"]["text"]
+                )
+            self._add_bot_message(lead, f"[Catalogo enviado: {len(products)} productos]")
+            return True
+        except Exception as e:
+            logger.error(f"Error enviando catalogo: {e}")
+            return False
+
+    async def _handle_product_selection(self, lead, message_text: str, db, tenant_id: str):
+        """Cuando el cliente selecciona un producto del catalogo (id prod_xxx), envia detalle"""
+        from catalog_service import CatalogService
+
+        catalog = CatalogService(db)
+        products = await catalog.get_products(tenant_id)
+
+        if not products:
+            self.wa.send_text_message(lead.phone, "No tengo informacion disponible en este momento.")
+            return
+
+        # Match by normalized id
+        msg_id = message_text.strip().lower()
+        selected = None
+        for p in products:
+            pid_full = f"prod_{p['name'][:20].replace(' ', '_').lower()}"
+            pid_short = f"product_{p['name'][:15].replace(' ', '_').lower()}"
+            if msg_id == pid_full or msg_id == pid_short or p['name'].lower() in msg_id:
+                selected = p
+                break
+
+        if not selected:
+            self.wa.send_text_message(lead.phone, "No encontre ese producto. Escribi 'catalogo' para ver opciones.")
+            return
+
+        msg = catalog.build_single_product_message(selected)
+        # CTA buttons
+        buttons = [
+            {"type": "reply", "reply": {"id": "cita_si", "title": "Quiero info"}},
+            {"type": "reply", "reply": {"id": "ver_catalogo", "title": "Ver mas"}}
+        ]
+        if selected.get("image_url"):
+            self.wa.send_text_message(lead.phone, msg + f"\n\n{selected['image_url']}", preview_url=True)
+        else:
+            self.wa.send_text_message(lead.phone, msg)
+        self.wa.send_interactive_buttons(lead.phone, "Te interesa este producto?", buttons)
+        self._add_bot_message(lead, f"[Detalle producto: {selected['name']}]")
 
     def _add_bot_message(self, lead, text: str):
         lead.conversation_history.append({

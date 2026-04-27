@@ -11,4 +11,5 @@
 - **Role:** admin
 - **Tenant:** demo-inmobiliaria
 
-> Note: These are created via `init_admin.py`. DB is currently clean.
+> Both accounts seeded into MongoDB via `python init_admin.py`.
+> Re-run that script if DB is wiped.

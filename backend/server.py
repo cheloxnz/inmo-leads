@@ -1355,6 +1355,26 @@ async def cancel_billing(current_user: User = Depends(require_admin)):
     return await payment_service.cancel_subscription(current_user.tenant_id)
 
 
+@api_router.post("/billing/bill-overage")
+async def bill_overage_endpoint(body: dict = None, current_user: User = Depends(get_current_user)):
+    """SuperAdmin: factura el overage de IA del periodo (todos los tenants o uno).
+
+    Body opcional:
+    - period: "YYYY-MM" (default: mes anterior si dia<=3, sino mes actual)
+    - tenant_id: si se especifica, solo factura ese tenant
+    """
+    if current_user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Solo superadmin")
+
+    body = body or {}
+    period = body.get("period")
+    tenant_id = body.get("tenant_id")
+
+    if tenant_id:
+        return await payment_service.bill_overage_for_tenant(tenant_id, period)
+    return await payment_service.bill_all_overages(period)
+
+
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
     """Webhook para eventos de Stripe"""

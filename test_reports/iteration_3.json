@@ -1,0 +1,65 @@
+{
+  "summary": "Tested InmoBot SaaS Catalog CRUD, tenant isolation, bot integration, WhatsApp send (graceful sin WA), y overage billing en Stripe (graceful sin Stripe). 21/21 tests backend pasados. UI catalogo verificado E2E (login -> /catalogo -> create -> edit -> delete).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_catalog_billing.py",
+    "/app/test_reports/pytest/catalog_billing.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "catalog_service.update_product/delete_product use product 'name' as identifier - frágil si dos productos del mismo tenant tienen el mismo nombre. Considerar agregar 'product_id' UUID y endpoints PUT/DELETE /api/catalog/{id} para robustez. (no-bloqueante)",
+    "build_product_list_message: WhatsApp permite max 10 sections con max 10 rows c/u; el código limita a 10 productos totales (ok), pero si todos caen en distintas categorias podría generar >10 sections en teoría. No se observó en testing pero es edge case a vigilar.",
+    "server.py POST /api/catalog/send/{phone} no verifica que el lead/phone pertenezca al tenant (no consulta db.leads). Bajo riesgo porque el envío usa la API de WhatsApp del tenant, pero idealmente validar phone -> tenant.",
+    "/api/billing/bill-overage: respuesta superadmin sin Stripe devolvió 200 con dict graceful (esperado). Ok."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_catalog_billing.py"
+  ],
+  "success_rate": {
+    "backend": "100% (21/21)",
+    "frontend": "100% (login + catalog CRUD E2E)"
+  },
+  "test_credentials": {
+    "tenant_admin_email": "demo@inmobot.com",
+    "tenant_admin_password": "Demo123!",
+    "tenant_id": "demo-inmobiliaria",
+    "superadmin_email": "admin@inmobot.com",
+    "superadmin_password": "Admin123!"
+  },
+  "seed_data_creation": "Productos TEST_* creados durante tests y limpiados al final. Producto remanente 'Casa con jardin' (categoria Casas) ya existía en demo-inmobiliaria, no fue tocado.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Catalog CRUD + tenant isolation + bot integration + overage billing graceful funcionan correctamente. Pruebas relevantes en /app/backend/tests/test_catalog_billing.py. Tenant isolation verificada insertando producto con tenant_id distinto en MongoDB y comprobando que GET /api/catalog del tenant 'demo-inmobiliaria' NO lo lista, y que PUT/DELETE cross-tenant retornan 404. /api/catalog/send/{phone} responde sin 500 cuando WhatsApp no está configurado (devuelve 200 con result.success=False, comportamiento esperado en dev). /api/billing/bill-overage: 403 correcto para tenant admin, 200 con respuesta graceful para superadmin sin overage/Stripe. UI /catalogo: login con demo@inmobot.com -> sidebar 'Catalogo' -> crear/editar/eliminar funciona con toasts 'Producto creado'.",
+  "test_results": {
+    "login_tenant_admin": "PASS",
+    "login_superadmin": "PASS",
+    "catalog_crud_create": "PASS - persiste tenant_id=demo-inmobiliaria, active=true",
+    "catalog_crud_list_filter_by_category": "PASS",
+    "catalog_categories_unique": "PASS",
+    "catalog_crud_update": "PASS - precio actualizado verificado vía GET",
+    "catalog_crud_update_404": "PASS",
+    "catalog_crud_delete_soft": "PASS - desactivado, no aparece en GET",
+    "catalog_requires_auth": "PASS - 401/403 sin token",
+    "catalog_send_whatsapp_no_wa_graceful": "PASS - sin 500",
+    "tenant_isolation_response_filter": "PASS - solo productos del tenant",
+    "tenant_isolation_cross_tenant_update_delete_404": "PASS",
+    "generic_flow_keywords_detect": "PASS - catalogo/productos/mostrame/menu/ofertas reconocidos",
+    "generic_flow_handlers_exist": "PASS - _handle_catalog_request, _handle_product_selection",
+    "generic_flow_prefix_prod_product": "PASS - ambos prefijos en process_message",
+    "overage_403_tenant_admin": "PASS",
+    "overage_superadmin_no_stripe_graceful": "PASS - 200 dict",
+    "overage_specific_tenant": "PASS",
+    "ui_catalog_page_loads": "PASS",
+    "ui_catalog_create_product": "PASS - toast 'Producto creado' visible",
+    "ui_catalog_edit_product": "PASS - precio 99 -> 199 verificado en card",
+    "ui_catalog_delete_product": "PASS - card desaparece"
+  }
+}
