@@ -34,7 +34,20 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-27 (Sesión Actual - Catálogo + Overage Billing)
+### 2026-04-27 (Sesión Actual - Action Items + Refactor)
+- **Action Items completados:**
+  - **product_id UUID:** Catalog migrado a `product_id` UUID. Backfill automático en `get_products` para productos legacy. Endpoints PUT/DELETE `/api/catalog/{product_id}` ahora usan UUID. Frontend (`CatalogPage.js`) actualizado.
+  - **Cross-tenant validation:** `POST /api/catalog/send/{phone}` rechaza con 403 si el phone pertenece a otro tenant.
+  - **Cron de overage:** `scheduler.py` agrega task `bill_monthly_overage` (corre día 1-3 a las 04:00 UTC, idempotente con `last_run_period`).
+  - **Refactor a routers:** Extraídos a `/app/backend/routers/`:
+    - `routers/catalog.py` (6 endpoints)
+    - `routers/billing.py` (7 endpoints)
+  - `server.py` reducido de 1908 → 1729 líneas (-179 líneas).
+  - Bug pre-existente arreglado: `/api/leads/stats/summary` retornaba 500 cuando `avg_score=None` (sin leads con score).
+- **Testing 100% PASS (29/29 backend + UI E2E):** ver `/app/test_reports/iteration_4.json`
+- **Pattern establecido:** Más routers extraíbles en futuro (leads, metrics, broadcast, agents).
+
+### 2026-04-27 (Sesión Anterior - Catálogo + Overage Billing)
 - **P0 Catálogo de Productos (COMPLETADO):**
   - Backend CRUD `/api/catalog` (GET/POST/PUT/DELETE) con tenant isolation estricto
   - `/api/catalog/categories` lista categorías únicas del tenant

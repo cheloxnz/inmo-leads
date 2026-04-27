@@ -574,7 +574,7 @@ async def get_stats(current_user: User = Depends(get_current_user)):
         {"$group": {"_id": None, "avg_score": {"$avg": "$score"}}}
     ]
     avg_result = await db.leads.aggregate(avg_score_pipeline).to_list(1)
-    avg_score = avg_result[0]["avg_score"] if avg_result else 0
+    avg_score = avg_result[0]["avg_score"] if avg_result and avg_result[0].get("avg_score") is not None else 0
     
     return {
         "total": total,
