@@ -95,8 +95,11 @@ class Tenant(BaseModel):
     whatsapp_business_account_id: str = ""
     webhook_verify_token: str = ""
     # Limits
-    max_leads: int = 500
-    max_agents: int = 5
+    max_leads: int = 2000
+    max_agents: int = 10
+    max_ai_messages: int = 2000
+    # AI Config (optional own key)
+    openai_api_key: str = ""  # If empty, uses platform key
     # Subscription
     subscription_status: str = "active"  # active, trial, suspended, cancelled
     subscription_plan: str = "basic"

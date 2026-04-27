@@ -18,7 +18,7 @@ from models import (
     LeadStatus, FlowStage, User
 )
 from whatsapp_service import WhatsAppService, create_wa_service_for_tenant
-from llm_service import LLMService
+from llm_service import LLMService, create_llm_for_tenant
 from bot_flow import BotFlowManager
 from scoring import calculate_score
 from google_services import GoogleSheetsService, GoogleCalendarService
@@ -113,7 +113,9 @@ email_service = EmailService(db)
 bot_flow = BotFlowManager(wa_service, llm_service, email_service)
 
 from generic_flow import GenericFlowEngine
+from usage_service import UsageService
 generic_flow = GenericFlowEngine(wa_service, llm_service, email_service)
+usage_service = UsageService(db)
 
 sheets_service = GoogleSheetsService()
 calendar_service = GoogleCalendarService()
@@ -316,8 +318,16 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                 template_id = tenant.get("template_id", "servicios")
                 if template_id == "inmobiliaria":
                     use_generic = False  # Use legacy flow for inmobiliaria
-            
+
+            # Create tenant-specific LLM service (uses tenant key if available)
+            tenant_llm = create_llm_for_tenant(tenant)
+
+            # Check AI usage limits before processing
+            ai_allowed = await usage_service.increment_ai_messages(tenant_id) if tenant_id else True
+
             if use_generic:
+                # Pass tenant-specific LLM and WA service
+                generic_flow.llm = tenant_llm if ai_allowed else None
                 await generic_flow.process_message(lead, message_text, db, tenant_id, tenant_wa=active_wa)
             else:
                 updated_lead = await bot_flow.process_message(lead, message_text, db)
@@ -797,6 +807,50 @@ async def update_whatsapp_config(
         {"$set": update_fields}
     )
     return {"message": "Configuracion de WhatsApp actualizada"}
+
+
+
+# ============================================
+# Usage / Limits Endpoints
+# ============================================
+
+@api_router.get("/usage")
+async def get_usage(current_user: User = Depends(get_current_user)):
+    """Obtiene resumen de uso del tenant actual"""
+    return await usage_service.get_usage_summary(current_user.tenant_id)
+
+
+@api_router.get("/config/ai")
+async def get_ai_config(current_user: User = Depends(require_admin)):
+    """Admin: Obtiene config de IA del tenant"""
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    return {
+        "has_own_key": bool(tenant.get("openai_api_key")),
+        "key_preview": "***" + tenant.get("openai_api_key", "")[-8:] if tenant.get("openai_api_key") else "",
+        "max_ai_messages": tenant.get("max_ai_messages", 2000),
+        "model": "gpt-4o"
+    }
+
+
+@api_router.put("/config/ai")
+async def update_ai_config(body: dict, current_user: User = Depends(require_admin)):
+    """Admin: Configura key propia de OpenAI (opcional)"""
+    update = {}
+    if "openai_api_key" in body:
+        update["openai_api_key"] = body["openai_api_key"]
+    
+    if not update:
+        raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+
+    update["updated_at"] = datetime.utcnow().isoformat()
+    await db.tenants.update_one(
+        {"tenant_id": current_user.tenant_id},
+        {"$set": update}
+    )
+    return {"message": "Configuracion de IA actualizada"}
+
 
 
 

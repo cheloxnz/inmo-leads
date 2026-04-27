@@ -11,55 +11,49 @@ logger = logging.getLogger(__name__)
 
 # Planes SaaS con precios mensuales en USD
 SUBSCRIPTION_PLANS = {
-    "basic": {
-        "name": "Basic",
-        "price_monthly": 49,
-        "description": "Para negocios que empiezan",
-        "max_leads": 500,
-        "max_agents": 3,
-        "features": [
-            "1 numero de WhatsApp",
-            "500 leads/mes",
-            "3 usuarios",
-            "Bot con IA (GPT-4)",
-            "Dashboard basico",
-            "Soporte por email"
-        ]
-    },
     "pro": {
         "name": "Pro",
         "price_monthly": 99,
         "description": "Para negocios en crecimiento",
         "max_leads": 2000,
         "max_agents": 10,
+        "max_ai_messages": 2000,
         "features": [
             "1 numero de WhatsApp",
-            "2000 leads/mes",
+            "2,000 leads/mes",
+            "2,000 conversaciones IA/mes",
             "10 usuarios",
-            "Bot con IA (GPT-4)",
+            "Bot con IA (GPT-4) incluida",
             "Dashboard completo",
             "Metricas avanzadas",
             "Broadcast masivo",
-            "Soporte prioritario"
+            "Flujo personalizable",
+            "Soporte prioritario",
+            "6 Bonus exclusivos"
         ]
     },
     "enterprise": {
         "name": "Enterprise",
         "price_monthly": 249,
         "description": "Para operaciones grandes",
-        "max_leads": 99999,
+        "max_leads": 10000,
         "max_agents": 50,
+        "max_ai_messages": 10000,
         "features": [
             "Multiples numeros WhatsApp",
-            "Leads ilimitados",
+            "10,000 leads/mes",
+            "10,000 conversaciones IA/mes",
             "50 usuarios",
-            "Bot con IA (GPT-4)",
+            "Bot con IA (GPT-4) incluida",
             "Dashboard completo",
             "Metricas avanzadas",
             "Broadcast masivo",
+            "Flujo personalizable",
             "API completa",
             "Soporte 24/7",
-            "Onboarding personalizado"
+            "Onboarding personalizado",
+            "Key propia de OpenAI (opcional)",
+            "6 Bonus exclusivos"
         ]
     }
 }

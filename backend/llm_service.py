@@ -5,20 +5,26 @@ from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class LLMService:
-    def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY")
+    """
+    Servicio de IA multi-tenant.
+    Usa la key de la plataforma por defecto, o la key propia del tenant si la tiene.
+    """
+
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model_name = "gpt-4o"
         self.client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
-        
+        self.enabled = bool(self.client)
+
         if not self.api_key:
             logger.warning("OPENAI_API_KEY no configurada - LLM deshabilitado")
-    
+
     async def _send_message(self, system_message: str, user_message: str) -> str:
-        """Envía un mensaje a OpenAI y retorna la respuesta"""
         if not self.client:
             return "Error: API key no configurada"
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model=self.model_name,
@@ -33,123 +39,67 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error en OpenAI: {e}")
             return f"Error: {str(e)}"
-    
-    async def classify_intent(self, user_message: str) -> Dict:
-        """Clasifica la intención del usuario: comprar, alquilar, vender, inversión"""
-        system_message = """Eres un clasificador de intenciones inmobiliarias. 
-        El usuario te dirá algo sobre propiedades. Debes clasificar su intención en una de estas categorías:
-        - comprar: quiere comprar una propiedad
-        - alquilar: quiere alquilar una propiedad
-        - vender: quiere vender su propiedad
-        - inversion: busca invertir en propiedades
-        - sin_definir: no está claro o está explorando opciones
-        
-        Responde SOLO con la categoría en minúsculas, sin explicaciones."""
-        
+
+    async def classify_intent(self, user_message: str, intents: list = None) -> Dict:
+        """Clasifica intencion del usuario (generico, configurable por template)"""
+        intent_list = intents or ["comprar", "alquilar", "vender", "inversion", "consulta"]
+        intents_str = ", ".join(intent_list)
+
+        system_message = f"""Eres un clasificador de intenciones.
+        Clasifica el mensaje del usuario en una de estas categorias: {intents_str}, sin_definir.
+        Responde SOLO con la categoria en minusculas, sin explicaciones."""
+
         response = await self._send_message(system_message, user_message)
-        intent = response.strip().lower()
+        intent = response.strip().lower().replace(" ", "_")
         return {"intent": intent, "confidence": "high"}
-    
-    async def extract_zone(self, user_message: str) -> Optional[str]:
-        """Extrae la zona/barrio mencionada por el usuario"""
-        system_message = """Eres un extractor de zonas y barrios de Buenos Aires, Argentina.
-        El usuario mencionará una zona, barrio o ubicación. Extrae y normaliza el nombre.
-        Si no mencionan ninguna zona, responde: NINGUNA
-        Ejemplos:
-        - "en palermo" -> Palermo
-        - "zona norte" -> Zona Norte
-        - "belgrano o nuñez" -> Belgrano/Núñez
-        Responde SOLO con el nombre de la zona normalizado."""
-        
+
+    async def extract_field(self, user_message: str, ai_prompt: str) -> Optional[str]:
+        """Extrae un campo usando un prompt custom del template"""
+        system_message = f"""{ai_prompt}
+        Responde SOLO con el valor extraido. Si no puedes extraer nada, responde: NINGUNO"""
+
         response = await self._send_message(system_message, user_message)
-        
-        if "NINGUNA" in response.upper():
+
+        if "NINGUNO" in response.upper() or "NO MENCION" in response.upper():
             return None
         return response.strip()
-    
-    async def extract_budget(self, user_message: str) -> Optional[str]:
-        """Extrae el presupuesto mencionado"""
-        system_message = """Eres un extractor de presupuestos inmobiliarios.
-        El usuario mencionará un monto o rango de presupuesto. Extrae y normaliza.
-        Si no mencionan presupuesto, responde: NINGUNO
-        Ejemplos:
-        - "hasta 200 mil dolares" -> USD 200.000
-        - "entre 100 y 150k" -> USD 100.000-150.000
-        - "500 lucas" -> USD 500.000
-        Responde SOLO con el presupuesto normalizado."""
-        
-        response = await self._send_message(system_message, user_message)
-        
-        if "NINGUNO" in response.upper():
-            return None
-        return response.strip()
-    
-    async def parse_free_text_response(self, user_message: str, context: str) -> Dict:
-        """Parsea respuestas en lenguaje libre del usuario según el contexto"""
-        system_message = f"""Eres un asistente que interpreta respuestas de usuarios en lenguaje natural.
-        Contexto: {context}
-        
-        Extrae la información relevante y devuelve un JSON con los datos estructurados.
-        Si no puedes extraer información clara, indica 'unclear': true"""
-        
-        response = await self._send_message(system_message, user_message)
-        
-        try:
-            import json
-            return json.loads(response)
-        except:
-            return {"parsed": response, "unclear": False}
-    
-    async def validate_response(self, user_message: str, expected_type: str) -> Dict:
-        """Valida si la respuesta del usuario es apropiada para lo que se preguntó"""
-        system_message = f"""Eres un validador de respuestas.
-        Se esperaba una respuesta de tipo: {expected_type}
-        
-        Analiza si el mensaje del usuario es una respuesta válida.
-        Responde con JSON: {{"valid": true/false, "reason": "explicación"}}"""
-        
-        response = await self._send_message(system_message, user_message)
-        
-        try:
-            import json
-            return json.loads(response)
-        except:
-            return {"valid": True, "reason": "Procesando respuesta"}
-    
+
     async def generate_smart_response(self, user_message: str, lead_context: Dict = None) -> str:
-        """Genera una respuesta inteligente para consultas generales del usuario"""
+        """Genera respuesta inteligente para consultas generales"""
         context_info = ""
         if lead_context:
-            context_info = f"""
-            Información del cliente:
-            - Nombre: {lead_context.get('name', 'No especificado')}
-            - Intención: {lead_context.get('intent', 'No definida')}
-            - Zona de interés: {lead_context.get('zone', 'No especificada')}
-            - Presupuesto: {lead_context.get('budget_text', 'No especificado')}
-            - Tipo de propiedad: {lead_context.get('property_type', 'No especificado')}
-            """
-        
-        system_message = f"""Eres un asistente virtual de una inmobiliaria en Buenos Aires, Argentina.
-        Tu rol es ayudar a clientes con consultas sobre propiedades, el mercado inmobiliario y el proceso de compra/alquiler.
-        
+            context_parts = [f"- {k}: {v}" for k, v in lead_context.items() if v]
+            context_info = f"\nInformacion del cliente:\n" + "\n".join(context_parts)
+
+        system_message = f"""Eres un asistente virtual profesional.
+        Tu rol es ayudar a clientes con sus consultas de forma amable y concisa.
         {context_info}
-        
+
         REGLAS:
-        1. Responde de forma amable y profesional en español argentino (usá "vos" en lugar de "tú")
-        2. Sé conciso pero informativo (máximo 3-4 oraciones)
-        3. Si no sabés algo específico, ofrecé conectar al cliente con un asesor
-        4. No inventes datos de propiedades específicas
-        5. Podés dar información general sobre:
-           - Zonas de Buenos Aires y sus características
-           - Proceso de compra/alquiler
-           - Documentación necesaria
-           - Tendencias del mercado inmobiliario
-           - Consejos para compradores/inquilinos
-        6. Si la consulta es muy específica sobre una propiedad, sugiere agendar una cita
-        7. Usá emojis moderadamente para ser más amigable
-        
-        INFORMACIÓN DE LA INMOBILIARIA:
-        - Horarios: Lun-Vie 9:00-18:00, Sáb 10:00-14:00"""
-        
+        1. Responde de forma amable y profesional en espanol
+        2. Se conciso (maximo 3-4 oraciones)
+        3. Si no sabes algo especifico, ofrece conectar con un asesor
+        4. No inventes datos
+        5. Si la consulta es muy especifica, sugiere agendar una cita"""
+
         response = await self._send_message(system_message, user_message)
         return response.strip()
+
+    async def parse_free_text_response(self, user_message: str, context: str) -> Dict:
+        """Parsea respuestas en lenguaje libre"""
+        system_message = f"""Eres un asistente que interpreta respuestas de usuarios.
+        Contexto: {context}
+        Extrae la informacion relevante. Responde con el dato extraido de forma limpia."""
+
+        response = await self._send_message(system_message, user_message)
+        return {"parsed": response.strip(), "unclear": False}
+
+
+def create_llm_for_tenant(tenant: dict = None) -> LLMService:
+    """
+    Crea un LLMService con la key del tenant si la tiene,
+    sino usa la key de la plataforma (.env).
+    """
+    if tenant and tenant.get("openai_api_key"):
+        return LLMService(api_key=tenant["openai_api_key"])
+    return LLMService()
