@@ -80,9 +80,9 @@ export default function Signup() {
         <h1>Empezá con InmoBot</h1>
         <p>Tu bot de WhatsApp con IA listo en 60 segundos.</p>
         <div className="sw-stepper">
-          <div className={`sw-step ${step >= 1 ? 'active' : ''}`}>1. Tu negocio</div>
-          <div className={`sw-step ${step >= 2 ? 'active' : ''}`}>2. Tu cuenta</div>
-          <div className={`sw-step ${step >= 3 ? 'active' : ''}`}>3. ¡Listo!</div>
+          <div className={`sw-step ${step > 1 ? 'completed' : step === 1 ? 'active' : ''}`}>1. Tu negocio</div>
+          <div className={`sw-step ${step > 2 ? 'completed' : step === 2 ? 'active' : ''}`}>2. Tu cuenta</div>
+          <div className={`sw-step ${step === 3 ? 'active' : ''}`}>3. ¡Listo!</div>
         </div>
       </div>
 

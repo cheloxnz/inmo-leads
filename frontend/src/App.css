@@ -7019,6 +7019,15 @@ body {
   color: #fff;
   border-color: transparent;
 }
+.sw-step.completed {
+  background: rgba(16,185,129,0.12);
+  color: #047857;
+  border-color: rgba(16,185,129,0.3);
+}
+.sw-step.completed::before {
+  content: "✓ ";
+  font-weight: 700;
+}
 .sw-card {
   border: 1px solid var(--border);
 }
@@ -7107,6 +7116,14 @@ body {
   gap: 0.5rem;
   justify-content: center;
   flex-wrap: wrap;
+}
+.sw-result-actions [data-testid="sw-go-dashboard"] {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 600;
+}
+.sw-result-actions [data-testid="sw-go-dashboard"]:hover {
+  opacity: 0.92;
 }
 
 

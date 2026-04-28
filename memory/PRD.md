@@ -34,7 +34,27 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Validaciones Backend + IA Copy + Hints WCAG)
+### 2026-04-28 (Sesión Actual - Rate-limit AI + Upload Logo + Paleta + Auto-onboarding)
+- **Rate-limit `/ai-generate`:** sliding window in-memory 5 calls/hora por tenant. Header rate_limit en respuesta. 429 cuando se excede con segundos de retry.
+- **Comparación paleta primary vs accent (`evaluatePaletteHarmony`):**
+  - <1.5 → warn-low "casi idénticos, no se va a notar"
+  - >14 → warn-high "muy contrastante, agresiva"
+  - 2-8 → ok "paleta coherente"
+  - UI: hint debajo del card de Colores en LandingEditor.
+- **Upload logo (`routers/uploads.py`):**
+  - `POST /api/uploads/logo` (admin) acepta jpg/png/webp/svg/gif, max 2MB, valida content-type.
+  - `GET /api/uploads/logos/{filename}` sirve archivos con regex anti-traversal + verificación path absoluto.
+  - UI: botón "Subir" al lado del input URL en LandingEditor + preview de imagen.
+- **🌟 Auto-onboarding wizard (sugerencia SaaS):**
+  - `routers/onboarding.py` con `slugify`, detección automática de template_id por keywords (inmobiliaria, clinica, restaurante, ecommerce, servicios), seed de 3 productos demo del rubro.
+  - `POST /api/onboarding/suggest-tenant-id`: genera slug único.
+  - `POST /api/onboarding/auto-setup`: crea tenant + agente admin + landing IA (tagline + features + steps generados con LLM con fallback) + 3 productos demo + JWT token para auto-login. Todo en una sola transacción.
+  - **Wizard `/signup`** (3 pasos visuales): step 1 (negocio + descripción + rubro autodetect), step 2 (email + password con tenant_id sugerido), step 3 (resumen con CTAs "Ver mi landing" / "Ir al dashboard").
+  - Stepper con estados visuales: completado (verde ✓), activo (gradient), pendiente (gris).
+  - Botón "Crear mi bot gratis" agregado al hero de la landing genérica.
+- **Testing 100% PASS (23/23 backend + frontend E2E):** `/app/test_reports/iteration_11.json`
+
+### 2026-04-28 (Sesión Anterior - Validaciones Backend + IA Copy + Hints WCAG)
 - **Backend validaciones (`auth_routes.py`):**
   - `_validate_branding_payload` con regex hex (`#rrggbb`), URL http(s), template_id en whitelist (5 rubros), custom_features/steps debe ser lista (max 5), max 500 chars por string.
   - 400 con `validation_errors` array para errores de tipo.
