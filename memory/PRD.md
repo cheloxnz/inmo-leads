@@ -34,6 +34,27 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-28 (Sesión Actual - AI Flow Editor + Hardening completo + Onboarding stress)
+- **AI Flow Editor (`/api/flow/ai-edit`):** asistente IA que edita el árbol del FlowBuilder en lenguaje natural. Whitelist de 7 operaciones: `add_step`, `update_step`, `remove_step`, `reorder_step`, `update_welcome`, `update_completion`, `update_appointment`. Cada op valida tipo (text/buttons/list), límite de botones WhatsApp (max 3), preview en 2 pasos con `confirmed_ops`, audit log con diff completo, rate-limit 8/h por tenant.
+  - UI: `AIFlowAssistant.js` integrado arriba del editor en `/flujo`. Iconografía + colores diferenciados por tipo de op, contador de pasos `current → preview`, mismas mejoras que AIBotConfig (countdown retry-after, deshabilitado durante 429).
+- **Hardening AI Bot Config Assistant:**
+  - `llm_service.py` ahora expone método público `send_message(system, user, max_tokens)` que levanta `RuntimeError` si no hay client. Routers AI consumen este método (no más `_send_message` privado).
+  - `bot_config_ai.py`: el chequeo de `llm.client` ocurre ANTES del rate-limit → no se gastan slots cuando IA no está configurada.
+  - Frontend `AIBotConfigAssistant.js`:
+    - Countdown en vivo del `retry_after` cuando se recibe 429 (parser regex extrae los segundos del detail, `setInterval` decrementa cada 1s, deshabilita preview button hasta que llegue a 0).
+    - Banner upsell post-apply (`Crown` icon, gradient amber) que sugiere upgrade a Plan Profesional con CTA a `/billing`. Solo se muestra si `subscription_plan` del tenant NO es `profesional/agencia/enterprise`.
+    - Cierre dismissible del banner (`X`).
+- **Auth global 401 interceptor (`AuthContext.js`):** `axios.interceptors.response.use` registrado en `useEffect([], [])`. Si una request retorna 401 con token presente → limpia sesión + redirect a `/login?expired=1`. No requiere cambios en componentes individuales.
+- **`/api/auth/tenant/branding` ahora devuelve `subscription_plan` y `subscription_status`** (read-only) para condiciones de UI tipo upsell.
+- **Tests E2E concurrencia Onboarding (P1) — `test_iter13_onboarding_concurrency.py`:**
+  - 3 tests con `pytest-asyncio` + `httpx.AsyncClient` + `motor`.
+  - Test 1: valida unique index sobre `tenants.tenant_id`.
+  - Test 2: dispara 15 requests simultáneos al mismo `business_name` → asserta 0 errores 5xx, 0 documentos huérfanos (tenant sin agent o agent sin tenant), todos los 200 tienen documento real en MongoDB.
+  - Test 3: 2 requests con MISMO email → uno gana 200, otro 409, exactamente 1 agent en DB.
+  - **Resultado:** 3/3 PASS.
+- **Tests:** Backend total 25/25 passed (iter12+iter13+iter14, 1 skip esperado de rate-limit cuando no hay OpenAI key — comportamiento correcto del hardening). Frontend E2E 100% (data-testids correctos en `/config` y `/flujo`).
+- **Archivos:** `/app/backend/routers/flow_ai.py` (nuevo), `/app/backend/llm_service.py` (método público), `/app/backend/auth_routes.py` (branding extendido), `/app/backend/server.py` (router registrado), `/app/frontend/src/components/AIFlowAssistant.js` (nuevo), `/app/frontend/src/components/AIBotConfigAssistant.js` (countdown+upsell), `/app/frontend/src/components/FlowBuilder.js` (integración), `/app/frontend/src/context/AuthContext.js` (401 interceptor), `/app/backend/tests/test_iter13_onboarding_concurrency.py` (nuevo).
+
 ### 2026-04-28 (Sesión Actual - AI Configuration Assistant + Hardening)
 - **AI Configuration Assistant** (`POST /api/bot-config/ai-edit`, `GET /api/bot-config/ai-edit/info`):
   - Tenant admin escribe en lenguaje natural (ej. "Cambia horario a 9-19hs y los sabados de 10 a 13") y la IA traduce a JSON contra whitelist de 9 campos del modelo `BotConfig` (business_hours_start/end, business_days, saturday_hours_*, auto_handoff_score, warm_lead_reactivation_days, appointment_reminder_hours, welcome_message).

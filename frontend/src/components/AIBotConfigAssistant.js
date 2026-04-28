@@ -58,12 +58,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
         }
       });
     // Plan del tenant para upsell condicional
-    axios.get(`${API}/auth/me`)
-      .then(r => {
-        // /me devuelve agent doc; el plan vive en tenant. Hacemos un GET extra mejor.
-      })
-      .catch(() => {});
-    axios.get(`${API}/tenant/branding`)
+    axios.get(`${API}/auth/tenant/branding`)
       .then(r => setTenantPlan((r.data?.subscription_plan || '').toLowerCase()))
       .catch(() => {});
   }, []);
