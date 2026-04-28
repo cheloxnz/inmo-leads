@@ -1,0 +1,40 @@
+{
+  "summary": "Iter 16 final - TTL indexes 90d/30d, Severity enum, visibilitychange listeners, Celebrations system, OpenAI MOCKED via respx. Backend: 9/9 iter16 PASS, 35P+1S regression iter12-15 (skip esperado por OPENAI_API_KEY ausente). MongoDB indexes verificados. dismissed_at se persiste como BSON datetime en NUEVOS dismisses (verificado live). Celebrations endpoints funcionan: GET detecta auto, POST seen idempotente con 404 en re-mark. Frontend E2E: 2 celebraciones visibles para demo tenant (first_ai_edit + branding_customized), max 2 enforced, dismiss remueve sin reload y revela el 3ro en cola (first_lead), visibilitychange dispara refetch de /coach/nudges. Order CoachCelebrations ARRIBA de CoachNudges confirmado en Dashboard.js linea 63-64.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter16_llm_mocked.py",
+    "/app/test_reports/pytest/iter16_results.xml",
+    "/app/test_reports/pytest/iter12_15_regression.xml"
+  ],
+  "action_items": [
+    "Ninguno bloqueante. Sistema listo para producción.",
+    "INFO: registros antiguos (pre-iter16) en coach_nudges.dismissed_at siguen como string ISO. El TTL index 'dismissed_at_ttl' solo expira documentos con BSON Date, así que esos legacy strings NO serán purgados. Si se quiere limpieza, ejecutar migración: db.coach_nudges.find({dismissed_at: {$type: 'string'}}) y convertir manualmente, o aceptar que solo nuevos dismisses tendrán TTL real.",
+    "INFO: warnings de DeprecationWarning de FastAPI on_event/lifespan visibles en logs - no bloqueante pero candidato a refactor a lifespan handler en el futuro."
+  ],
+  "critical_code_review_comments": [
+    "coach.py linea 176: created_at del nudge se guarda como string ISO (.isoformat()), no datetime BSON. Esto es inconsistente con dismissed_at que ahora SÍ es BSON. No es bug per se (no hay TTL sobre created_at), pero por consistencia y para queries por fecha futuras, conviene unificar a BSON datetime.",
+    "coach.py _detect_celebrations_for_tenant: en cada GET /coach/celebrations se ejecuta lazy detection con N find_one queries. Para tenants con muchas requests, considerar throttling por tenant_id (e.g. cache de detección con TTL 60s) similar a como se hizo con flow_ai. Ahora mismo el unique compound index en (tenant_id, celebration_type) hace que el insert duplicado falle silenciosamente, pero las N queries se siguen ejecutando.",
+    "CoachCelebrations.js: si una celebración tiene cta_url externa (http://) el href funciona; pero usa href='/landing' que no funciona en SPA cliente sin recargar. Considerar React Router Link para navegación interna sin recarga - aplica también a CoachNudges.js. Es UX minor.",
+    "Severity enum: implementación correcta con fallback a 'info'. PROS: defense in depth. Bien hecho.",
+    "Migración de legacy dismissed_at strings: agregar startup script para convertir a datetime para que TTL aplique."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (9/9 iter16 + 35/36 regression con 1 skip esperado)",
+    "frontend": "100% (celebraciones + nudges + visibilitychange OK)"
+  },
+  "test_credentials": "demo@inmobot.com / Demo123!",
+  "seed_data_creation": "El demo tenant tiene 3 celebraciones en coach_celebrations (first_ai_edit, first_lead, branding_customized). Durante el test, 1 fue marcada seen (first_ai_edit) y luego se reseteó seen_at=None para verificar UI. Tras el frontend test, una celebración volvió a quedar marcada seen vía dismiss UI. Para reset: db.coach_celebrations.update_many({tenant_id:'demo-inmobiliaria'},{$set:{seen_at:None}}).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "MongoDB indexes verificados live: coach_nudges tiene dismissed_at_ttl (90d) + compound (tenant_id,nudge_type,dismissed_at) + unique nudge_id. coach_celebrations tiene seen_at_ttl (30d) + unique (tenant_id,celebration_type) + unique celebration_id. respx tests requieren OPENAI_API_KEY=sk-test-fake-for-mock seteado ANTES de import server (módulo lo cachea); el fixture lo maneja. Tests iter16 (9P) cubren bot-config/ai-edit y flow/ai-edit con LLM mocked. Próximos cambios podrían: convertir created_at de coach_nudges a BSON datetime para consistencia, y agregar scheduler call _detect_celebrations_for_tenant en el cron.",
+  "rca of the issue": "N/A - sin bugs encontrados. Todos los items de la review_request verificados: TTL indexes ✓, dismissed_at BSON ✓ (en NUEVOS dismisses), Severity enum ✓, celebrations endpoints ✓, mapping nudge→celebration ✓, iter16 9/9 ✓, regression iter12-15 ✓, visibilitychange CoachNudges ✓, Dashboard renderiza Celebrations arriba de Nudges ✓, click X celebración remueve sin reload ✓, retorna null sin celebraciones ✓, max 2 visibles slice(0,2) ✓."
+}

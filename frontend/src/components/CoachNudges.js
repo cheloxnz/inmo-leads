@@ -38,6 +38,15 @@ export default function CoachNudges() {
 
   useEffect(() => {
     fetchNudges();
+
+    // Refrescar nudges al volver a la pestaña (despues de tener foco)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNudges();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   const fetchNudges = async () => {

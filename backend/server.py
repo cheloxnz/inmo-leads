@@ -1659,6 +1659,19 @@ async def startup_event():
         # Coach: indice compuesto para acelerar lookup de nudges activos
         await db.coach_nudges.create_index([("tenant_id", 1), ("nudge_type", 1), ("dismissed_at", 1)])
         await db.coach_nudges.create_index([("nudge_id", 1)], unique=True)
+        # Coach: TTL index sobre dismissed_at -> auto-purge de nudges descartados tras 90 dias.
+        # Mongo NO borra docs donde el campo es null (solo aplica si es BSON Date).
+        await db.coach_nudges.create_index(
+            "dismissed_at", expireAfterSeconds=90 * 86400, name="dismissed_at_ttl"
+        )
+        # Celebrations: idempotencia (1 por tenant_id + tipo) y TTL 30 dias sobre seen_at
+        await db.coach_celebrations.create_index(
+            [("tenant_id", 1), ("celebration_type", 1)], unique=True
+        )
+        await db.coach_celebrations.create_index([("celebration_id", 1)], unique=True)
+        await db.coach_celebrations.create_index(
+            "seen_at", expireAfterSeconds=30 * 86400, name="seen_at_ttl"
+        )
         logger.info("Indices unique creados/verificados")
     except Exception as e:
         logger.warning(f"No se pudieron crear indices unique: {e}")
