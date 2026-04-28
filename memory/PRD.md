@@ -34,7 +34,18 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - TTL/Severity/visibilitychange/Mock tests/Celebrations)
+### 2026-04-28 (Sesión Actual - Lifespan + share/marketing orgánico + SPA navigation + cache celebrations)
+- **Marketing orgánico (share cards):** ShareCelebrationModal con canvas 1200x630 que renderiza la card branded del tenant (gradient primary→accent, emoji grande, título, métrica, business_name, "Hecho con InmoBot AI"). Botones: Descargar imagen, Copiar al clipboard, X/Twitter intent, LinkedIn intent.
+  - Endpoint `POST /api/coach/celebrations/{id}/share` con body `{platform: twitter|linkedin|download|copy}`. Trackea `shares.{platform}` y `shares.total` en el doc + audit_log con `action='celebration_shared'`. Devuelve `card_data` con branding del tenant + `share_text` prellenado con hashtags `#SaaS #AI #WhatsApp #PyME`.
+  - Validación: platform whitelist (fuera → `unknown`), 404 si celebration no existe.
+- **FastAPI lifespan handler** (reemplaza `@app.on_event` deprecado): un único `@asynccontextmanager` para startup (indices, migración, scheduler) + shutdown (scheduler.stop, mongo.close). Sin warnings de deprecation.
+- **`coach_nudges.created_at` y `dismissed_at` ahora BSON datetime** (consistencia + soporte TTL futuro). Migración one-shot al startup convierte legacy strings → datetime. Respuestas siguen exponiendo ISO string para JSON.
+- **Cache `_detect_celebrations_for_tenant` TTL 60s** (`cache_util` namespace `celebrations_detected`): reduce N find_one por GET. Invalidación automática en dismiss para que la próxima detección vea el signal resuelto.
+- **React Router Link en CTAs:** `CoachNudges` y `CoachCelebrations` usan `<Link to>` para URLs internas (SPA navigation sin reload), `<a target=_blank>` para externas.
+- **Tests:** Backend iter17 9/9 PASS + 32/32 regression. Frontend E2E 100%. Cero bugs reportados.
+- **Archivos:** `/app/backend/server.py` (lifespan), `/app/backend/routers/coach.py` (cache + share + BSON datetime), `/app/frontend/src/components/ShareCelebrationModal.js` (nuevo), `/app/frontend/src/components/CoachNudges.js` (Link), `/app/frontend/src/components/CoachCelebrations.js` (Link + share button + modal).
+
+### 2026-04-28 (Sesión Anterior - TTL/Severity/visibilitychange/Mock tests/Celebrations)
 - **TTL indexes en MongoDB:**
   - `coach_nudges.dismissed_at` con `expireAfterSeconds=90*86400` (90 días) — purge automático de nudges descartados.
   - `coach_celebrations.seen_at` con `expireAfterSeconds=30*86400` (30 días) — purge de celebraciones vistas.
