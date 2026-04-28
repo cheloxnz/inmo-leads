@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import BillingSection from '../components/BillingSection';
+import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -69,7 +70,9 @@ export default function Configuration() {
         <h1>Configuración</h1>
         <p className="subtitle">Parámetros del bot y horarios de atención</p>
       </header>
-      
+
+      <AIBotConfigAssistant onApplied={fetchConfig} />
+
       <div className="config-grid">
         <Card>
           <CardHeader>
