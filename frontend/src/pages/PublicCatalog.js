@@ -6,6 +6,26 @@ import './PublicCatalog.css';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
+function getSessionId() {
+  let sid = sessionStorage.getItem('inmobot_wid_sid');
+  if (!sid) {
+    sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem('inmobot_wid_sid', sid);
+  }
+  return sid;
+}
+
+function trackEvent(tenantId, eventType, extra = {}) {
+  try {
+    axios.post(`${BACKEND}/api/public/catalog/${tenantId}/track`, {
+      event_type: eventType,
+      session_id: getSessionId(),
+      referrer: document.referrer || '',
+      ...extra,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 export default function PublicCatalog() {
   const { tenantId } = useParams();
   const [searchParams] = useSearchParams();
@@ -27,6 +47,12 @@ export default function PublicCatalog() {
       if (res.data?.tenant?.business_name) {
         document.title = `${res.data.tenant.business_name} - Catalogo`;
       }
+      // Track page view (una vez por session_id/tenantId)
+      const viewKey = `inmobot_wid_view_${tenantId}`;
+      if (!sessionStorage.getItem(viewKey)) {
+        trackEvent(tenantId, 'view');
+        sessionStorage.setItem(viewKey, '1');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Catalogo no disponible');
     } finally {
@@ -40,6 +66,7 @@ export default function PublicCatalog() {
     e.preventDefault();
     if (!query.trim()) return;
     setRecLoading(true);
+    trackEvent(tenantId, 'ai_search', { query });
     try {
       const res = await axios.post(`${BACKEND}/api/public/catalog/${tenantId}/recommend`, { query, max_results: 3 });
       setRecommendations(res.data.recommendations || []);
@@ -51,10 +78,15 @@ export default function PublicCatalog() {
   };
 
   const openWhatsApp = (product) => {
+    trackEvent(tenantId, 'click_whatsapp', { product_id: product.product_id });
     const phone = (data?.tenant?.whatsapp_phone || '').replace(/\D/g, '');
     if (!phone) return;
     const msg = encodeURIComponent(`Hola! Me interesa el producto: ${product.name}`);
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+  };
+
+  const handleProductClick = (product) => {
+    trackEvent(tenantId, 'click_product', { product_id: product.product_id });
   };
 
   if (loading) {
@@ -125,7 +157,7 @@ export default function PublicCatalog() {
           <div className="pc-empty">No hay productos para mostrar</div>
         ) : (
           displayProducts.map(product => (
-            <article key={product.product_id || product.name} className="pc-card" data-testid={`pc-product-${product.product_id}`}>
+            <article key={product.product_id || product.name} className="pc-card" onClick={() => handleProductClick(product)} data-testid={`pc-product-${product.product_id}`}>
               {product.image_url ? (
                 <div className="pc-card-img" style={{ backgroundImage: `url(${product.image_url})` }} />
               ) : (

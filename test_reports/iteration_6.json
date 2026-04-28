@@ -1,0 +1,43 @@
+{
+  "summary": "Iteración 6 - Validación de Widget Tracking, Widget Analytics, widget.js drop-in y SuperAdmin Metrics. 22/22 tests backend passing (después de corregir 1 path de regresión /api/billing/plans -> /api/plans). Frontend /catalogo/analytics renderiza KPIs (12 views, 1 lead), snippets drop-in (usan https), top búsquedas IA y actividad diaria. /superadmin muestra bloque Global Metrics con MRR/ARR/Churn/Overage/Revenue. Tracking E2E: las visitas públicas aparecen en analytics del tenant.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/catalog/{tenant_id}/track", "issue": "Sin rate-limiting: flood de 100+ POST pasaría. No rompe (insertar en Mongo es rápido) pero es un vector de abuso. Considerar rate-limit por IP/sesión o captcha ligero. No bloqueante."},
+      {"endpoint": "/api/superadmin/metrics", "issue": "Churn calculado como cancelled con updated_at>=30d. Funciona pero no todos los updates implican cancelación. Más preciso sería usar un evento específico (subscription_cancelled) o timestamp cancelled_at."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar", "issues": ["El nav 'Widget Stats' sí aparece para SuperAdmin (usa la misma vista tenant admin + botón SuperAdmin arriba). Este comportamiento sigue el patrón existente (superadmin ve todos los links de admin: Dashboard, Leads, Kanban, etc.). Si se quiere ocultar SOLO Widget Stats para superadmin se debe condicionar con !isSuperAdmin explícitamente. Actualmente NO es un bug, es comportamiento heredado."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_widget_and_superadmin.py",
+    "/app/test_reports/pytest/widget_superadmin.xml"
+  ],
+  "action_items": [
+    "(Opcional) Evaluar rate-limit en POST /public/catalog/{tenant_id}/track para evitar abuso.",
+    "(Opcional) Si el producto requiere ocultar 'Widget Stats' al superadmin, añadir `&& !isSuperAdmin` en el Link de App.js línea 200."
+  ],
+  "critical_code_review_comments": [
+    "widget_analytics_service.py: correcto uso de hash SHA256 truncado para IP (no guarda PII).",
+    "routers/widget.py y routers/superadmin.py: extracción limpia. get_db() importado desde auth_routes para reuso del mismo cliente Mongo - OK.",
+    "widget.py /track: valida tenant existe y active=true antes de insertar, previniendo creación de basura por tenants inválidos. Bueno.",
+    "widget.js drop-in: usa x-forwarded-proto para reconstruir URL con https detrás del ingress. Verificado en test (https presente en respuesta).",
+    "Cache-Control: public, max-age=300 (5min) razonable para un drop-in.",
+    "superadmin.py: los endpoints quedan bajo /api/superadmin/* gracias al include_router(prefix='/api'). 403 correcto para tenant admin verificado."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_widget_and_superadmin.py (nuevo)"
+  ],
+  "success_rate": {"backend": "100% (22/22)", "frontend": "100% flujos críticos"},
+  "test_credentials": "demo@inmobot.com / Demo123!  |  admin@inmobot.com / Admin123!",
+  "seed_data_creation": "Los tests insertan eventos TEST_ en widget_analytics (view, click_product, click_whatsapp, ai_search, lead_generated). No se limpian automáticamente (collection analytics append-only). Se observó 12 views / 2 clicks / 2 ai_searches / 1 lead en dashboard tras la suite.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend fully validated: tracking (5 event types + invalid + tenant-not-found=404), analytics (days=30/7, auth required), widget.js (https, Cache-Control, CORS, iframe, tenant en código), superadmin (MRR/ARR/tenants/churn/overage/revenue + tenants/usage + global widget analytics + 403 para admin). Frontend validado: Widget Analytics renderiza KPIs y snippets drop-in; SuperAdmin muestra bloque Global (MRR, Activos, Churn, Overage, Revenue 30d). El flood de 10 POST consecutivos pasa OK sin rate-limit.",
+  "rca of the issue": "N/A - todos los requisitos del problem statement funcionan. Solo notas opcionales: (1) rate-limit no implementado (esperado, no rompe), (2) nav 'Widget Stats' es visible también para superadmin porque superadmin hereda isAdmin=true (patrón existente; no es un bug nuevo)."
+}

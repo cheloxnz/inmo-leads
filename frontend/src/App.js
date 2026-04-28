@@ -25,6 +25,7 @@ import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
 import PublicCatalog from './pages/PublicCatalog';
+import WidgetAnalytics from './pages/WidgetAnalytics';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
@@ -188,12 +189,22 @@ function Navigation() {
 
             <Link
               to="/catalogo"
-              className={`nav-link ${isActive('/catalogo') ? 'active' : ''}`}
+              className={`nav-link ${isActive('/catalogo') && !isActive('/catalogo/analytics') ? 'active' : ''}`}
               data-testid="nav-catalog"
               title="Catálogo"
             >
               <span className="icon"><Package size={16} /></span>
               {!isCollapsed && <span>Catalogo</span>}
+            </Link>
+
+            <Link
+              to="/catalogo/analytics"
+              className={`nav-link ${isActive('/catalogo/analytics') ? 'active' : ''}`}
+              data-testid="nav-widget-analytics"
+              title="Analytics del Widget"
+            >
+              <span className="icon">📊</span>
+              {!isCollapsed && <span>Widget Stats</span>}
             </Link>
 
             <Link
@@ -415,6 +426,11 @@ function AppContent() {
           <Route path="/catalogo" element={
             <ProtectedRoute adminOnly>
               <CatalogPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/catalogo/analytics" element={
+            <ProtectedRoute adminOnly>
+              <WidgetAnalytics />
             </ProtectedRoute>
           } />
           <Route path="/flujo" element={

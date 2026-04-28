@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Building2, Users, MessageSquare, Plus, Search, 
   ChevronDown, ChevronUp, Power, PowerOff, Settings,
-  Globe, CreditCard, Activity
+  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap
 } from 'lucide-react';
 
 export default function SuperAdminPanel() {
@@ -18,6 +18,7 @@ export default function SuperAdminPanel() {
   const [expandedTenant, setExpandedTenant] = useState(null);
   const [search, setSearch] = useState('');
   const [templates, setTemplates] = useState([]);
+  const [globalMetrics, setGlobalMetrics] = useState(null);
 
   const fetchTenants = useCallback(async () => {
     try {
@@ -39,10 +40,20 @@ export default function SuperAdminPanel() {
     }
   }, []);
 
+  const fetchGlobalMetrics = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/superadmin/metrics`);
+      setGlobalMetrics(res.data);
+    } catch (err) {
+      console.error('Error fetching global metrics:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTenants();
     fetchTemplates();
-  }, [fetchTenants, fetchTemplates]);
+    fetchGlobalMetrics();
+  }, [fetchTenants, fetchTemplates, fetchGlobalMetrics]);
 
   if (!isSuperAdmin) {
     return <div className="sa-denied" data-testid="sa-denied">Acceso denegado</div>;
@@ -64,6 +75,52 @@ export default function SuperAdminPanel() {
         <h1>Panel SuperAdmin</h1>
         <p>Gestion de clientes (tenants)</p>
       </div>
+
+      {/* Global SaaS Metrics */}
+      {globalMetrics && (
+        <div className="sa-global-metrics" data-testid="sa-global-metrics">
+          <Card className="sa-global-card sa-mrr">
+            <CardContent>
+              <DollarSign className="sa-global-icon" />
+              <div className="sa-global-value" data-testid="sa-mrr">${globalMetrics.mrr || 0}</div>
+              <div className="sa-global-label">MRR</div>
+              <div className="sa-global-sub">ARR ~${globalMetrics.arr_estimated || 0}</div>
+            </CardContent>
+          </Card>
+          <Card className="sa-global-card">
+            <CardContent>
+              <Building2 className="sa-global-icon" />
+              <div className="sa-global-value">{globalMetrics.tenants?.active || 0}</div>
+              <div className="sa-global-label">Activos</div>
+              <div className="sa-global-sub">{globalMetrics.tenants?.past_due || 0} morosos</div>
+            </CardContent>
+          </Card>
+          <Card className="sa-global-card">
+            <CardContent>
+              <TrendingDown className="sa-global-icon" />
+              <div className="sa-global-value">{globalMetrics.tenants?.churn_rate_pct || 0}%</div>
+              <div className="sa-global-label">Churn 30d</div>
+              <div className="sa-global-sub">{globalMetrics.tenants?.churned_last_30d || 0} cancelados</div>
+            </CardContent>
+          </Card>
+          <Card className="sa-global-card">
+            <CardContent>
+              <Zap className="sa-global-icon" />
+              <div className="sa-global-value">{globalMetrics.usage?.total_overage_messages || 0}</div>
+              <div className="sa-global-label">Overage IA</div>
+              <div className="sa-global-sub">{globalMetrics.usage?.total_ai_messages || 0} totales</div>
+            </CardContent>
+          </Card>
+          <Card className="sa-global-card">
+            <CardContent>
+              <DollarSign className="sa-global-icon" />
+              <div className="sa-global-value">${globalMetrics.revenue_last_30d?.total || 0}</div>
+              <div className="sa-global-label">Revenue 30d</div>
+              <div className="sa-global-sub">{globalMetrics.leads?.new_last_30d || 0} leads nuevos</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="sa-stats">
