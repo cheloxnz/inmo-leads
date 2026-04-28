@@ -94,6 +94,68 @@ class LLMService:
         response = await self._send_message(system_message, user_message)
         return {"parsed": response.strip(), "unclear": False}
 
+    async def generate_landing_copy(self, business_description: str) -> Dict:
+        """Genera copy para landing dinamica desde una descripcion del negocio.
+
+        Retorna: {
+            "business_tagline": "...",
+            "features": [{"icon": "home|calendar|message|shield|bot", "title": "...", "desc": "..."}, ...3],
+            "steps": [{"title": "...", "desc": "..."}, ...3]
+        }
+        """
+        if not self.client:
+            return {
+                "business_tagline": "Atencion 24/7 con IA por WhatsApp",
+                "features": [],
+                "steps": [],
+                "ai_enabled": False
+            }
+
+        system_message = """Eres un experto en marketing digital y copywriting.
+Dada una descripcion breve de un negocio, generas copy persuasivo para su landing page.
+Responde SOLO con un JSON valido (sin texto extra) con esta estructura exacta:
+{
+  "business_tagline": "Frase corta de 5-10 palabras",
+  "features": [
+    {"icon": "home|calendar|message|shield|bot", "title": "Titulo corto", "desc": "Descripcion de hasta 100 chars"},
+    {"icon": "...", "title": "...", "desc": "..."},
+    {"icon": "...", "title": "...", "desc": "..."}
+  ],
+  "steps": [
+    {"title": "Paso 1 corto", "desc": "Descripcion de hasta 80 chars"},
+    {"title": "Paso 2 corto", "desc": "Descripcion de hasta 80 chars"},
+    {"title": "Paso 3 corto", "desc": "Descripcion de hasta 80 chars"}
+  ]
+}
+Iconos validos: home, calendar, message, shield, bot.
+Escribi en ESPANOL rioplatense (vos en lugar de tu)."""
+
+        user_prompt = f"Descripcion del negocio: \"{business_description}\"\n\nGenera el JSON:"
+
+        try:
+            response = await self._send_message(system_message, user_prompt)
+            import json
+            import re
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if not match:
+                return {"business_tagline": "", "features": [], "steps": [], "ai_enabled": True, "error": "no JSON"}
+            parsed = json.loads(match.group(0))
+            valid_icons = {"home", "calendar", "message", "shield", "bot"}
+            features = parsed.get("features", [])[:3]
+            for f in features:
+                if f.get("icon") not in valid_icons:
+                    f["icon"] = "bot"
+            steps = parsed.get("steps", [])[:3]
+            return {
+                "business_tagline": (parsed.get("business_tagline") or "")[:120],
+                "features": features,
+                "steps": steps,
+                "ai_enabled": True
+            }
+        except Exception as e:
+            logger.error(f"Error en generate_landing_copy: {e}")
+            return {"business_tagline": "", "features": [], "steps": [], "ai_enabled": True, "error": str(e)}
+
     async def recommend_products(self, user_message: str, products: list, lead_context: Dict = None, max_results: int = 3) -> list:
         """
         Dado un mensaje del usuario y la lista de productos del tenant,

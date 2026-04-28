@@ -67,7 +67,8 @@ export default function DynamicLanding() {
   const t = tenantData.tenant;
   const businessName = t.business_name || t.name || 'Tu negocio';
   const tpl = getLandingTemplate(t.template_id, businessName);
-  const phone = (t.whatsapp_phone || '').replace(/[^0-9]/g, '');
+  const displayPhone = (t.whatsapp_display_phone || t.whatsapp_phone || '').replace(/[^0-9]/g, '');
+  const phone = displayPhone;
   const whatsappLink = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(tpl.cta_text)}`
     : '#';

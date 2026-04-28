@@ -6903,6 +6903,43 @@ body {
   gap: 0.5rem;
 }
 
+/* AI box + contrast hints + helper text in editor */
+.le-ai-box {
+  border: 1px solid #8b5cf6 !important;
+  background: linear-gradient(135deg, rgba(139,92,246,0.04), rgba(99,102,241,0.04));
+}
+.le-ai-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem;
+}
+.le-ai-input {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.le-ai-input > div { flex: 1; }
+.le-helper {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+.le-contrast {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.le-contrast-aaa { background: rgba(16,185,129,0.12); color: #047857; }
+.le-contrast-aa { background: rgba(99,102,241,0.12); color: #4338ca; }
+.le-contrast-aa-large { background: rgba(245,158,11,0.12); color: #b45309; }
+.le-contrast-fail { background: rgba(220,38,38,0.12); color: #b91c1c; }
+
 
 .catalog-search, .catalog-filter {
   display: flex;

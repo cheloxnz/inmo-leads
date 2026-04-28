@@ -5,17 +5,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, ExternalLink, Save, Eye } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Save, Eye, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ALL_TEMPLATES } from '../data/landingTemplates';
+import { evaluateColorContrast } from '../utils/colorContrast';
 
 const ICON_OPTIONS = ['home', 'calendar', 'message', 'shield', 'bot'];
+
+function ContrastHint({ result }) {
+  if (!result) return null;
+  const cls = `le-contrast le-contrast-${result.level}`;
+  const Icon = result.level === 'fail' ? AlertTriangle : CheckCircle2;
+  return (
+    <div className={cls} data-testid={`contrast-${result.level}`}>
+      <Icon className="w-3 h-3" />
+      <span>{result.message}</span>
+    </div>
+  );
+}
 
 export default function LandingEditor() {
   const [data, setData] = useState({
     business_name: '',
     business_tagline: '',
     contact_phone: '',
+    whatsapp_display_phone: '',
     template_id: 'servicios',
     logo_url: '',
     primary_color: '#3b82f6',
@@ -26,6 +40,8 @@ export default function LandingEditor() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiDescription, setAiDescription] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   const fetchBranding = useCallback(async () => {
     try {
@@ -92,6 +108,7 @@ export default function LandingEditor() {
         business_name: data.business_name,
         business_tagline: data.business_tagline,
         contact_phone: data.contact_phone,
+        whatsapp_display_phone: data.whatsapp_display_phone,
         template_id: data.template_id,
         logo_url: data.logo_url,
         primary_color: data.primary_color,
@@ -102,11 +119,46 @@ export default function LandingEditor() {
       await axios.put(`${API}/auth/tenant/branding`, payload);
       toast.success('Branding guardado');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error guardando');
+      const detail = err.response?.data?.detail;
+      if (detail?.validation_errors) {
+        toast.error(detail.validation_errors.join(', '));
+      } else {
+        toast.error(detail || 'Error guardando');
+      }
     } finally {
       setSaving(false);
     }
   };
+
+  const generateWithAi = async () => {
+    if (!aiDescription.trim()) {
+      toast.error('Describí tu negocio en una línea');
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await axios.post(`${API}/auth/tenant/branding/ai-generate`, { description: aiDescription });
+      const r = res.data;
+      if (!r.ai_enabled) {
+        toast.warning('IA no configurada en este tenant. Configurá tu OpenAI API Key en /configuracion.');
+        return;
+      }
+      setData(prev => ({
+        ...prev,
+        business_tagline: r.business_tagline || prev.business_tagline,
+        custom_features: r.features?.length ? r.features : prev.custom_features,
+        custom_steps: r.steps?.length ? r.steps : prev.custom_steps,
+      }));
+      toast.success('Copy generado por IA. Revisalo y ajustá lo que necesites.');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Error generando copy');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const primaryContrast = evaluateColorContrast(data.primary_color);
+  const accentContrast = evaluateColorContrast(data.accent_color);
 
   const previewUrl = data.tenant_id ? `/inicio/${data.tenant_id}` : '';
 
@@ -138,6 +190,29 @@ export default function LandingEditor() {
       <div className="le-grid">
         {/* Form */}
         <div className="le-form">
+          <Card className="le-ai-box">
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" /> Generar con IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="le-ai-hint">Describí tu negocio en una línea y la IA genera tagline + features + pasos.</p>
+              <div className="le-ai-input">
+                <Input
+                  value={aiDescription}
+                  onChange={e => setAiDescription(e.target.value)}
+                  placeholder="Soy una clínica odontológica en Buenos Aires especializada en implantes"
+                  data-testid="le-ai-input"
+                />
+                <Button onClick={generateWithAi} disabled={aiLoading} data-testid="le-ai-generate">
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  {aiLoading ? 'Generando...' : 'Generar'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle className="text-sm">Información del negocio</CardTitle></CardHeader>
             <CardContent className="le-fields">
@@ -150,8 +225,14 @@ export default function LandingEditor() {
                 <Input id="le-bt" value={data.business_tagline || ''} onChange={e => update('business_tagline', e.target.value)} placeholder="Ej: Tu salud, nuestra prioridad" data-testid="le-tagline" />
               </div>
               <div>
-                <Label htmlFor="le-tel">WhatsApp (con código de país)</Label>
+                <Label htmlFor="le-tel">WhatsApp principal (con código país)</Label>
                 <Input id="le-tel" value={data.contact_phone || ''} onChange={e => update('contact_phone', e.target.value)} placeholder="5491133334444" data-testid="le-phone" />
+                <small className="le-helper">Número que recibe los mensajes del bot.</small>
+              </div>
+              <div>
+                <Label htmlFor="le-tel-display">WhatsApp para mostrar (opcional)</Label>
+                <Input id="le-tel-display" value={data.whatsapp_display_phone || ''} onChange={e => update('whatsapp_display_phone', e.target.value)} placeholder="Igual que el principal si lo dejás vacío" data-testid="le-phone-display" />
+                <small className="le-helper">Si querés que la landing muestre un número diferente al que opera el bot.</small>
               </div>
               <div>
                 <Label htmlFor="le-tpl">Rubro / Template</Label>
@@ -183,6 +264,7 @@ export default function LandingEditor() {
                   <input type="color" value={data.primary_color} onChange={e => update('primary_color', e.target.value)} data-testid="le-primary-color" />
                   <Input value={data.primary_color} onChange={e => update('primary_color', e.target.value)} />
                 </div>
+                <ContrastHint result={primaryContrast} />
               </div>
               <div>
                 <Label>Color de acento</Label>
@@ -190,6 +272,7 @@ export default function LandingEditor() {
                   <input type="color" value={data.accent_color} onChange={e => update('accent_color', e.target.value)} data-testid="le-accent-color" />
                   <Input value={data.accent_color} onChange={e => update('accent_color', e.target.value)} />
                 </div>
+                <ContrastHint result={accentContrast} />
               </div>
             </CardContent>
           </Card>

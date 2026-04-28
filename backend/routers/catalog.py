@@ -136,6 +136,7 @@ async def get_public_catalog(tenant_id: str, category: Optional[str] = None):
             "business_tagline": tenant.get("business_tagline", ""),
             "country": tenant.get("country", ""),
             "whatsapp_phone": tenant.get("contact_phone", ""),
+            "whatsapp_display_phone": tenant.get("whatsapp_display_phone", ""),
             "template_id": template_id,
             "logo_url": tenant.get("logo_url", ""),
             "primary_color": tenant.get("primary_color", ""),

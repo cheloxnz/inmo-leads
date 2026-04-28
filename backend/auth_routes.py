@@ -3,6 +3,9 @@ from typing import Optional, List
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 from models import Agent, AgentCreate, AgentLogin, User, Tenant, TenantCreate
 from auth import verify_password, get_password_hash, create_access_token, decode_access_token
@@ -361,13 +364,65 @@ async def update_tenant(
     return {"message": "Tenant actualizado"}
 
 
+import re
+
 # Branding: campos que el tenant admin puede editar de su propio tenant
 _BRANDING_ALLOWED_FIELDS = {
     "business_name", "business_tagline", "logo_url",
     "primary_color", "accent_color", "hero_bg_url",
-    "template_id", "contact_phone", "country",
-    "custom_features", "custom_steps",
+    "template_id", "contact_phone", "whatsapp_display_phone",
+    "country", "custom_features", "custom_steps",
 }
+
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+_URL_RE = re.compile(r"^https?://[^\s<>\"']+$")
+
+
+def _validate_branding_payload(data: dict) -> tuple[dict, list, list]:
+    """Valida y sanitiza payload de branding.
+
+    Retorna (safe, rejected, errors):
+      safe: dict con campos validos para guardar
+      rejected: campos no en whitelist (auditoria)
+      errors: lista de mensajes de error de validacion
+    """
+    safe = {}
+    rejected = []
+    errors = []
+
+    for k, v in (data or {}).items():
+        if k not in _BRANDING_ALLOWED_FIELDS:
+            rejected.append(k)
+            continue
+
+        # Validacion por tipo de campo
+        if k in ("primary_color", "accent_color"):
+            if v and not _HEX_COLOR_RE.match(str(v)):
+                errors.append(f"{k}: debe ser hex color #rrggbb")
+                continue
+        elif k in ("logo_url", "hero_bg_url"):
+            if v and not _URL_RE.match(str(v)):
+                errors.append(f"{k}: debe ser URL http(s) valida")
+                continue
+        elif k in ("custom_features", "custom_steps"):
+            if not isinstance(v, list):
+                errors.append(f"{k}: debe ser una lista")
+                continue
+            if len(v) > 5:
+                errors.append(f"{k}: maximo 5 items")
+                continue
+        elif k == "template_id":
+            valid = {"inmobiliaria", "clinica", "restaurante", "ecommerce", "servicios"}
+            if v not in valid:
+                errors.append(f"template_id: debe ser uno de {sorted(valid)}")
+                continue
+        elif isinstance(v, str) and len(v) > 500:
+            errors.append(f"{k}: demasiado largo (>500 chars)")
+            continue
+
+        safe[k] = v
+
+    return safe, rejected, errors
 
 
 @router.get("/tenant/branding")
@@ -406,10 +461,29 @@ async def update_my_branding(
     """Tenant admin: actualiza la branding/landing de su propio tenant"""
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="Sin tenant")
-    # Filtrar solo campos permitidos
-    safe = {k: v for k, v in (update_data or {}).items() if k in _BRANDING_ALLOWED_FIELDS}
+
+    safe, rejected, errors = _validate_branding_payload(update_data)
+
+    # Log de auditoria si hay rechazos por whitelist (intento de elevacion)
+    if rejected:
+        logger.warning(
+            f"[AUDIT] tenant={current_user.tenant_id} user={current_user.email} "
+            f"intento de modificar campos NO permitidos: {rejected}"
+        )
+        await db.audit_log.insert_one({
+            "tenant_id": current_user.tenant_id,
+            "user_email": current_user.email,
+            "action": "branding_rejected_fields",
+            "rejected_fields": rejected,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    if errors:
+        raise HTTPException(status_code=400, detail={"validation_errors": errors})
+
     if not safe:
         raise HTTPException(status_code=400, detail="Sin campos validos")
+
     safe["updated_at"] = datetime.utcnow().isoformat()
     result = await db.tenants.update_one(
         {"tenant_id": current_user.tenant_id},
@@ -417,7 +491,31 @@ async def update_my_branding(
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
-    return {"message": "Branding actualizado", "updated_fields": list(safe.keys())}
+    return {
+        "message": "Branding actualizado",
+        "updated_fields": list(safe.keys()),
+        "rejected_fields": rejected,
+    }
+
+
+@router.post("/tenant/branding/ai-generate")
+async def ai_generate_branding(
+    body: dict,
+    current_user: User = Depends(require_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Tenant admin: genera copy para landing usando IA desde una descripcion del negocio."""
+    description = (body or {}).get("description", "").strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="description es requerido")
+    if len(description) > 500:
+        raise HTTPException(status_code=400, detail="description demasiado larga (>500 chars)")
+
+    from llm_service import create_llm_for_tenant
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    llm = create_llm_for_tenant(tenant)
+    result = await llm.generate_landing_copy(description)
+    return result
 
 
 @router.delete("/tenants/{tenant_id}")
