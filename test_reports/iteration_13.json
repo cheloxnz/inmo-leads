@@ -1,0 +1,47 @@
+{
+  "summary": "Iter 13/14 - AI Flow Assistant nuevo + hardening AI Bot Config + branding subscription. Backend: 25/25 passed (1 skip esperado). Frontend E2E PASS para /flujo (AIFlowAssistant) y /config (AIBotConfigAssistant). Tests de regresion iter12 e iter13 (concurrency 3/3) verdes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter14_ai_flow_assistant.py",
+    "/app/backend/tests/test_iter12_ai_bot_config.py",
+    "/app/backend/tests/test_iter13_onboarding_concurrency.py",
+    "/app/test_reports/pytest/iter14_full.xml",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "action_items": [
+    "Ninguno bloqueante. Backend 25/25, frontend visual y funcional OK.",
+    "INFO: el test 'TestAIEditRateLimit::test_rate_limit_kicks_in' de iter12 ahora SKIPEA cuando no hay OPENAI_API_KEY (comportamiento esperado tras hardening: llm.client se chequea ANTES del rate-limit, asi que sin key no se consumen slots y nunca llega un 429). Si en el futuro se setea OPENAI_API_KEY, el test se re-habilita automaticamente.",
+    "INFO: el endpoint /tenant/branding esta montado bajo /api/auth/tenant/branding (auth_router prefix=/auth). El test_iter14 fue ajustado para usar la URL correcta. La PRD/spec menciona '/api/tenant/branding' que no existe; documentar la ruta real.",
+    "401-interceptor E2E: solo se gatilla con token presente + 401 backend. Borrar localStorage manualmente NO dispara el interceptor (correctamente: requiere token presente segun la condicion 'localStorage.getItem(token)'). La logica del interceptor en AuthContext.js (lineas 29-48) esta correcta: status===401 && localStorage.getItem('token') -> setToken(null) + window.location.href='/login?expired=1'. No es facilmente testeable E2E sin un token genuinamente expirado en el server."
+  ],
+  "critical_code_review_comments": [
+    "flow_ai.py: la mutacion del state intermedio durante validacion de confirmed_ops es correcta (re-leemos steps tras cada op aplicada) pero consume CPU si la lista es grande. Para >50 ops podria optimizarse, aunque el limite efectivo de instruction (500 chars) lo previene en la practica.",
+    "flow_ai.py linea 251: 'tenant = await db.tenants.find_one(...)' se hace en cada request. Cachear por TTL corto (60s) reduciria carga si el endpoint se vuelve popular.",
+    "flow_ai.py: el prompt SYSTEM_PROMPT incluye 'sin tildes' y 'snake_case' para field names pero NO valida que el LLM cumpla estrictamente. _validate_op aplica un fallback (custom_fields.campo_N) si el formato es invalido, lo cual es robusto.",
+    "AuthContext.js: el interceptor se monta en useEffect SIN deps array vacio depender de window? Idealmente useEffect(() => {...}, []) para que se monte una sola vez (verificar). Si se remonta en re-renders, podria registrar multiples interceptors.",
+    "Endpoint mismatch: spec dice '/api/tenant/branding' pero auth_router tiene prefix /auth, asi que la ruta real es '/api/auth/tenant/branding'. El frontend probablemente ya usa la ruta correcta pero conviene alinear documentacion.",
+    "flow_ai.py: no hay limite explicito en cantidad de operations por preview (la respuesta del LLM podria devolver 100 ops). Considerar truncar a 20 max para evitar UI lenta en el preview."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter14_ai_flow_assistant.py (nuevo: 12 tests)",
+    "/app/backend/tests/test_iter12_ai_bot_config.py (test_rate_limit_kicks_in ahora skipea si no hay OPENAI_API_KEY - comportamiento esperado tras hardening)"
+  ],
+  "success_rate": {
+    "backend": "100% (25/25 tests, 1 skip esperado)",
+    "frontend": "100% (todos los data-testid esperados encontrados, error 503 mostrado correctamente, posicion correcta de AIFlowAssistant arriba del welcome message)"
+  },
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant admin)",
+  "seed_data_creation": "El test test_apply_update_welcome_persists modifica custom_welcome_message del tenant 'demo-inmobiliaria' a 'TEST_iter14: Hola! Soy InmoBot, tu asesor virtual de prueba.' y test_apply_add_step_persists agrega un step con question='TEST_iter14 pregunta'. Para revertir, usar el boton 'Restaurar template' en /flujo o eliminar custom_flow_steps/custom_welcome_message del bot_config en MongoDB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests reside en /app/backend/tests/test_iter14_ai_flow_assistant.py (12 tests para flow-ai + branding subscription_plan). Iter12 tests siguen aplicables (10 PASS + 1 SKIP). Iter13 onboarding concurrency tests pasaron 3/3. Si se setea OPENAI_API_KEY en backend/.env, los tests test_no_openai_key_returns_503_without_consuming_slot fallaran (esperan 503) y test_rate_limit_kicks_in se re-habilitara. Endpoint correcto para branding: /api/auth/tenant/branding (NO /api/tenant/branding). El test verifico subscription_plan y subscription_status en la respuesta.",
+  "rca of the issue": "N/A - sin bugs. El unico cambio de comportamiento documentado (rate-limit no se ejercita sin OPENAI_API_KEY) es el resultado esperado del hardening: 'llm.client check antes del rate-limit'. El test viejo se actualizo para skipear elegantemente en este escenario."
+}

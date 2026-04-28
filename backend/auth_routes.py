@@ -461,6 +461,9 @@ async def get_my_branding(
         if k in _LIST_FIELDS and not isinstance(val, list):
             val = [] if not val else val
         out[k] = val
+    # Read-only: subscription info para que la UI muestre upsells/limites correctamente
+    out["subscription_plan"] = tenant.get("subscription_plan", "")
+    out["subscription_status"] = tenant.get("subscription_status", "")
     return out
 
 

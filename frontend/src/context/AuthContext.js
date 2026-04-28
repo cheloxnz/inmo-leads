@@ -26,6 +26,28 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // Global 401 interceptor: si el token expira, hacer logout y redirect a /login
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      (resp) => resp,
+      (error) => {
+        const status = error?.response?.status;
+        if (status === 401 && localStorage.getItem('token')) {
+          // Token invalido/expirado -> limpiar sesion
+          localStorage.removeItem('token');
+          setToken(null);
+          setUser(null);
+          delete axios.defaults.headers.common['Authorization'];
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login?expired=1';
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, []);
+
   // Verificar sesión al cargar
   useEffect(() => {
     const checkAuth = async () => {

@@ -40,6 +40,27 @@ class LLMService:
             logger.error(f"Error en OpenAI: {e}")
             return f"Error: {str(e)}"
 
+    async def send_message(self, system_message: str, user_message: str, max_tokens: int = 500) -> str:
+        """API publica: envia un mensaje al LLM. Levanta RuntimeError si no hay client.
+
+        max_tokens override permite responses mas largos (ej. flow trees)."""
+        if not self.client:
+            raise RuntimeError("LLM no configurado (api_key faltante)")
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_message},
+                ],
+                temperature=0.4,
+                max_tokens=max_tokens,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"Error en OpenAI (send_message): {e}")
+            raise
+
     async def classify_intent(self, user_message: str, intents: list = None) -> Dict:
         """Clasifica intencion del usuario (generico, configurable por template)"""
         intent_list = intents or ["comprar", "alquilar", "vender", "inversion", "consulta"]

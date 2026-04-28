@@ -5,24 +5,51 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Sparkles, CheckCircle2, XCircle, Loader2, RotateCcw, Crown, X } from 'lucide-react';
+import {
+  Sparkles, CheckCircle2, XCircle, Loader2, RotateCcw,
+  Plus, Pencil, Trash2, ArrowUpDown, MessageSquare,
+} from 'lucide-react';
 
-const FIELD_LABELS = {
-  business_hours_start: 'Hora inicio (Lun-Vie)',
-  business_hours_end: 'Hora fin (Lun-Vie)',
-  business_days: 'Dias laborales',
-  saturday_hours_start: 'Hora inicio (Sabado)',
-  saturday_hours_end: 'Hora fin (Sabado)',
-  auto_handoff_score: 'Score handoff humano',
-  warm_lead_reactivation_days: 'Dias reactivacion lead tibio',
-  appointment_reminder_hours: 'Recordatorio cita (horas antes)',
-  welcome_message: 'Mensaje de bienvenida',
+const OP_LABELS = {
+  add_step: { icon: Plus, label: 'Agregar paso', color: 'green' },
+  update_step: { icon: Pencil, label: 'Modificar paso', color: 'blue' },
+  remove_step: { icon: Trash2, label: 'Eliminar paso', color: 'red' },
+  reorder_step: { icon: ArrowUpDown, label: 'Reordenar paso', color: 'amber' },
+  update_welcome: { icon: MessageSquare, label: 'Mensaje bienvenida', color: 'purple' },
+  update_completion: { icon: MessageSquare, label: 'Mensaje cierre', color: 'purple' },
+  update_appointment: { icon: MessageSquare, label: 'Mensaje cita', color: 'purple' },
 };
 
-const formatValue = (v) => {
-  if (Array.isArray(v)) return v.join(', ');
-  if (v === undefined || v === null) return '—';
-  return String(v);
+const COLOR_CLASSES = {
+  green: 'bg-green-50 border-green-200 text-green-800',
+  blue: 'bg-blue-50 border-blue-200 text-blue-800',
+  red: 'bg-red-50 border-red-200 text-red-800',
+  amber: 'bg-amber-50 border-amber-200 text-amber-800',
+  purple: 'bg-purple-50 border-purple-200 text-purple-800',
+};
+
+const summarizeParams = (op, params) => {
+  if (!params) return '';
+  switch (op) {
+    case 'add_step':
+      return `"${params.question || ''}" (${params.type || 'text'})`;
+    case 'update_step': {
+      const parts = [];
+      if (params.question) parts.push(`pregunta="${params.question}"`);
+      if (params.type) parts.push(`tipo=${params.type}`);
+      return `${params.step_id}: ${parts.join(', ') || '(sin cambios)'}`;
+    }
+    case 'remove_step':
+      return `id=${params.step_id}`;
+    case 'reorder_step':
+      return `${params.step_id} → posición ${params.new_index}`;
+    case 'update_welcome':
+    case 'update_completion':
+    case 'update_appointment':
+      return `"${(params.text || '').slice(0, 80)}${(params.text || '').length > 80 ? '…' : ''}"`;
+    default:
+      return JSON.stringify(params).slice(0, 80);
+  }
 };
 
 const parseRetrySeconds = (msg) => {
@@ -30,9 +57,7 @@ const parseRetrySeconds = (msg) => {
   return m ? parseInt(m[1], 10) : null;
 };
 
-const PRO_PLANS = ['profesional', 'agencia', 'enterprise'];
-
-export default function AIBotConfigAssistant({ onApplied }) {
+export default function AIFlowAssistant({ onApplied }) {
   const [instruction, setInstruction] = useState('');
   const [examples, setExamples] = useState([]);
   const [rateLimit, setRateLimit] = useState(null);
@@ -41,34 +66,17 @@ export default function AIBotConfigAssistant({ onApplied }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [retryIn, setRetryIn] = useState(0);
-  const [showUpsell, setShowUpsell] = useState(false);
-  const [tenantPlan, setTenantPlan] = useState('');
   const countdownRef = useRef(null);
 
   useEffect(() => {
-    axios.get(`${API}/bot-config/ai-edit/info`)
+    axios.get(`${API}/flow/ai-edit/info`)
       .then(r => {
         setExamples(r.data.examples || []);
         setRateLimit(r.data.rate_limit);
       })
-      .catch((err) => {
-        // 401 lo maneja el interceptor global. Otros errores → silenciosos pero log.
-        if (err?.response?.status >= 500) {
-          console.warn('AI Assistant info error:', err.response?.data);
-        }
-      });
-    // Plan del tenant para upsell condicional
-    axios.get(`${API}/auth/me`)
-      .then(r => {
-        // /me devuelve agent doc; el plan vive en tenant. Hacemos un GET extra mejor.
-      })
-      .catch(() => {});
-    axios.get(`${API}/tenant/branding`)
-      .then(r => setTenantPlan((r.data?.subscription_plan || '').toLowerCase()))
       .catch(() => {});
   }, []);
 
-  // Countdown del retry-after cuando recibimos 429
   useEffect(() => {
     if (retryIn <= 0) {
       if (countdownRef.current) {
@@ -103,7 +111,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
     setError('');
     setPreview(null);
     try {
-      const r = await axios.post(`${API}/bot-config/ai-edit`, {
+      const r = await axios.post(`${API}/flow/ai-edit`, {
         instruction: instruction.trim(),
         confirm: false,
       });
@@ -111,11 +119,11 @@ export default function AIBotConfigAssistant({ onApplied }) {
       if (r.data.rate_limit) {
         setRateLimit(prev => ({ ...(prev || {}), ...r.data.rate_limit }));
       }
-      const validCount = (r.data.preview?.actions || []).length;
+      const validCount = (r.data.preview?.operations || []).length;
       if (validCount === 0) {
-        toast.warning('La IA no encontro cambios validos para aplicar');
+        toast.warning('La IA no encontro operaciones validas');
       } else {
-        toast.success(`${validCount} cambio(s) listos para revisar`);
+        toast.success(`${validCount} operacion(es) listas`);
       }
     } catch (err) {
       const status = err.response?.status;
@@ -134,23 +142,19 @@ export default function AIBotConfigAssistant({ onApplied }) {
   };
 
   const applyChanges = async () => {
-    if (!preview || !preview.actions?.length) return;
+    if (!preview || !preview.operations?.length) return;
     setApplying(true);
     try {
-      const r = await axios.post(`${API}/bot-config/ai-edit`, {
+      const r = await axios.post(`${API}/flow/ai-edit`, {
         instruction: instruction.trim(),
         confirm: true,
-        confirmed_actions: preview.actions.map(a => ({ field: a.field, value: a.value })),
+        confirmed_ops: preview.operations.map(o => ({ op: o.op, params: o.params })),
       });
       if (r.data.applied) {
-        toast.success(`Aplicados ${r.data.applied_fields?.length || 0} cambio(s)`);
+        toast.success(`Aplicadas ${r.data.applied_count || 0} operacion(es)`);
         setPreview(null);
         setInstruction('');
         if (onApplied) onApplied();
-        // Upsell post-apply (solo si no esta en plan pro)
-        if (!PRO_PLANS.includes(tenantPlan)) {
-          setShowUpsell(true);
-        }
       } else {
         toast.error('No se pudieron aplicar los cambios');
       }
@@ -165,57 +169,24 @@ export default function AIBotConfigAssistant({ onApplied }) {
   const previewBtnDisabled = loadingPreview || applying || !instruction.trim() || retryIn > 0;
 
   return (
-    <Card data-testid="ai-bot-config-assistant" className="border-purple-200">
+    <Card data-testid="ai-flow-assistant" className="border-purple-200 mb-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-purple-500" />
-          Asistente IA de Configuracion
+          Asistente IA del Flujo
           <Badge variant="outline" className="ml-auto text-xs">Beta</Badge>
         </CardTitle>
         <p className="text-sm text-gray-500 mt-1">
-          Modificá la configuración del bot escribiendo en lenguaje natural.
-          La IA propone los cambios y vos los confirmás antes de aplicar.
+          Editá el árbol del bot conversando: agregar/quitar/mover pasos, cambiar mensajes. La IA propone, vos aplicás.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {showUpsell && (
-          <div
-            data-testid="ai-bot-config-upsell"
-            className="relative p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-300 rounded-lg flex items-start gap-3"
-          >
-            <Crown className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 text-sm">
-              <p className="font-semibold text-amber-900">¡Buenísimo! Cambio aplicado.</p>
-              <p className="text-amber-800 mt-1">
-                ¿Sabías que en el plan <strong>Profesional</strong> tenés cambios IA ilimitados (hoy estás en {rateLimit?.max || 10}/h) y branding sin marca de InmoBot?
-              </p>
-              <a
-                href="/billing"
-                data-testid="ai-bot-config-upsell-cta"
-                className="inline-block mt-2 text-xs px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-medium transition-colors"
-              >
-                Ver planes →
-              </a>
-            </div>
-            <button
-              data-testid="ai-bot-config-upsell-close"
-              onClick={() => setShowUpsell(false)}
-              className="text-amber-500 hover:text-amber-700"
-              aria-label="Cerrar"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Instrucción
-          </label>
+          <label className="block text-sm font-medium mb-2">Instrucción</label>
           <textarea
-            data-testid="ai-bot-config-instruction"
+            data-testid="ai-flow-instruction"
             className="w-full min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-            placeholder='Ej: "Cambia el horario a 9 a 19hs de lunes a viernes y los sabados de 10 a 13hs"'
+            placeholder='Ej: "Agrega un paso para preguntar el barrio donde busca y otro para el rango de precio"'
             value={instruction}
             maxLength={500}
             onChange={(e) => setInstruction(e.target.value)}
@@ -224,7 +195,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
           <div className="flex justify-between text-xs text-gray-400 mt-1">
             <span>{instruction.length}/500</span>
             {rateLimit && (
-              <span data-testid="ai-bot-config-rate-limit">
+              <span data-testid="ai-flow-rate-limit">
                 {rateLimit.remaining ?? rateLimit.max} de {rateLimit.max} req/hora restantes
               </span>
             )}
@@ -233,7 +204,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
 
         {retryIn > 0 && (
           <div
-            data-testid="ai-bot-config-retry-countdown"
+            data-testid="ai-flow-retry-countdown"
             className="p-3 bg-orange-50 border border-orange-200 rounded-md text-sm text-orange-800 flex items-center gap-2"
           >
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -248,7 +219,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
               {examples.map((ex, i) => (
                 <button
                   key={i}
-                  data-testid={`ai-bot-config-example-${i}`}
+                  data-testid={`ai-flow-example-${i}`}
                   type="button"
                   className="text-xs px-3 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-full border border-purple-200 transition-colors"
                   onClick={() => setInstruction(ex)}
@@ -263,19 +234,19 @@ export default function AIBotConfigAssistant({ onApplied }) {
 
         <div className="flex gap-2">
           <Button
-            data-testid="ai-bot-config-preview-btn"
+            data-testid="ai-flow-preview-btn"
             onClick={requestPreview}
             disabled={previewBtnDisabled}
           >
             {loadingPreview ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generando…</>
             ) : (
-              <><Sparkles className="w-4 h-4 mr-2" />Previsualizar cambios</>
+              <><Sparkles className="w-4 h-4 mr-2" />Previsualizar operaciones</>
             )}
           </Button>
           {preview && (
             <Button
-              data-testid="ai-bot-config-reset-btn"
+              data-testid="ai-flow-reset-btn"
               variant="outline"
               onClick={reset}
               disabled={applying}
@@ -286,49 +257,56 @@ export default function AIBotConfigAssistant({ onApplied }) {
         </div>
 
         {error && (
-          <div data-testid="ai-bot-config-error" className="p-3 bg-red-50 border border-red-200 text-sm text-red-700 rounded-md">
+          <div data-testid="ai-flow-error" className="p-3 bg-red-50 border border-red-200 text-sm text-red-700 rounded-md">
             {error}
           </div>
         )}
 
         {preview && (
-          <div data-testid="ai-bot-config-preview" className="space-y-3 mt-4 border-t pt-4">
+          <div data-testid="ai-flow-preview" className="space-y-3 mt-4 border-t pt-4">
             {preview.summary && (
               <div className="text-sm italic text-gray-600">
                 <strong>Resumen:</strong> {preview.summary}
               </div>
             )}
 
-            {preview.actions?.length > 0 && (
+            {(preview.current_step_count !== undefined && preview.preview_step_count !== undefined) && (
+              <div className="text-xs text-gray-500">
+                Pasos: <span className="font-mono">{preview.current_step_count}</span>
+                {' → '}
+                <span className="font-mono font-semibold text-purple-700">{preview.preview_step_count}</span>
+              </div>
+            )}
+
+            {preview.operations?.length > 0 && (
               <div>
                 <p className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  {preview.actions.length} cambio(s) válido(s)
+                  {preview.operations.length} operación(es) válida(s)
                 </p>
                 <div className="space-y-2">
-                  {preview.actions.map((a, i) => (
-                    <div
-                      key={i}
-                      data-testid={`ai-bot-config-action-${i}`}
-                      className="p-3 bg-green-50 border border-green-200 rounded-md text-sm"
-                    >
-                      <div className="font-medium">
-                        {FIELD_LABELS[a.field] || a.field}
+                  {preview.operations.map((o, i) => {
+                    const meta = OP_LABELS[o.op] || { icon: Pencil, label: o.op, color: 'blue' };
+                    const Icon = meta.icon;
+                    return (
+                      <div
+                        key={i}
+                        data-testid={`ai-flow-op-${i}`}
+                        className={`p-3 border rounded-md text-sm ${COLOR_CLASSES[meta.color]}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium">
+                          <Icon className="w-4 h-4" />
+                          {meta.label}
+                        </div>
+                        <div className="text-xs mt-1 opacity-90 font-mono">
+                          {summarizeParams(o.op, o.params)}
+                        </div>
+                        {o.explanation && (
+                          <div className="text-xs mt-1 opacity-75 italic">{o.explanation}</div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        <span className="line-through text-gray-400">
-                          {formatValue(a.previous)}
-                        </span>
-                        {' → '}
-                        <span className="text-green-700 font-mono">
-                          {formatValue(a.value)}
-                        </span>
-                      </div>
-                      {a.explanation && (
-                        <div className="text-xs text-gray-500 mt-1">{a.explanation}</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -337,31 +315,31 @@ export default function AIBotConfigAssistant({ onApplied }) {
               <div>
                 <p className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-1">
                   <XCircle className="w-4 h-4" />
-                  {preview.invalid.length} cambio(s) rechazado(s)
+                  {preview.invalid.length} operación(es) rechazada(s)
                 </p>
                 <div className="space-y-1">
                   {preview.invalid.map((inv, i) => (
                     <div
                       key={i}
-                      data-testid={`ai-bot-config-invalid-${i}`}
+                      data-testid={`ai-flow-invalid-${i}`}
                       className="p-2 bg-red-50 border border-red-200 rounded-md text-xs text-red-700"
                     >
-                      <strong>{inv.field || '?'}:</strong> {inv.reason}
+                      <strong>{inv.op || '?'}:</strong> {inv.reason}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {preview.actions?.length === 0 && preview.invalid?.length === 0 && (
+            {preview.operations?.length === 0 && preview.invalid?.length === 0 && (
               <div className="text-sm text-gray-500">
-                La IA no propuso ningún cambio. Probá con una instrucción más específica.
+                La IA no propuso ninguna operación. Probá con una instrucción más específica.
               </div>
             )}
 
-            {preview.actions?.length > 0 && (
+            {preview.operations?.length > 0 && (
               <Button
-                data-testid="ai-bot-config-apply-btn"
+                data-testid="ai-flow-apply-btn"
                 onClick={applyChanges}
                 disabled={applying}
                 className="bg-green-600 hover:bg-green-700"
@@ -369,7 +347,7 @@ export default function AIBotConfigAssistant({ onApplied }) {
                 {applying ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Aplicando…</>
                 ) : (
-                  <><CheckCircle2 className="w-4 h-4 mr-2" />Aplicar {preview.actions.length} cambio(s)</>
+                  <><CheckCircle2 className="w-4 h-4 mr-2" />Aplicar {preview.operations.length} operación(es)</>
                 )}
               </Button>
             )}

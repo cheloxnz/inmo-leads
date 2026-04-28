@@ -9,6 +9,7 @@ import {
   MessageSquare, ListChecks, Type, Save, RotateCcw, Pencil,
   Sparkles, ArrowDown
 } from 'lucide-react';
+import AIFlowAssistant from './AIFlowAssistant';
 
 export default function FlowBuilder() {
   const [config, setConfig] = useState(null);
@@ -161,6 +162,9 @@ export default function FlowBuilder() {
           </Button>
         </div>
       </div>
+
+      {/* AI Flow Assistant */}
+      <AIFlowAssistant onApplied={fetchConfig} />
 
       {/* Welcome Message */}
       <Card className="fb-section">

@@ -202,7 +202,7 @@ async def ai_edit_bot_config(
     )
 
     try:
-        response = await llm._send_message(SYSTEM_PROMPT, user_prompt)
+        response = await llm.send_message(SYSTEM_PROMPT, user_prompt, max_tokens=600)
     except Exception as e:
         logger.error(f"Error llamando IA: {e}")
         raise HTTPException(status_code=502, detail=f"Error IA: {e}")
