@@ -34,7 +34,20 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-27 (Sesión Actual - Action Items + Refactor)
+### 2026-04-28 (Sesión Actual - Backlog + Sugerencia SaaS)
+- **Backlog completados:**
+  - **Bulk-write backfill** de `product_id` en `catalog_service.get_products` (1 op vs N ops).
+  - **Router metrics.py** extraído: 5 endpoints (`/metrics/leads-by-day`, `/leads-by-status`, `/leads-by-intent`, `/conversion-funnel`, `/messages`).
+  - **AI Recommendations** en `LLMService.recommend_products` + integración en `generic_flow._handle_catalog_request` (envía carrusel personalizado si LLM habilitado + lead tiene contexto).
+- **Nueva Feature: Catálogo Público Embebible:**
+  - `GET /api/public/catalog/{tenant_id}` (sin auth) retorna tenant info + products (sin tenant_id leak) + categorías. 404 si tenant no existe.
+  - `POST /api/public/catalog/{tenant_id}/recommend` recomendaciones IA públicas.
+  - `POST /api/catalog/recommend` (auth) para preview desde dashboard admin.
+  - **React widget** `/p/catalogo/:tenantId`: página pública embebible con buscador IA, filtros, grid, CTA WhatsApp, modo embed (`?embed=1`), document.title con branding.
+  - **UI dashboard** en `CatalogPage.js`: nuevo `catalog-pro-panel` con link público copiable + preview IA inline.
+- **Testing 100% PASS** (21/21 iter_5 + regresión): `/app/test_reports/iteration_5.json`
+
+### 2026-04-27 (Sesión Anterior - Action Items + Refactor)
 - **Action Items completados:**
   - **product_id UUID:** Catalog migrado a `product_id` UUID. Backfill automático en `get_products` para productos legacy. Endpoints PUT/DELETE `/api/catalog/{product_id}` ahora usan UUID. Frontend (`CatalogPage.js`) actualizado.
   - **Cross-tenant validation:** `POST /api/catalog/send/{phone}` rechaza con 403 si el phone pertenece a otro tenant.

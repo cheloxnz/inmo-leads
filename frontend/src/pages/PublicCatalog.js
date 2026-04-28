@@ -23,6 +23,10 @@ export default function PublicCatalog() {
     try {
       const res = await axios.get(`${BACKEND}/api/public/catalog/${tenantId}`);
       setData(res.data);
+      // SEO/branding: setear document.title con el tenant
+      if (res.data?.tenant?.business_name) {
+        document.title = `${res.data.tenant.business_name} - Catalogo`;
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Catalogo no disponible');
     } finally {
