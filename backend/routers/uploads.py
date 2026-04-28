@@ -26,8 +26,10 @@ async def upload_logo(
     file: UploadFile = File(...),
     current_user: User = Depends(require_admin),
 ):
-    """Admin: sube un logo y devuelve la URL publica."""
-    # Validar tipo
+    """Admin: sube un logo y devuelve la URL publica.
+    Lee el archivo en chunks abortando temprano si excede MAX_FILE_SIZE.
+    """
+    # Validar tipo (antes de leer body para no malgastar memoria)
     content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0]
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -35,12 +37,23 @@ async def upload_logo(
             detail=f"Tipo no permitido: {content_type}. Permitidos: jpg, png, webp, svg, gif."
         )
 
-    # Leer contenido validando tamaño
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="Archivo demasiado grande (max 2 MB)")
-    if len(content) == 0:
+    # Lectura streaming en chunks de 64KB; abortar si supera MAX_FILE_SIZE
+    chunks = []
+    total = 0
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Archivo demasiado grande (max 2 MB)")
+        chunks.append(chunk)
+
+    if total == 0:
         raise HTTPException(status_code=400, detail="Archivo vacio")
+
+    content = b"".join(chunks)
 
     # Extension segura
     ext_map = {
@@ -66,7 +79,7 @@ async def upload_logo(
     return {
         "url": public_url,
         "filename": filename,
-        "size_bytes": len(content),
+        "size_bytes": total,
         "content_type": content_type,
     }
 

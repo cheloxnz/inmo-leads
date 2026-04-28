@@ -374,6 +374,7 @@ _BRANDING_ALLOWED_FIELDS = {
     "primary_color", "accent_color", "hero_bg_url",
     "template_id", "contact_phone", "whatsapp_display_phone",
     "country", "custom_features", "custom_steps",
+    "palette_warn_disabled",
 }
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -417,6 +418,10 @@ def _validate_branding_payload(data: dict) -> tuple[dict, list, list]:
                 continue
             if len(v) > 5:
                 errors.append(f"{k}: maximo 5 items")
+                continue
+        elif k == "palette_warn_disabled":
+            if not isinstance(v, bool):
+                errors.append(f"{k}: debe ser true/false")
                 continue
         elif k == "template_id":
             valid = {"inmobiliaria", "clinica", "restaurante", "ecommerce", "servicios"}
@@ -519,27 +524,23 @@ async def ai_generate_branding(
     if len(description) > 500:
         raise HTTPException(status_code=400, detail="description demasiado larga (>500 chars)")
 
-    # Rate-limit por tenant
-    tenant_id = current_user.tenant_id
-    now = time.time()
-    bucket = _ai_rate_buckets[tenant_id]
-    while bucket and bucket[0] < now - _AI_RATE_WINDOW:
-        bucket.popleft()
-    if len(bucket) >= _AI_RATE_MAX:
-        oldest = bucket[0]
-        retry_in = int(_AI_RATE_WINDOW - (now - oldest))
+    # Rate-limit por tenant (Redis-backed con fallback in-memory)
+    from rate_limit import check_rate_limit, get_retry_after
+    rate_key = f"ai-gen:{current_user.tenant_id}"
+    allowed, remaining = await check_rate_limit(rate_key, _AI_RATE_MAX, _AI_RATE_WINDOW)
+    if not allowed:
+        retry_in = await get_retry_after(rate_key, _AI_RATE_WINDOW)
         raise HTTPException(
             status_code=429,
             detail=f"Limite de IA alcanzado ({_AI_RATE_MAX}/hora). Reintentar en {retry_in}s."
         )
-    bucket.append(now)
 
     from llm_service import create_llm_for_tenant
-    tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
     llm = create_llm_for_tenant(tenant)
     result = await llm.generate_landing_copy(description)
     result["rate_limit"] = {
-        "remaining": _AI_RATE_MAX - len(bucket),
+        "remaining": remaining,
         "max": _AI_RATE_MAX,
         "window_seconds": _AI_RATE_WINDOW
     }

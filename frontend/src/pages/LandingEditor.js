@@ -36,6 +36,7 @@ export default function LandingEditor() {
     accent_color: '#8b5cf6',
     custom_features: [],
     custom_steps: [],
+    palette_warn_disabled: false,
     tenant_id: '',
   });
   const [loading, setLoading] = useState(true);
@@ -115,6 +116,7 @@ export default function LandingEditor() {
         accent_color: data.accent_color,
         custom_features: data.custom_features,
         custom_steps: data.custom_steps,
+        palette_warn_disabled: !!data.palette_warn_disabled,
       };
       await axios.put(`${API}/auth/tenant/branding`, payload);
       toast.success('Branding guardado');
@@ -313,9 +315,20 @@ export default function LandingEditor() {
               </div>
             </CardContent>
             {paletteHarmony.level !== 'ok' || paletteHarmony.message ? (
-              <div className={`le-palette-hint le-palette-${paletteHarmony.level}`} data-testid="palette-hint">
-                {paletteHarmony.message}
-              </div>
+              !data.palette_warn_disabled && (
+                <div className={`le-palette-hint le-palette-${paletteHarmony.level}`} data-testid="palette-hint">
+                  {paletteHarmony.message}
+                  {(paletteHarmony.level === 'warn-low' || paletteHarmony.level === 'warn-high') && (
+                    <button
+                      onClick={() => update('palette_warn_disabled', true)}
+                      className="le-palette-dismiss"
+                      data-testid="palette-dismiss"
+                    >
+                      No mostrar más (uso paleta intencional)
+                    </button>
+                  )}
+                </div>
+              )
             ) : null}
           </Card>
 

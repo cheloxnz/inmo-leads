@@ -6950,6 +6950,19 @@ body {
 .le-palette-warn-low { background: rgba(245,158,11,0.12); color: #b45309; }
 .le-palette-warn-high { background: rgba(220,38,38,0.12); color: #b91c1c; }
 .le-palette-ok { background: rgba(16,185,129,0.12); color: #047857; }
+.le-palette-dismiss {
+  display: block;
+  margin-top: 0.4rem;
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  color: inherit;
+  font-weight: 500;
+}
+.le-palette-dismiss:hover { opacity: 0.8; }
 
 /* Logo upload */
 .le-logo-upload {

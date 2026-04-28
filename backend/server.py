@@ -1643,6 +1643,17 @@ async def startup_event():
     global assignment_engine
     logger.info("Iniciando tareas programadas...")
     assignment_engine = AssignmentEngine(db)
+
+    # Indices uniqueness para evitar race conditions
+    try:
+        await db.tenants.create_index("tenant_id", unique=True)
+        await db.agents.create_index("email", unique=True)
+        await db.products.create_index([("tenant_id", 1), ("product_id", 1)], unique=True)
+        await db.widget_analytics.create_index([("tenant_id", 1), ("event_type", 1), ("created_at", -1)])
+        logger.info("Indices unique creados/verificados")
+    except Exception as e:
+        logger.warning(f"No se pudieron crear indices unique: {e}")
+
     await scheduler.start()
 
 

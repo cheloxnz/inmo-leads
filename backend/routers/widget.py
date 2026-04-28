@@ -53,9 +53,11 @@ async def track_widget_event(tenant_id: str, request: Request, body: dict):
     user_agent = request.headers.get("user-agent", "")
     referrer = request.headers.get("referer", "") or (body or {}).get("referrer", "")
 
-    # Rate limit por (ip, tenant_id)
-    rate_key = f"{client_ip}:{tenant_id}"
-    if not _check_rate_limit(rate_key):
+    # Rate limit por (ip, tenant_id) - Redis con fallback in-memory
+    from rate_limit import check_rate_limit
+    rate_key = f"track:{client_ip}:{tenant_id}"
+    allowed, _ = await check_rate_limit(rate_key, _RATE_LIMIT_MAX, _RATE_LIMIT_WINDOW)
+    if not allowed:
         raise HTTPException(status_code=429, detail="Demasiadas solicitudes")
 
     return await widget_service.track_event(

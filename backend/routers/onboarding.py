@@ -1,6 +1,7 @@
 """Router de auto-onboarding: crea tenant + usuario + landing + catalogo demo desde una descripcion."""
 import re
 import unicodedata
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -8,6 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from auth_routes import get_db
 from auth import get_password_hash, create_access_token
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["onboarding"])
 
 
@@ -96,6 +98,10 @@ async def auto_setup_tenant(
 
     if not business_name or not description or not email or not password:
         raise HTTPException(status_code=400, detail="business_name, description, email y password son requeridos")
+    if len(description) < 20:
+        raise HTTPException(status_code=400, detail="description minimo 20 caracteres")
+    if len(description) > 500:
+        raise HTTPException(status_code=400, detail="description demasiado larga (>500 chars)")
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="password minimo 8 caracteres")
     if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
@@ -135,7 +141,8 @@ async def auto_setup_tenant(
     if existing_user:
         raise HTTPException(status_code=409, detail="Email ya registrado")
 
-    # 4. Crear tenant
+    # 4. Crear tenant + agent + productos con rollback ante fallos
+    from pymongo.errors import DuplicateKeyError
     now_iso = datetime.now(timezone.utc).isoformat()
     tenant_doc = {
         "tenant_id": tenant_id,
@@ -154,7 +161,7 @@ async def auto_setup_tenant(
         "updated_at": now_iso,
     }
 
-    # 5. Llamar IA para tagline + features + steps
+    # 5. Llamar IA para tagline + features + steps (mejor effort)
     try:
         from llm_service import create_llm_for_tenant
         llm = create_llm_for_tenant(tenant_doc)
@@ -169,9 +176,14 @@ async def auto_setup_tenant(
         tenant_doc["business_tagline"] = "Atencion 24/7 con IA"
         ai_used = False
 
-    await db.tenants.insert_one(tenant_doc)
+    # 6. INSERT tenant (atrapando race condition con index unique)
+    try:
+        await db.tenants.insert_one(tenant_doc)
+    except DuplicateKeyError:
+        # Race condition: otro request creo el tenant mientras procesabamos
+        raise HTTPException(status_code=409, detail="Tenant ya existe (intentar de nuevo)")
 
-    # 6. Crear usuario admin
+    # 7. INSERT agent. Si falla, rollback del tenant.
     user_doc = {
         "email": email,
         "password_hash": get_password_hash(password),
@@ -182,9 +194,17 @@ async def auto_setup_tenant(
         "tenant_id": tenant_id,
         "created_at": now_iso,
     }
-    await db.agents.insert_one(user_doc)
+    try:
+        await db.agents.insert_one(user_doc)
+    except DuplicateKeyError:
+        # Rollback tenant
+        await db.tenants.delete_one({"tenant_id": tenant_id})
+        raise HTTPException(status_code=409, detail="Email ya registrado")
+    except Exception as e:
+        await db.tenants.delete_one({"tenant_id": tenant_id})
+        raise HTTPException(status_code=500, detail=f"Error creando usuario: {e}")
 
-    # 7. Insertar productos demo del rubro
+    # 8. INSERT productos demo. Si falla, rollback tenant + agent.
     import uuid
     demo = DEMO_PRODUCTS.get(detected, DEMO_PRODUCTS["servicios"])
     products_to_insert = []
@@ -198,9 +218,17 @@ async def auto_setup_tenant(
             **p,
         })
     if products_to_insert:
-        await db.products.insert_many(products_to_insert)
+        try:
+            await db.products.insert_many(products_to_insert)
+        except Exception as e:
+            # Rollback agent + tenant (productos no son criticos pero mantenemos consistencia)
+            logger.warning(f"Falla seed productos, rollback completo: {e}")
+            await db.products.delete_many({"tenant_id": tenant_id})
+            await db.agents.delete_one({"email": email})
+            await db.tenants.delete_one({"tenant_id": tenant_id})
+            raise HTTPException(status_code=500, detail="Error inicializando catalogo demo")
 
-    # 8. Token JWT para auto-login
+    # 9. Token JWT para auto-login
     token = create_access_token({
         "sub": email,
         "tenant_id": tenant_id,
