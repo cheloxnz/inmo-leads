@@ -1672,6 +1672,28 @@ async def startup_event():
         await db.coach_celebrations.create_index(
             "seen_at", expireAfterSeconds=30 * 86400, name="seen_at_ttl"
         )
+
+        # Migracion one-shot: dismissed_at legacy como string ISO -> BSON datetime
+        # (necesario para que el TTL index dismissed_at_ttl pueda purgarlos tras 90d)
+        legacy_count = await db.coach_nudges.count_documents({
+            "dismissed_at": {"$type": "string"}
+        })
+        if legacy_count:
+            from datetime import datetime as _dt
+            cursor = db.coach_nudges.find({"dismissed_at": {"$type": "string"}}, {"_id": 1, "dismissed_at": 1})
+            migrated = 0
+            async for doc in cursor:
+                try:
+                    val = doc["dismissed_at"]
+                    parsed = _dt.fromisoformat(val.replace("Z", "+00:00"))
+                    await db.coach_nudges.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"dismissed_at": parsed}},
+                    )
+                    migrated += 1
+                except Exception:
+                    pass
+            logger.info(f"Migrated {migrated} legacy dismissed_at strings -> BSON datetime")
         logger.info("Indices unique creados/verificados")
     except Exception as e:
         logger.warning(f"No se pudieron crear indices unique: {e}")

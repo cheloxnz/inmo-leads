@@ -34,7 +34,27 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Smart Onboarding Coach + cache + truncate + ROUTES.md)
+### 2026-04-28 (Sesión Actual - TTL/Severity/visibilitychange/Mock tests/Celebrations)
+- **TTL indexes en MongoDB:**
+  - `coach_nudges.dismissed_at` con `expireAfterSeconds=90*86400` (90 días) — purge automático de nudges descartados.
+  - `coach_celebrations.seen_at` con `expireAfterSeconds=30*86400` (30 días) — purge de celebraciones vistas.
+  - Migración one-shot al startup: convierte `dismissed_at` legacy (string ISO) a BSON datetime para que el TTL aplique. Probado: 4 docs migrados live.
+- **Severity Enum (`high|warn|info`)** en `routers/coach.py`. Validación defense-in-depth con fallback a `info` si check_fn devuelve valor inválido.
+- **Sistema de Celebrations** (live metrics combinado con Coach):
+  - 4 tipos: `whatsapp_connected`, `first_lead`, `branding_customized`, `first_ai_edit`. Cada uno con emoji, título festivo, body y CTA contextual.
+  - Endpoint `GET /api/coach/celebrations` evalúa lazy en cada request y devuelve no-vistas. `POST .../seen` marca como vista. Idempotente por unique compound `(tenant_id, celebration_type)`.
+  - Auto-trigger tras `dismiss` de nudge: si el signal subyacente está resuelto, crea celebración (mapping `whatsapp_unconfigured`→`whatsapp_connected`, etc.).
+  - UI `CoachCelebrations.js`: gradient verde emerald/teal, emoji grande 3xl, sparkles icon, max 2 visibles a la vez, mark-seen sin reload, return null si vacío.
+  - Integrado en Dashboard ARRIBA de CoachNudges para celebrar antes de nudgear.
+- **`visibilitychange` listener** en `CoachNudges.js` y `CoachCelebrations.js`: refresca al volver a la pestaña sin requerir reload manual.
+- **Tests E2E con OpenAI MOCKED via `respx`** (`test_iter16_llm_mocked.py`):
+  - 9 tests usando FastAPI TestClient + respx interceptor del endpoint `chat.completions`.
+  - Cubre: preview con LLM válido, JSON inválido → 502, OpenAI 5xx → 502, campos no-whitelist → invalid[], rate-limit 11vo=429, flow_ai truncate a 20 ops, apply path NO llama LLM (verificado por ausencia de mock match).
+  - Sin gastar créditos OpenAI reales. Reproducible 100% en CI.
+- **Tests:** Backend 9/9 iter16 + 35/36 regression (1 skip esperado). Frontend E2E 100%: dashboard renderiza celebraciones arriba de nudges, max 2, dismiss sin reload, visibilitychange OK.
+- **Archivos:** `/app/backend/routers/coach.py` (Severity enum + celebrations), `/app/backend/server.py` (TTL indexes + migración), `/app/backend/tests/test_iter16_llm_mocked.py` (nuevo), `/app/frontend/src/components/CoachCelebrations.js` (nuevo), `/app/frontend/src/components/CoachNudges.js` (visibilitychange), `/app/frontend/src/pages/Dashboard.js` (integración).
+
+### 2026-04-28 (Sesión Anterior - Smart Onboarding Coach + cache + truncate + ROUTES.md)
 - **Smart Onboarding Coach (`/api/coach/*`):** sistema de nudges contextuales para retención del trial.
   - 4 tipos de nudges declarativos:
     - `whatsapp_unconfigured` (high, ≥1 día sin token de WhatsApp)
