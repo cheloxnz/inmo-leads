@@ -1,0 +1,43 @@
+{
+  "summary": "Iter 15 - Smart Onboarding Coach + cache_util TTL + flow_ai truncate(20) + ROUTES.md docs. Backend: 10/10 pass (iter15) y 25/26 regression iter12+13+14 (1 skip esperado por OPENAI_API_KEY ausente). Frontend E2E: dashboard renderiza CoachNudges con whatsapp_unconfigured (severity high), dismiss funciona sin reload, empty-state retorna null correctamente, idempotencia + recreate-tras-dismiss verificados via API.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter15_coach_cache.py",
+    "/app/test_reports/pytest/iter15_results.xml",
+    "/app/test_reports/pytest/iter15_regression.xml"
+  ],
+  "action_items": [
+    "Ninguno bloqueante. Coach feature ready to ship.",
+    "INFO: el scheduler corrió 2 ciclos durante el testing (logs '[Scheduler] Onboarding Coach: N nudges nuevos sobre 16 tenants evaluados'). Confirmado que se ejecuta cada 6h tras los primeros 120s.",
+    "INFO: el demo tenant está en 'Promedio/lead' = 1 lead, por eso nudge no_leads_yet NO aparece (correcto: depende de whatsapp_access_token configurado, que NO está, así que igual nunca dispararía). default_branding y ai_unused podrían disparar pero solo whatsapp_unconfigured fue verificado in vivo (es el de severity high y es lo que pide el playbook)."
+  ],
+  "critical_code_review_comments": [
+    "coach.py _evaluate_tenant: la query existing en línea 131 hace find_one con {tenant_id, nudge_type, dismissed_at: None} sin índice. Para escala, agregar índice compuesto en coach_nudges (tenant_id, nudge_type, dismissed_at) reduciría latencia con >10k nudges activos.",
+    "coach.py: severity 'warn' no está mapeada en ningún Pydantic model (es free-string). Considerar Enum para evitar typos en el futuro (high|warn|info).",
+    "flow_ai.py línea 322 truncated: tiene un fallo sutil — usa len(parsed.get('operations') or []) > _MAX_OPS_PREVIEW comparando contra la lista ORIGINAL (no la truncada). Está correcto, pero la línea 321 ya hace el slice [:20]. OK no hay bug.",
+    "CoachNudges.js: useEffect deps array está vacío [] correctamente. No re-fetcha si el usuario navega y vuelve sin re-mount; aceptable para nudges (cron 6h). Si quisieras refetch al volver a la pestaña, agregar visibilitychange listener.",
+    "ROUTES.md: documentación clara y completa. El bloque sobre /api/auth/tenant/branding aclara correctamente la convención del prefix /auth y el por qué /api/tenant/branding NO existe."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter15_coach_cache.py (NUEVO: 10 tests)",
+    "/app/test_reports/iteration_14.json (este reporte)"
+  ],
+  "success_rate": {
+    "backend": "100% (35/36, 1 skip esperado por OPENAI_API_KEY ausente)",
+    "frontend": "100% (CoachNudges renderiza correctamente, dismiss sin reload, empty-state null, severity colors aplicados)"
+  },
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant admin demo-inmobiliaria, sin whatsapp_access_token, >7 días de antigüedad)",
+  "seed_data_creation": "El test crea (vía POST /coach/run) hasta 4 nudges en la col coach_nudges del tenant demo-inmobiliaria: whatsapp_unconfigured (siempre), default_branding y ai_unused (probables, dependen de signals). El test NO los limpia al final — quedan dismissed los descartados durante el flujo. Para reset completo: 'await db.coach_nudges.delete_many({\"tenant_id\": \"demo-inmobiliaria\"})'.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend tests reside en /app/backend/tests/test_iter15_coach_cache.py (10 tests: 6 endpoint coach + 2 cache_util TTL + 1 flow_ai truncate constant + 1 routes doc). Iter12 (10P/1S), iter13 (3P), iter14 (12P) siguen verdes. Endpoint correcto Coach: /api/coach/{nudges,run}; Branding: /api/auth/tenant/branding. Si se setea OPENAI_API_KEY, el test test_rate_limit_kicks_in de iter12 se re-habilita. La col coach_nudges es nueva. Idempotencia verificada: /coach/run 2da vez devuelve created=0; tras dismiss el mismo nudge_type SÍ se recrea (created=1) en /coach/run posterior, lo cual es correcto.",
+  "rca of the issue": "N/A - sin bugs encontrados. Las 4 mejoras del playbook están implementadas y funcionando: (1) ROUTES.md documenta /api/auth/tenant/branding, (2) flow_ai.py usa cache_util ttl=60s para tenant lookup, (3) flow_ai.py trunca operaciones a 20 con flag preview.truncated, (4) Coach completo con backend cron + 3 endpoints + frontend banner integrado en Dashboard."
+}

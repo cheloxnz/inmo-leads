@@ -21,12 +21,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth_routes import require_admin, get_db
 from models import User
 from rate_limit import check_rate_limit, get_retry_after
+from cache_util import ttl_cache_get, ttl_cache_set
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["flow-ai"])
 
 _RATE_MAX = 8
 _RATE_WINDOW = 3600
+_TENANT_CACHE_TTL = 60.0   # segundos
+_MAX_OPS_PREVIEW = 20      # tope defensivo contra respuestas LLM excesivas
 
 # Whitelist de operaciones
 _VALID_OPS = {
@@ -171,10 +174,16 @@ def _apply_ops(state: dict, ops: list) -> dict:
 
 
 async def _load_flow_state(db, current_user) -> dict:
-    """Lee el estado actual del flujo (custom + fallback al template base)."""
+    """Lee el estado actual del flujo (custom + fallback al template base).
+    Cachea tenant lookup por TTL corto para soportar trafico alto."""
     from flow_templates import get_template
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0}) or {}
-    base = get_template(tenant.get("template_id", "servicios"))
+    cached_tenant = ttl_cache_get("tenants", current_user.tenant_id)
+    if cached_tenant is None:
+        cached_tenant = await db.tenants.find_one(
+            {"tenant_id": current_user.tenant_id}, {"_id": 0}
+        ) or {}
+        ttl_cache_set("tenants", current_user.tenant_id, cached_tenant, ttl=_TENANT_CACHE_TTL)
+    base = get_template(cached_tenant.get("template_id", "servicios"))
     cfg = await db.bot_config.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0}) or {}
     return {
         "welcome_message": cfg.get("custom_welcome_message") or base.get("welcome_message", ""),
@@ -246,10 +255,16 @@ async def ai_edit_flow(
 
         return {"applied": True, "applied_count": len(valid), "invalid": invalid}
 
-    # Pre-check IA antes de rate-limit
+    # Pre-check IA antes de rate-limit (con cache de tenant)
     from llm_service import create_llm_for_tenant
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    llm = create_llm_for_tenant(tenant)
+    cached_tenant = ttl_cache_get("tenants", current_user.tenant_id)
+    if cached_tenant is None:
+        cached_tenant = await db.tenants.find_one(
+            {"tenant_id": current_user.tenant_id}, {"_id": 0}
+        )
+        if cached_tenant:
+            ttl_cache_set("tenants", current_user.tenant_id, cached_tenant, ttl=_TENANT_CACHE_TTL)
+    llm = create_llm_for_tenant(cached_tenant)
     if not llm.client:
         raise HTTPException(
             status_code=503,
@@ -302,7 +317,10 @@ async def ai_edit_flow(
     valid_ops = []
     invalid_ops = []
     sim_state = state
-    for op in parsed.get("operations") or []:
+    # Truncar a _MAX_OPS_PREVIEW como defensa ante respuestas LLM excesivas
+    raw_ops = (parsed.get("operations") or [])[:_MAX_OPS_PREVIEW]
+    truncated = len(parsed.get("operations") or []) > _MAX_OPS_PREVIEW
+    for op in raw_ops:
         err, normalized = _validate_op(op, sim_state["flow_steps"])
         if err:
             invalid_ops.append({"op": (op or {}).get("op"), "reason": err, "params": (op or {}).get("params")})
@@ -318,6 +336,8 @@ async def ai_edit_flow(
             "summary": parsed.get("summary", ""),
             "current_step_count": len(state["flow_steps"]),
             "preview_step_count": len(sim_state["flow_steps"]),
+            "truncated": truncated,
+            "max_ops": _MAX_OPS_PREVIEW,
         },
         "applied": False,
         "rate_limit": {"remaining": remaining, "max": _RATE_MAX, "window_seconds": _RATE_WINDOW},

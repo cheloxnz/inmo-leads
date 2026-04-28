@@ -4,6 +4,7 @@ import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import MetricsCharts from '../components/MetricsCharts';
 import UsagePanel from '../components/UsagePanel';
+import CoachNudges from '../components/CoachNudges';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
@@ -57,7 +58,9 @@ export default function Dashboard() {
         <h1>Dashboard</h1>
         <p className="subtitle">Métricas y estadísticas en tiempo real</p>
       </header>
-      
+
+      <CoachNudges />
+
       <div className="stats-grid">
         <Card className="stat-card" data-testid="stat-total-leads">
           <CardHeader>

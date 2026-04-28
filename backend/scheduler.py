@@ -25,6 +25,22 @@ class ScheduledTasks:
         asyncio.create_task(self.check_warm_lead_reactivation())
         asyncio.create_task(self.check_whatsapp_appointment_reminders())
         asyncio.create_task(self.bill_monthly_overage())
+        asyncio.create_task(self.run_onboarding_coach())
+
+    async def run_onboarding_coach(self):
+        """Cada 6 horas, evalua todos los tenants y crea nudges del Coach."""
+        await asyncio.sleep(120)  # esperar warmup
+        from routers.coach import run_coach_for_all_tenants
+        while self.running:
+            try:
+                result = await run_coach_for_all_tenants(self.db)
+                logger.info(
+                    f"[Scheduler] Onboarding Coach: {result.get('created', 0)} nudges nuevos "
+                    f"sobre {result.get('evaluated', 0)} tenants evaluados"
+                )
+            except Exception as e:
+                logger.error(f"[Scheduler] Coach error: {e}")
+            await asyncio.sleep(6 * 3600)
     
     async def bill_monthly_overage(self):
         """Factura overage de IA al inicio del mes (dia 1, 04:00 UTC).
