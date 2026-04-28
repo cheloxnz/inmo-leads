@@ -1,0 +1,32 @@
+{
+  "summary": "Re-test post-fix de los 2 bugs HIGH detectados en iter_7. AMBOS FIXES VALIDADOS. Se re-ejecuto la misma suite /app/backend/tests/test_iter7_rate_limit_attribution_templates.py y paso 19/20 (1 skip intencional de aislamiento). El test critico TestLeadAttribution::test_attribution_full_flow que FALLABA en iter_7 ahora PASA: lead.source='widget', lead.referring_product_id='TEST_PROP_123' y lead.widget_session_id='TEST_SESSION_ATTR' persisten en DB despues del save_lead siguiente. El branch generic_flow tambien queda cubierto porque el tenant demo-inmobiliaria no tiene campo template_id en DB, por lo que template_id default='servicios' -> use_generic=True -> ejecuta la rama fix 2 (updated_lead=lead). No aparecen NameError nuevos en backend.err.log desde el restart (ultimo ocurrio 2026-04-26, ahora es 2026-04-28 con fix aplicado). Regresion liviana OK: GET /api/templates, POST /track, rate-limit 30 OK + 10 x 429, GET /api/widget/analytics con bloque attribution.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A", "issue": "Warning passlib/bcrypt: 'module bcrypt has no attribute __about__' - no afecta funcionalidad, es incompat menor de version passlib vs bcrypt. No bloquea login. Considerar upgrade/pin de passlib."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_rate_limit_attribution_templates.py",
+    "/app/test_reports/pytest/iter8_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py linea 335-339: la logica 'use_generic = True' por default con override a False solo si template_id=='inmobiliaria' es correcta pero fragil. Si en el futuro se agregan mas templates con flujo propio (ej: 'medico', 'restaurante'), habria que convertir en un map template_id->flow_handler. Por ahora es aceptable.",
+    "server.py linea 350-352: generic_flow.process_message muta el objeto lead in-place y no retorna nada. El comentario '# generic_flow muta lead in-place; usar lead como updated_lead' aclara la intencion. Recomendable en una refactor futura: que ambos flows (generic_flow y bot_flow) retornen el lead actualizado consistentemente - eliminaria este tipo de bugs silenciosos.",
+    "Modelo Lead ahora tiene referring_product_id y widget_session_id como Optional[str] (models.py 159-160). Bien. Considerar indice en leads(tenant_id, source, created_at) si reports de attribution crecen."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (19 PASS + 1 skip intencional de 20)", "frontend": "N/A (backend only)"},
+  "test_credentials": "demo@inmobot.com / Demo123!  |  admin@inmobot.com / Admin123!",
+  "seed_data_creation": "El test TestLeadAttribution inserta click_whatsapp + lead + lead_generated event y los elimina en el finally. TestRateLimitTrack deja ~95 eventos 'view' en widget_analytics que se auto-desvanecen de la ventana de 60s.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Ambos fixes de iter_7 confirmados en iter_8. El test test_attribution_full_flow valida end-to-end: click_whatsapp -> handle_incoming_message -> generic_flow.process_message (muta lead) -> save_lead -> lead en DB tiene source=widget + referring_product_id + widget_session_id. Como el tenant demo-inmobiliaria tiene template_id default 'servicios', el flow atraviesa la rama use_generic=True (fix 2). No se requiere crear tenant adicional con template distinto. Si main agent agrega nuevos templates, considerar agregar un test especifico por template.",
+  "rca of the issue": "Fixes aplicados por E1 y validados: (1) server.py linea 260-265 ahora setea lead.source='widget', lead.referring_product_id, lead.widget_session_id en el OBJETO Lead (antes solo en lead_dict), por lo que el save_lead posterior que hace $set: lead.model_dump() ya no sobreescribe el source. (2) server.py linea 352 agrega updated_lead=lead despues de generic_flow.process_message (que muta lead in-place pero no retorna), evitando el NameError. (3) models.py linea 159-160 agrega referring_product_id y widget_session_id como Optional[str] al modelo Lead para consistencia."
+}

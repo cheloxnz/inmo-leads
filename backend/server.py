@@ -257,6 +257,9 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                     sort=[("created_at", -1)]
                 )
                 if recent_click:
+                    lead.source = "widget"
+                    lead.referring_product_id = recent_click.get("product_id")
+                    lead.widget_session_id = recent_click.get("session_id")
                     lead_dict["source"] = "widget"
                     lead_dict["referring_product_id"] = recent_click.get("product_id")
                     lead_dict["widget_session_id"] = recent_click.get("session_id")
@@ -345,6 +348,8 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                 # Pass tenant-specific LLM and WA service
                 generic_flow.llm = tenant_llm if ai_allowed else None
                 await generic_flow.process_message(lead, message_text, db, tenant_id, tenant_wa=active_wa)
+                # generic_flow muta lead in-place; usar lead como updated_lead
+                updated_lead = lead
             else:
                 updated_lead = await bot_flow.process_message(lead, message_text, db)
             

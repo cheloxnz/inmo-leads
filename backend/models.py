@@ -156,6 +156,8 @@ class Lead(BaseModel):
     last_message_at: datetime = Field(default_factory=datetime.utcnow)
     last_reactivation_email_at: Optional[datetime] = None
     source: str = "whatsapp"
+    referring_product_id: Optional[str] = None
+    widget_session_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
     conversation_history: List[dict] = Field(default_factory=list)
