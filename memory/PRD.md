@@ -34,7 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - AI Flow Editor + Hardening completo + Onboarding stress)
+### 2026-04-28 (Sesión Actual - Smart Onboarding Coach + cache + truncate + ROUTES.md)
+- **Smart Onboarding Coach (`/api/coach/*`):** sistema de nudges contextuales para retención del trial.
+  - 4 tipos de nudges declarativos:
+    - `whatsapp_unconfigured` (high, ≥1 día sin token de WhatsApp)
+    - `no_leads_yet` (warn, ≥3 días con WhatsApp pero 0 leads)
+    - `default_branding` (info, ≥5 días con colores/logo por defecto)
+    - `ai_unused` (info, ≥7 días sin usar Asistente IA bot_config_ai/flow_ai)
+  - Idempotencia: `(tenant_id, nudge_type, dismissed_at=None)` único activo por tipo. Tras dismiss, el mismo tipo SÍ puede recrearse.
+  - Endpoints: `GET /api/coach/nudges`, `POST /api/coach/nudges/{id}/dismiss`, `POST /api/coach/run` (admin manual trigger).
+  - Scheduler task `run_onboarding_coach` corre cada 6h sobre todos los tenants `active`.
+  - Índice compuesto `coach_nudges (tenant_id, nudge_type, dismissed_at)` + unique `nudge_id`.
+  - UI `CoachNudges.js` integrada en Dashboard (`/`): max 3 nudges visibles, severity styling (red/amber/blue), CTA contextual con icon, X dismiss sin reload, return null si no hay nudges (no contenedor vacío).
+- **Cache util TTL (`cache_util.py`):** namespace dict + monotonic clock. Aplicado en `flow_ai.py` para `tenant.find_one` (TTL 60s), reduce carga si el endpoint se vuelve popular.
+- **Truncate ops a 20 en flow_ai:** defensa ante respuestas LLM excesivas. `parsed.operations[:20]`, expone `preview.truncated=bool` y `preview.max_ops=20` para que la UI pueda alertar al usuario.
+- **Documentación de rutas (`/app/backend/ROUTES.md`):** referencia completa de prefijos, foco en `/api/auth/tenant/branding` (común confusión por el prefix `/auth`). Incluye Coach, Asistentes IA, Onboarding, Rate-Limiting.
+- **Tests:** Backend 10/10 passed (iter15) + 25/26 regression (1 skip esperado). Frontend E2E 100%: dashboard renderiza nudges con severity correcto, dismiss API integrado, idempotencia verificada.
+- **Archivos:** `/app/backend/routers/coach.py` (nuevo), `/app/backend/cache_util.py` (nuevo), `/app/backend/ROUTES.md` (nuevo), `/app/backend/scheduler.py` (run_onboarding_coach task), `/app/backend/server.py` (router + indices), `/app/backend/routers/flow_ai.py` (cache + truncate), `/app/frontend/src/components/CoachNudges.js` (nuevo), `/app/frontend/src/pages/Dashboard.js` (integración).
+
+### 2026-04-28 (Sesión Anterior - AI Flow Editor + Hardening completo + Onboarding stress)
 - **AI Flow Editor (`/api/flow/ai-edit`):** asistente IA que edita el árbol del FlowBuilder en lenguaje natural. Whitelist de 7 operaciones: `add_step`, `update_step`, `remove_step`, `reorder_step`, `update_welcome`, `update_completion`, `update_appointment`. Cada op valida tipo (text/buttons/list), límite de botones WhatsApp (max 3), preview en 2 pasos con `confirmed_ops`, audit log con diff completo, rate-limit 8/h por tenant.
   - UI: `AIFlowAssistant.js` integrado arriba del editor en `/flujo`. Iconografía + colores diferenciados por tipo de op, contador de pasos `current → preview`, mismas mejoras que AIBotConfig (countdown retry-after, deshabilitado durante 429).
 - **Hardening AI Bot Config Assistant:**

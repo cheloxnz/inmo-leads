@@ -1656,6 +1656,9 @@ async def startup_event():
         await db.agents.create_index("email", unique=True)
         await db.products.create_index([("tenant_id", 1), ("product_id", 1)], unique=True)
         await db.widget_analytics.create_index([("tenant_id", 1), ("event_type", 1), ("created_at", -1)])
+        # Coach: indice compuesto para acelerar lookup de nudges activos
+        await db.coach_nudges.create_index([("tenant_id", 1), ("nudge_type", 1), ("dismissed_at", 1)])
+        await db.coach_nudges.create_index([("nudge_id", 1)], unique=True)
         logger.info("Indices unique creados/verificados")
     except Exception as e:
         logger.warning(f"No se pudieron crear indices unique: {e}")
