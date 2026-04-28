@@ -6344,6 +6344,93 @@ body {
   flex-wrap: wrap;
 }
 
+/* Public link + AI preview panel */
+.catalog-pro-panel {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.catalog-pro-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.catalog-pro-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+.catalog-pro-link svg { color: #6366f1; }
+.catalog-pro-label { color: var(--text-secondary); font-weight: 500; }
+.catalog-pro-link code {
+  background: var(--bg-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+.catalog-pro-link button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.catalog-pro-link button:hover { background: var(--bg-secondary); }
+.catalog-pro-open {
+  color: #6366f1;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #6366f1;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+.catalog-pro-open:hover { background: #6366f1; color: #fff; }
+
+.catalog-ai-form {
+  background: linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05));
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+.catalog-ai-form svg { color: #6366f1; flex-shrink: 0; }
+.catalog-ai-form input {
+  flex: 1;
+  min-width: 200px;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+.catalog-ai-clear {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+.catalog-ai-result {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+.catalog-ai-result strong { display: block; margin-bottom: 0.25rem; color: #6366f1; }
+.catalog-ai-result ul { margin: 0; padding-left: 1.25rem; }
+.catalog-ai-result li { margin-bottom: 0.15rem; }
+
 .catalog-search, .catalog-filter {
   display: flex;
   align-items: center;

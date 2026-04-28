@@ -42,14 +42,19 @@ class CatalogService:
             query["category"] = category
 
         products = await self.db.products.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
-        # Backfill product_id si falta (para productos viejos)
+        # Backfill product_id con bulk_write si hay productos legacy sin id
+        from pymongo import UpdateOne
+        ops = []
         for p in products:
             if not p.get("product_id"):
-                p["product_id"] = str(uuid.uuid4())
-                await self.db.products.update_one(
-                    {"tenant_id": tenant_id, "name": p["name"]},
-                    {"$set": {"product_id": p["product_id"]}}
-                )
+                new_id = str(uuid.uuid4())
+                p["product_id"] = new_id
+                ops.append(UpdateOne(
+                    {"tenant_id": tenant_id, "name": p["name"], "product_id": {"$exists": False}},
+                    {"$set": {"product_id": new_id}}
+                ))
+        if ops:
+            await self.db.products.bulk_write(ops, ordered=False)
         return products
 
     async def get_product_by_id(self, tenant_id: str, product_id: str) -> Optional[dict]:

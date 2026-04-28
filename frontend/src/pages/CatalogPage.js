@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Pencil, Package, Tag, DollarSign,
-  Image, Send, X, Search, Filter
+  Image, Send, X, Search, Filter, Sparkles, Globe, Copy
 } from 'lucide-react';
 
 export default function CatalogPage() {
@@ -17,6 +17,11 @@ export default function CatalogPage() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [filterCategory, setFilterCategory] = useState('');
   const [search, setSearch] = useState('');
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiRecs, setAiRecs] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [publicLink, setPublicLink] = useState('');
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -40,6 +45,34 @@ export default function CatalogPage() {
   }, []);
 
   useEffect(() => { fetchProducts(); fetchCategories(); }, [fetchProducts, fetchCategories]);
+
+  // Compute public catalog link from tenant_id of first product (lazy)
+  useEffect(() => {
+    if (products.length > 0 && !publicLink) {
+      const tid = products[0].tenant_id;
+      if (tid) setPublicLink(`${window.location.origin}/p/catalogo/${tid}`);
+    }
+  }, [products, publicLink]);
+
+  const handleAiRecommend = async (e) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await axios.post(`${API}/catalog/recommend`, { query: aiQuery, max_results: 3 });
+      setAiRecs(res.data.recommendations || []);
+      setAiEnabled(res.data.ai_enabled);
+    } catch (err) {
+      toast.error('Error en recomendaciones IA');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const copyPublicLink = () => {
+    navigator.clipboard.writeText(publicLink);
+    toast.success('Link publico copiado');
+  };
 
   const handleDelete = async (product) => {
     if (!window.confirm(`Eliminar "${product.name}"?`)) return;
@@ -68,6 +101,50 @@ export default function CatalogPage() {
           <Plus className="w-4 h-4 mr-1" /> Nuevo Producto
         </Button>
       </div>
+
+      {/* Public link + AI preview */}
+      {products.length > 0 && (
+        <div className="catalog-pro-panel" data-testid="catalog-pro-panel">
+          <div className="catalog-pro-row">
+            <div className="catalog-pro-link">
+              <Globe className="w-4 h-4" />
+              <span className="catalog-pro-label">Link publico:</span>
+              <code data-testid="catalog-public-link">{publicLink}</code>
+              <button onClick={copyPublicLink} data-testid="catalog-copy-link" title="Copiar">
+                <Copy className="w-3 h-3" />
+              </button>
+              <a href={publicLink} target="_blank" rel="noopener noreferrer" className="catalog-pro-open">Abrir</a>
+            </div>
+          </div>
+          <form className="catalog-pro-row catalog-ai-form" onSubmit={handleAiRecommend}>
+            <Sparkles className="w-4 h-4" />
+            <input
+              placeholder="Preview IA: que buscaria un cliente? Ej: casa para familia..."
+              value={aiQuery}
+              onChange={e => setAiQuery(e.target.value)}
+              data-testid="catalog-ai-input"
+            />
+            <Button type="submit" disabled={aiLoading} data-testid="catalog-ai-submit" size="sm">
+              {aiLoading ? '...' : 'Probar IA'}
+            </Button>
+            {aiRecs.length > 0 && (
+              <button type="button" onClick={() => { setAiRecs([]); setAiQuery(''); }} className="catalog-ai-clear">
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </form>
+          {aiRecs.length > 0 && (
+            <div className="catalog-ai-result" data-testid="catalog-ai-result">
+              <strong>Top {aiRecs.length} recomendados{!aiEnabled ? ' (fallback, IA no configurada)' : ''}:</strong>
+              <ul>
+                {aiRecs.map(p => (
+                  <li key={p.product_id}>{p.name} {p.price ? `- $${p.price}` : ''} {p.category ? `(${p.category})` : ''}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="catalog-toolbar">

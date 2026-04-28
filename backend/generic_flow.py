@@ -395,6 +395,7 @@ class GenericFlowEngine:
 
     async def _handle_catalog_request(self, lead, db, tenant_id: str) -> bool:
         """Envia el catalogo de productos del tenant via WhatsApp interactive message.
+        Si hay LLM habilitado y el lead tiene contexto/intent, envia recomendaciones personalizadas.
 
         Retorna True si se envio el catalogo (debe saltarse el flujo regular).
         """
@@ -407,17 +408,45 @@ class GenericFlowEngine:
         if not products:
             return False  # no hay catalogo, dejar al flujo regular continuar
 
+        # Si hay LLM y el lead tiene contexto, pedir recomendaciones personalizadas
+        filtered = products
+        personalized = False
+        if self.llm and self.llm.enabled and len(products) > 3:
+            last_msg = ""
+            if lead.conversation_history:
+                for m in reversed(lead.conversation_history):
+                    if m.get("from") == "customer":
+                        last_msg = m.get("text", "")
+                        break
+            lead_ctx = {
+                "name": lead.name,
+                "intent": lead.intent,
+                "urgency": lead.urgency,
+                **(lead.custom_fields or {})
+            }
+            try:
+                rec_ids = await self.llm.recommend_products(last_msg, products, lead_ctx, max_results=3)
+                if rec_ids:
+                    filtered = [p for p in products if p.get("product_id") in rec_ids]
+                    # Ordenar por relevancia
+                    filtered.sort(key=lambda p: rec_ids.index(p["product_id"]))
+                    personalized = True
+            except Exception as e:
+                logger.error(f"Error recomendaciones IA: {e}")
+
         try:
-            if len(products) <= 3:
-                body_text, buttons = catalog.build_carousel_buttons(products)
+            header = "Recomendados para ti" if personalized else "Catalogo"
+            if len(filtered) <= 3:
+                body_text, buttons = catalog.build_carousel_buttons(filtered)
+                intro = "Basado en tu busqueda, estos son los mas recomendados:\n\n" if personalized else ""
                 self.wa.send_interactive_buttons(
                     lead.phone,
-                    body_text or "Mira nuestros productos:",
+                    intro + (body_text or "Mira nuestros productos:"),
                     buttons,
-                    header_text="Catalogo"
+                    header_text=header
                 )
             else:
-                list_data = catalog.build_product_list_message(products)
+                list_data = catalog.build_product_list_message(filtered, header=header)
                 self.wa.send_list_message(
                     lead.phone,
                     list_data["body"]["text"],
@@ -425,7 +454,7 @@ class GenericFlowEngine:
                     list_data["action"]["sections"],
                     header_text=list_data["header"]["text"]
                 )
-            self._add_bot_message(lead, f"[Catalogo enviado: {len(products)} productos]")
+            self._add_bot_message(lead, f"[Catalogo enviado: {len(filtered)} productos{'(personalizado)' if personalized else ''}]")
             return True
         except Exception as e:
             logger.error(f"Error enviando catalogo: {e}")

@@ -94,6 +94,59 @@ class LLMService:
         response = await self._send_message(system_message, user_message)
         return {"parsed": response.strip(), "unclear": False}
 
+    async def recommend_products(self, user_message: str, products: list, lead_context: Dict = None, max_results: int = 3) -> list:
+        """
+        Dado un mensaje del usuario y la lista de productos del tenant,
+        retorna los product_ids mas relevantes ordenados por relevancia.
+        Si LLM no esta habilitado o hay error, retorna los primeros N productos activos.
+        """
+        if not products:
+            return []
+
+        if not self.client:
+            return [p.get("product_id") for p in products[:max_results] if p.get("product_id")]
+
+        # Construye lista compacta de productos
+        lines = []
+        for p in products[:30]:  # tope para prompt
+            pid = p.get("product_id", "")
+            name = p.get("name", "")
+            desc = (p.get("description") or "")[:80]
+            price = p.get("price") or ""
+            cat = p.get("category") or ""
+            lines.append(f"- id={pid} | {name} | cat={cat} | precio={price} | {desc}")
+
+        ctx = ""
+        if lead_context:
+            ctx_parts = [f"{k}={v}" for k, v in lead_context.items() if v]
+            ctx = " Contexto del lead: " + ", ".join(ctx_parts)
+
+        system_message = f"""Eres un asistente de ventas. Dado un mensaje del cliente y un catalogo de productos, elige los {max_results} productos mas relevantes.
+Responde SOLO con un JSON array de strings con los product_id seleccionados, ordenados de mas a menos relevante.
+Ejemplo de respuesta valida: ["id1","id2","id3"]
+Si ningun producto es relevante, responde: []"""
+
+        user_prompt = f"""Mensaje del cliente: "{user_message}"{ctx}
+
+Catalogo disponible:
+{chr(10).join(lines)}
+
+Devuelve JSON array de hasta {max_results} product_id relevantes:"""
+
+        try:
+            response = await self._send_message(system_message, user_prompt)
+            import json
+            import re
+            match = re.search(r'\[.*?\]', response, re.DOTALL)
+            if not match:
+                return [p.get("product_id") for p in products[:max_results] if p.get("product_id")]
+            ids = json.loads(match.group(0))
+            valid_ids = {p.get("product_id") for p in products if p.get("product_id")}
+            return [i for i in ids if i in valid_ids][:max_results]
+        except Exception as e:
+            logger.error(f"Error en recommend_products: {e}")
+            return [p.get("product_id") for p in products[:max_results] if p.get("product_id")]
+
 
 def create_llm_for_tenant(tenant: dict = None) -> LLMService:
     """

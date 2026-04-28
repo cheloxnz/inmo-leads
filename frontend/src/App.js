@@ -24,6 +24,7 @@ import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
+import PublicCatalog from './pages/PublicCatalog';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
@@ -344,7 +345,7 @@ function AppContent() {
   const location = useLocation();
   
   // Páginas públicas que no necesitan el layout del dashboard
-  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login'];
+  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/p/'];
   const isPublicPage = publicPages.some(page => location.pathname.startsWith(page)) || location.pathname === '/inicio';
 
   if (loading) {
@@ -361,6 +362,7 @@ function AppContent() {
               isAuthenticated ? <Navigate to={isSuperAdmin ? "/superadmin" : isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
             } />
             <Route path="/inicio" element={<InmobiliariaLanding />} />
+            <Route path="/p/catalogo/:tenantId" element={<PublicCatalog />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
