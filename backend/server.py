@@ -131,23 +131,6 @@ async def root():
     return {"message": "InmoBot SaaS API"}
 
 
-@api_router.get("/templates")
-async def list_templates():
-    """Lista todos los templates de rubro disponibles"""
-    from flow_templates import get_all_templates
-    return get_all_templates()
-
-
-@api_router.get("/templates/{template_id}")
-async def get_template_detail(template_id: str):
-    """Obtiene detalle de un template"""
-    from flow_templates import get_template
-    template = get_template(template_id)
-    if template["id"] != template_id and template_id != "servicios":
-        raise HTTPException(status_code=404, detail="Template no encontrado")
-    return template
-
-
 @api_router.get("/webhook")
 async def verify_webhook(request: Request):
     """Verificación de webhook de WhatsApp (multi-tenant)"""
@@ -260,13 +243,44 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
             lead_dict = lead.model_dump()
             lead_dict["last_message_at"] = lead.last_message_at.isoformat()
             lead_dict["created_at"] = lead.created_at.isoformat()
+
+            # Lead Attribution: si hubo click_whatsapp reciente del widget (ultimos 30 min), atribuir al widget
+            try:
+                from datetime import timedelta as _td
+                cutoff = (datetime.utcnow() - _td(minutes=30)).isoformat()
+                recent_click = await db.widget_analytics.find_one(
+                    {
+                        "tenant_id": tenant_id,
+                        "event_type": "click_whatsapp",
+                        "created_at": {"$gte": cutoff}
+                    },
+                    sort=[("created_at", -1)]
+                )
+                if recent_click:
+                    lead_dict["source"] = "widget"
+                    lead_dict["referring_product_id"] = recent_click.get("product_id")
+                    lead_dict["widget_session_id"] = recent_click.get("session_id")
+                    # Emitir lead_generated event al analytics del widget
+                    await db.widget_analytics.insert_one({
+                        "tenant_id": tenant_id,
+                        "event_type": "lead_generated",
+                        "product_id": recent_click.get("product_id"),
+                        "session_id": recent_click.get("session_id"),
+                        "phone": sender,
+                        "ip_hash": recent_click.get("ip_hash", ""),
+                        "created_at": datetime.utcnow().isoformat(),
+                        "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                    })
+            except Exception as _attr_err:
+                logger.warning(f"Lead attribution fallo: {_attr_err}")
+
             await db.leads.insert_one(lead_dict)
             
             # 🔔 Notificar NUEVO LEAD (solo primer mensaje)
             await notification_manager.send_to_admins({
                 "type": "new_lead",
                 "title": "📥 Nuevo Lead",
-                "message": f"Nueva conversación iniciada desde {sender}",
+                "message": f"Nueva conversación iniciada desde {sender}{' (vino del catalogo web)' if lead_dict.get('source') == 'widget' else ''}",
                 "lead_phone": sender,
                 "timestamp": datetime.utcnow().isoformat()
             })
@@ -1594,6 +1608,7 @@ from routers.billing import router as billing_router
 from routers.metrics import router as metrics_router
 from routers.widget import router as widget_router
 from routers.superadmin import router as superadmin_router
+from routers.templates import router as templates_router
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1602,6 +1617,7 @@ app.include_router(billing_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
 app.include_router(widget_router, prefix="/api")
 app.include_router(superadmin_router, prefix="/api")
+app.include_router(templates_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

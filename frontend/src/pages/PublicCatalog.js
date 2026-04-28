@@ -62,6 +62,22 @@ export default function PublicCatalog() {
 
   useEffect(() => { fetchCatalog(); }, [fetchCatalog]);
 
+  // Si está embebido, emite la altura por postMessage para auto-resize del iframe
+  useEffect(() => {
+    if (!isEmbed) return;
+    const sendHeight = () => {
+      const h = document.documentElement.scrollHeight;
+      try {
+        window.parent.postMessage({ type: 'inmobot-resize', tenant: tenantId, height: h }, '*');
+      } catch (e) {}
+    };
+    sendHeight();
+    const ro = new ResizeObserver(sendHeight);
+    ro.observe(document.body);
+    window.addEventListener('load', sendHeight);
+    return () => { ro.disconnect(); window.removeEventListener('load', sendHeight); };
+  }, [isEmbed, tenantId, data, recommendations]);
+
   const handleRecommend = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;

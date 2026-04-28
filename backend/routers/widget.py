@@ -1,4 +1,6 @@
 """Router de widget analytics + widget.js drop-in"""
+import time
+from collections import defaultdict, deque
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
@@ -10,6 +12,29 @@ router = APIRouter(tags=["widget"])
 
 _db = get_db()
 widget_service = WidgetAnalyticsService(_db)
+
+# In-memory rate limit por IP+tenant: max 30 eventos / 60s
+_RATE_LIMIT_MAX = 30
+_RATE_LIMIT_WINDOW = 60  # segundos
+_rate_buckets = defaultdict(deque)
+
+
+def _check_rate_limit(key: str) -> bool:
+    """Sliding window rate limit. Retorna True si esta dentro del limite."""
+    now = time.time()
+    bucket = _rate_buckets[key]
+    # Drop timestamps fuera de la ventana
+    while bucket and bucket[0] < now - _RATE_LIMIT_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT_MAX:
+        return False
+    bucket.append(now)
+    # Garbage collect dicts grandes (proteccion de memoria)
+    if len(_rate_buckets) > 5000:
+        for k in list(_rate_buckets.keys())[:1000]:
+            if not _rate_buckets[k] or _rate_buckets[k][-1] < now - _RATE_LIMIT_WINDOW * 2:
+                _rate_buckets.pop(k, None)
+    return True
 
 
 @router.post("/public/catalog/{tenant_id}/track")
@@ -28,6 +53,11 @@ async def track_widget_event(tenant_id: str, request: Request, body: dict):
     user_agent = request.headers.get("user-agent", "")
     referrer = request.headers.get("referer", "") or (body or {}).get("referrer", "")
 
+    # Rate limit por (ip, tenant_id)
+    rate_key = f"{client_ip}:{tenant_id}"
+    if not _check_rate_limit(rate_key):
+        raise HTTPException(status_code=429, detail="Demasiadas solicitudes")
+
     return await widget_service.track_event(
         tenant_id=tenant_id,
         event_type=event_type,
@@ -43,7 +73,26 @@ async def track_widget_event(tenant_id: str, request: Request, body: dict):
 @router.get("/widget/analytics")
 async def get_widget_analytics(days: int = 30, current_user: User = Depends(require_admin)):
     """Admin: retorna metricas del widget del tenant"""
-    return await widget_service.get_analytics(current_user.tenant_id, days=days)
+    analytics = await widget_service.get_analytics(current_user.tenant_id, days=days)
+
+    # Agregar leads atribuidos al widget (source=widget)
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    since = (_dt.now(_tz.utc) - _td(days=days)).isoformat()
+    widget_leads = await _db.leads.count_documents({
+        "tenant_id": current_user.tenant_id,
+        "source": "widget",
+        "created_at": {"$gte": since}
+    })
+    total_leads = await _db.leads.count_documents({
+        "tenant_id": current_user.tenant_id,
+        "created_at": {"$gte": since}
+    })
+    analytics["attribution"] = {
+        "widget_leads": widget_leads,
+        "total_leads_period": total_leads,
+        "widget_share_pct": round((widget_leads / total_leads * 100), 1) if total_leads > 0 else 0
+    }
+    return analytics
 
 
 @router.get("/superadmin/widget/analytics")

@@ -1,0 +1,40 @@
+{
+  "summary": "Iteracion 7 - Validacion de rate-limit /track, Lead Attribution Engine, refactor templates router, iframe auto-resize postMessage y regresion. 18/20 tests backend PASS + 1 skip infra + 1 FAIL (bug real de attribution). Frontend postMessage 'inmobot-resize' emitido correctamente 5 veces con tenant+height validos cuando ?embed=1. Rate-limit sliding window funciona exacto: 30 OK + 10 x 429 en burst de 40; buckets por IP+tenant independientes. Templates: list+detalle 200, 404 en id invalido. Attribution endpoint /api/widget/analytics retorna attribution{widget_leads,total_leads_period,widget_share_pct}. BUG CRITICO encontrado: lead.source=widget se sobreescribe a 'whatsapp' por bot_flow.save_lead ($set con lead.model_dump() que usa el default del modelo).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "server.handle_incoming_message (linea 241-277)", "issue": "Bug de Lead Attribution: la atribucion setea 'source=widget' solo en lead_dict y en el insert inicial, pero el objeto Lead `lead` mantiene source='whatsapp' (default del modelo). Luego bot_flow.process_message -> save_lead hace db.leads.update_one con $set: lead.model_dump() que SOBREESCRIBE source de vuelta a 'whatsapp'. Resultado: lead queda con source='whatsapp' en DB, perdiendo la atribucion al widget. referring_product_id y widget_session_id SI persisten (no estan en Lead model, $set no los toca). lead_generated event SI se inserta correctamente. FIX: en server.py linea 260 agregar `lead.source = 'widget'` (y opcionalmente agregar los campos referring_product_id/widget_session_id al modelo Lead en models.py para consistencia).", "priority": "HIGH"},
+      {"endpoint": "server.handle_incoming_message (linea 347 generic_flow branch)", "issue": "generic_flow.process_message() no retorna el lead actualizado, pero linea 352+ accede a `updated_lead.status`, `updated_lead.flow_stage`, etc. -> NameError 'cannot access local variable updated_lead'. Swallowed por try/except linea 415. Afecta a TODOS los tenants con template != 'inmobiliaria'. Log: 'ERROR server:server.py:416 Error manejando mensaje entrante: cannot access local variable updated_lead where it is not associated with a value'. FIX: asignar `updated_lead = await generic_flow.process_message(...)` o usar `lead` directamente en el branch generic.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter7_rate_limit_attribution_templates.py",
+    "/app/test_reports/pytest/iter7_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: En /app/backend/server.py linea ~260 agregar `lead.source = 'widget'` dentro del bloque de attribution para que save_lead no sobreescriba el source (alternativamente: pasar referring_product_id y widget_session_id al modelo Lead).",
+    "CRITICAL: En /app/backend/server.py linea 347 (branch use_generic=True), asignar `updated_lead = await generic_flow.process_message(...)` o bien reemplazar usos de updated_lead por lead en el bloque use_generic para evitar NameError silencioso.",
+    "(Opcional) Agregar lead.source al set explicito en attribution y agregar campos referring_product_id, widget_session_id al modelo Lead en models.py."
+  ],
+  "critical_code_review_comments": [
+    "routers/widget.py rate-limit: sliding window in-memory con deque es correcto para single-instance; si escalan a multiples pods/workers esto se rompe (cada proceso tiene su buffer). Recomiendo usar Redis INCR+EXPIRE o NGINX limit_req si se despliega con replicas.",
+    "routers/templates.py linea 18: logica de validacion `if template["id"] != template_id and template_id != 'servicios'` es confusa. flow_templates.get_template() probablemente devuelve un default cuando no encuentra - mejor que get_template lance excepcion o retorne None y asi el 404 sea explicito.",
+    "server.py linea 247-275: try/except swallow silencioso que solo loguea warning - esta bien, pero el lead_generated event se inserta dentro del mismo try y depende del click encontrado; bueno tener timeout/indice en widget_analytics(tenant_id, event_type, created_at) para que el find_one sea rapido.",
+    "PublicCatalog.js linea 66-79: excelente uso de ResizeObserver + postMessage. Emite tambien al cambiar data/recommendations (dependencia del effect). Un edge-case: postMessage con target '*' -> en produccion deberia restringir a origen del parent si se conoce, por seguridad."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter7_rate_limit_attribution_templates.py (nuevo)"
+  ],
+  "success_rate": {"backend": "90% (18/20, 1 skip infra, 1 FAIL por bug real)", "frontend": "100% (postMessage + clase pc-embed)"},
+  "test_credentials": "demo@inmobot.com / Demo123!  |  admin@inmobot.com / Admin123!",
+  "seed_data_creation": "El test TestLeadAttribution inserta y borra al finalizar: click_whatsapp en widget_analytics, lead en leads collection y lead_generated event. TestRateLimitTrack deja ~95 eventos 'view' en widget_analytics (append-only) - se desvanecen de la ventana de 60s.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Rate-limit validado (30/60s por IP+tenant, 429 correcto, buckets independientes). Templates router refactored funciona (list+detalle+404). Frontend iframe auto-resize valido (5 postMessage 'inmobot-resize' con tenant+height al cargar ?embed=1). Attribution endpoint /api/widget/analytics retorna el bloque attribution correcto. BUG CRITICO a verificar despues del fix: que lead.source='widget' sobrevive el save_lead posterior y que referring_product_id/widget_session_id quedan en el doc final. El test test_attribution_full_flow re-ejecutado despues del fix debe pasar. Tambien verificar el branch generic_flow (template != inmobiliaria) para el NameError de updated_lead.",
+  "rca of the issue": "Lead Attribution bug RCA: (1) server.py linea 242 crea `lead = Lead(phone, tenant_id)` con source default 'whatsapp'. (2) linea 243 lead_dict = lead.model_dump() -> source='whatsapp'. (3) linea 260 lead_dict['source']='widget' (solo modifica el dict, no el objeto). (4) linea 277 db.leads.insert_one(lead_dict) -> DB tiene source='widget'. (5) linea 349 updated_lead = bot_flow.process_message(lead, ...) usa el objeto `lead` que aun tiene source='whatsapp'. (6) internamente save_lead hace update_one {$set: lead.model_dump()} -> source vuelve a 'whatsapp' en DB. FIX: en el bloque attribution agregar `lead.source = 'widget'` para que la version in-memory tambien refleje el cambio. Reproduccion: ver test TestLeadAttribution.test_attribution_full_flow en iter7 file."
+}

@@ -135,6 +135,31 @@ export default function WidgetAnalytics() {
         </CardContent>
       </Card>
 
+      {/* Attribution */}
+      {data.attribution && data.attribution.total_leads_period > 0 && (
+        <Card className="wa-section wa-attribution">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2"><Users className="w-4 h-4" /> Atribucion de Leads al Widget</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="wa-attr-row" data-testid="wa-attribution">
+              <div className="wa-attr-card">
+                <div className="wa-attr-value">{data.attribution.widget_leads}</div>
+                <div className="wa-attr-label">Leads del widget</div>
+              </div>
+              <div className="wa-attr-card">
+                <div className="wa-attr-value">{data.attribution.total_leads_period}</div>
+                <div className="wa-attr-label">Leads totales (periodo)</div>
+              </div>
+              <div className="wa-attr-card wa-attr-pct">
+                <div className="wa-attr-value">{data.attribution.widget_share_pct}%</div>
+                <div className="wa-attr-label">Share del widget</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Top products */}
       {data.top_products?.length > 0 && (
         <Card className="wa-section">
