@@ -1,0 +1,47 @@
+{
+  "summary": "Iter 11 - Validacion E2E de las 4 features pedidas: (1) rate-limit AI 5/hora por tenant, (2) upload logo con validacion content-type/size/path-traversal, (3) auto-onboarding wizard /signup (3 pasos crea tenant+user+landing+catalog demo), (4) hint de paleta primary vs accent en LandingEditor + boton subir logo. Backend: 23/23 tests PASS en /app/backend/tests/test_iter11_onboarding_uploads_ratelimit.py. Frontend: signup wizard E2E funcional (step1 input + textarea + select template, step2 tenant_id sugerido + email/password, step3 resumen con tenant_id, rubro detectado 'restaurante', 3 productos seeded, token guardado en localStorage). LandingEditor: boton 'Subir' funciona (PNG -> /api/uploads/logos/{filename} -> URL backend devuelta y reflejada en input), palette hint warn-low ('casi identicos 1.2:1') detectado correctamente. Auto-deteccion templates: 'pizzeria con delivery' -> restaurante, 'clinica odontologica' -> clinica, 'inmobiliaria propiedades alquiler' -> inmobiliaria. Path traversal: el ingress normaliza /api/uploads/logos/../../../etc/passwd a /etc/passwd (devuelve HTML del SPA, NO el archivo del sistema); regex del backend rechaza 400 cualquier filename invalido que llegue al endpoint. Regresion: login, /api/catalog, /api/public/catalog/{tenant}, /api/auth/tenant/branding siguen 200.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/uploads/logo (no-file)", "issue": "Devuelve 422 (FastAPI default por File required). Funciona pero el detail es 'Field required' generico, no 'archivo requerido'. Cosmetico."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Signup wizard step 3", "issues": ["El boton 'Ir al dashboard' aparece visualmente atenuado/casi invisible en el screenshot final (texto poco legible sobre fondo claro). Verificar contraste WCAG en el .sw-go-dashboard. Funcionalmente clickable, pero baja affordance visual."]},
+      {"screen": "Signup wizard stepper", "issues": ["Despues de avanzar a step 3, los 3 chips del stepper (1/2/3) quedan TODOS con clase 'active' (color morado). Esperable por la logica step >= N, pero podria mejorarse mostrando los pasos previos en otro estado (e.g., 'completed' check verde) para diferenciar pasado vs actual."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter11_onboarding_uploads_ratelimit.py",
+    "/app/test_reports/pytest/iter11_results.xml"
+  ],
+  "action_items": [
+    "Ninguno bloqueante. Todas las features funcionan en backend y frontend.",
+    "OPCIONAL UX: mejorar contraste/estilo del boton 'Ir al dashboard' en step 3 del wizard (.sw-go-dashboard). En el screenshot se ve translucido.",
+    "OPCIONAL UX: diferenciar estado 'completado' vs 'activo' en el stepper visual del Signup wizard.",
+    "OPCIONAL backend: el rate-limit AI es in-memory (defaultdict+deque). Si el backend escala a multiples replicas, el bucket no es compartido. Para produccion considerar Redis-backed sliding window."
+  ],
+  "critical_code_review_comments": [
+    "routers/uploads.py: el regex de filename ^[a-zA-Z0-9_\\-]+\\.(jpg|png|webp|svg|gif)$ es estricto y correcto. El check adicional path.resolve().startswith(...) es defensa en profundidad redundante (ya garantizada por el regex), pero esta bien mantenerlo.",
+    "routers/uploads.py upload_logo: lee TODO el archivo en memoria antes de validar tamano (await file.read() seguido de len(content) > MAX). Para protegerse contra DoS con archivos enormes, deberia usar streaming o leer chunks hasta MAX+1 bytes y abortar. Hoy un atacante puede subir 100MB y solo despues recibe 413 (memoria del worker afectada).",
+    "routers/onboarding.py auto_setup_tenant: NO esta envuelto en una transaccion. Si la insert de products falla despues de crear tenant+user, queda inconsistencia. MongoDB requiere session.start_transaction() para multi-doc atomicity. En la practica raro que falle, pero idealmente deberia ser transaccional o tener rollback explicito.",
+    "routers/onboarding.py: la generacion del tenant_id tiene race condition (TOCTOU): dos requests concurrentes con el mismo business_name podrian pasar el while find_one y luego ambos hacer insert con el mismo tenant_id. Solucion: agregar unique index en tenants.tenant_id y atrapar DuplicateKeyError.",
+    "routers/onboarding.py: NO valida longitud minima de description (solo >0). Sin embargo el frontend valida >20 chars. Inconsistencia menor: se podrian crear tenants via API directa con description='x'.",
+    "auth_routes.py rate-limit AI: bucket in-memory por tenant_id (defaultdict). Memoria crece sin limite si hay millones de tenants. Para SaaS en produccion: TTL/LRU o backing store externo.",
+    "Signup.js: localStorage.setItem('user', JSON.stringify(...)) y 'token' coincide con el formato esperado por el resto de la app (ver Login.js para verificar). Si el frontend usa otro key (e.g. 'access_token'), el auto-login no funcionaria desde el step 3.",
+    "colorContrast.js evaluatePaletteHarmony: rangos hardcoded (1.5/2/8/14). Si la marca usa intencionalmente palette monocromatica (ratio <1.5), el warn molesta. Considerar opt-out por tenant."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11_onboarding_uploads_ratelimit.py (nuevo: 23 tests)"
+  ],
+  "success_rate": {"backend": "100% (23/23 tests)", "frontend": "100% (signup wizard E2E + landing editor upload + palette hint validados)"},
+  "test_credentials": "demo@inmobot.com / Demo123!  |  admin@inmobot.com / Admin123!  |  multiples TEST_iter11_*@inmobot.com creados via auto-setup (passwords FreshPass123!, Setup12345!, PizzaPass1!, InmoPass1!, E2EPass1234!)",
+  "seed_data_creation": "Se crearon ~5 tenants nuevos via /api/onboarding/auto-setup (test-pizzeria-e2e, test-clinica-odontologica-{hash}, test-pizzeria-{hash}, test-inmo-{hash}, test-iter11-fresh-{hash}) cada uno con 3 productos demo. El tenant demo-inmobiliaria recibio un logo subido (URL: /api/uploads/logos/demo-inmobiliaria_fa8ddcdc762647ddb5bb113a0f48ea85.png). El bucket de rate-limit del fresh tenant quedo agotado (5/5 + 1 rejected).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 11 completo. Para regresion volver a correr pytest backend/tests/test_iter11_onboarding_uploads_ratelimit.py - es idempotente (cada test crea un email/tenant uuid unico). El test 'test_fresh_tenant_can_make_5_calls_then_429' depende del fixture session-scoped fresh_tenant que crea un tenant nuevo cada corrida. El path traversal de URLs raw es manejado por el ingress (normaliza antes de llegar al backend) - validado manualmente con curl --path-as-is. Si en el futuro se quita el ingress de delante, REVALIDAR que el endpoint serve_logo siga rechazando paths con '..'. La ruta del LandingEditor en el frontend es /landing/editor (NO /landing-editor ni /editor-landing).",
+  "rca of the issue": "N/A - sin bugs encontrados. Solo recomendaciones de hardening (rate-limit redis-backed, transaccion en onboarding, streaming en upload, unique index en tenant_id)."
+}

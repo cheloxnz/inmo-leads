@@ -365,6 +365,8 @@ async def update_tenant(
 
 
 import re
+import time
+from collections import defaultdict, deque
 
 # Branding: campos que el tenant admin puede editar de su propio tenant
 _BRANDING_ALLOWED_FIELDS = {
@@ -376,6 +378,11 @@ _BRANDING_ALLOWED_FIELDS = {
 
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _URL_RE = re.compile(r"^https?://[^\s<>\"']+$")
+
+# Rate-limit AI Copy Gen: 5 calls/hora por tenant
+_AI_RATE_MAX = 5
+_AI_RATE_WINDOW = 3600
+_ai_rate_buckets = defaultdict(deque)
 
 
 def _validate_branding_payload(data: dict) -> tuple[dict, list, list]:
@@ -504,17 +511,38 @@ async def ai_generate_branding(
     current_user: User = Depends(require_admin),
     db: AsyncIOMotorDatabase = Depends(get_db)
 ):
-    """Tenant admin: genera copy para landing usando IA desde una descripcion del negocio."""
+    """Tenant admin: genera copy para landing usando IA desde una descripcion del negocio.
+    Rate-limit: 5 calls/hora por tenant."""
     description = (body or {}).get("description", "").strip()
     if not description:
         raise HTTPException(status_code=400, detail="description es requerido")
     if len(description) > 500:
         raise HTTPException(status_code=400, detail="description demasiado larga (>500 chars)")
 
+    # Rate-limit por tenant
+    tenant_id = current_user.tenant_id
+    now = time.time()
+    bucket = _ai_rate_buckets[tenant_id]
+    while bucket and bucket[0] < now - _AI_RATE_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= _AI_RATE_MAX:
+        oldest = bucket[0]
+        retry_in = int(_AI_RATE_WINDOW - (now - oldest))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Limite de IA alcanzado ({_AI_RATE_MAX}/hora). Reintentar en {retry_in}s."
+        )
+    bucket.append(now)
+
     from llm_service import create_llm_for_tenant
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    tenant = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
     llm = create_llm_for_tenant(tenant)
     result = await llm.generate_landing_copy(description)
+    result["rate_limit"] = {
+        "remaining": _AI_RATE_MAX - len(bucket),
+        "max": _AI_RATE_MAX,
+        "window_seconds": _AI_RATE_WINDOW
+    }
     return result
 
 

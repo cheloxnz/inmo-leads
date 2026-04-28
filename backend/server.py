@@ -1614,6 +1614,8 @@ from routers.metrics import router as metrics_router
 from routers.widget import router as widget_router
 from routers.superadmin import router as superadmin_router
 from routers.templates import router as templates_router
+from routers.uploads import router as uploads_router
+from routers.onboarding import router as onboarding_router
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1623,6 +1625,8 @@ app.include_router(metrics_router, prefix="/api")
 app.include_router(widget_router, prefix="/api")
 app.include_router(superadmin_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
+app.include_router(uploads_router, prefix="/api")
+app.include_router(onboarding_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

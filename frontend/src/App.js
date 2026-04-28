@@ -29,6 +29,7 @@ import CatalogPage from './pages/CatalogPage';
 import PublicCatalog from './pages/PublicCatalog';
 import WidgetAnalytics from './pages/WidgetAnalytics';
 import LandingEditor from './pages/LandingEditor';
+import Signup from './pages/Signup';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
@@ -369,7 +370,7 @@ function AppContent() {
   const location = useLocation();
   
   // Páginas públicas que no necesitan el layout del dashboard
-  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/p/'];
+  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/signup', '/p/'];
   const isPublicPage = publicPages.some(page => location.pathname.startsWith(page));
 
   // Subdomain routing: si llega por {tenant}.platform.com y no esta en una ruta especifica,
@@ -394,6 +395,7 @@ function AppContent() {
             } />
             <Route path="/inicio" element={<DynamicLanding />} />
             <Route path="/inicio/:tenantId" element={<DynamicLanding />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/p/catalogo/:tenantId" element={<PublicCatalog />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

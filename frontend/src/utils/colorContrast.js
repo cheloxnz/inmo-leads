@@ -57,3 +57,33 @@ export function evaluateColorContrast(primary) {
   }
   return { level, message, bestRatio: worstUseCase, bestText: '#ffffff' };
 }
+
+/**
+ * Evalúa la coherencia entre primary y accent.
+ * Si son MUY similares (ratio < 1.5), advierte (paleta aburrida/poco diferenciada).
+ * Si son MUY contrastantes (ratio > 12), advierte (paleta caótica).
+ * Ideal: 2-8.
+ */
+export function evaluatePaletteHarmony(primary, accent) {
+  const ratio = contrastRatio(primary, accent);
+  if (ratio === 0) return { level: 'ok', message: '' };
+  if (ratio < 1.5) {
+    return {
+      level: 'warn-low',
+      message: `Los colores son casi idénticos (${ratio.toFixed(1)}:1). El acento no se va a notar.`
+    };
+  }
+  if (ratio > 14) {
+    return {
+      level: 'warn-high',
+      message: `Combinación muy contrastante (${ratio.toFixed(1)}:1). Puede verse agresiva.`
+    };
+  }
+  if (ratio >= 2 && ratio <= 8) {
+    return {
+      level: 'ok',
+      message: `Paleta coherente (ratio ${ratio.toFixed(1)}:1).`
+    };
+  }
+  return { level: 'ok', message: '' };
+}

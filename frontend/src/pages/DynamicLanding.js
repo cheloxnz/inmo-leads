@@ -129,7 +129,12 @@ export default function DynamicLanding() {
               </Button>
             )}
             {!tenantId && (
-              <Button size="lg" variant="outline" onClick={() => {
+              <Button size="lg" variant="outline" onClick={() => navigate('/signup')} data-testid="btn-signup-hero">
+                Crear mi bot gratis <Sparkles className="w-4 h-4 ml-2" />
+              </Button>
+            )}
+            {!tenantId && (
+              <Button size="lg" variant="ghost" onClick={() => {
                 document.getElementById('servicios')?.scrollIntoView({ behavior: 'smooth' });
               }} data-testid="btn-ver-servicios">
                 Ver Servicios <ArrowRight className="w-4 h-4 ml-2" />

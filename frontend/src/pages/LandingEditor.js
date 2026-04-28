@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, ExternalLink, Save, Eye, Sparkles, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ALL_TEMPLATES } from '../data/landingTemplates';
-import { evaluateColorContrast } from '../utils/colorContrast';
+import { evaluateColorContrast, evaluatePaletteHarmony } from '../utils/colorContrast';
 
 const ICON_OPTIONS = ['home', 'calendar', 'message', 'shield', 'bot'];
 
@@ -162,6 +162,7 @@ export default function LandingEditor() {
 
   const primaryContrast = evaluateColorContrast(data.primary_color);
   const accentContrast = evaluateColorContrast(data.accent_color);
+  const paletteHarmony = evaluatePaletteHarmony(data.primary_color, data.accent_color);
 
   const previewUrl = data.tenant_id ? `/inicio/${data.tenant_id}` : '';
 
@@ -252,8 +253,41 @@ export default function LandingEditor() {
                 </select>
               </div>
               <div>
-                <Label htmlFor="le-logo">URL del logo</Label>
-                <Input id="le-logo" value={data.logo_url || ''} onChange={e => update('logo_url', e.target.value)} placeholder="https://..." data-testid="le-logo-url" />
+                <Label htmlFor="le-logo">Logo</Label>
+                <div className="le-logo-upload">
+                  <Input id="le-logo" value={data.logo_url || ''} onChange={e => update('logo_url', e.target.value)} placeholder="https://..." data-testid="le-logo-url" />
+                  <label className="le-logo-btn" data-testid="le-logo-upload-btn">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > 2 * 1024 * 1024) {
+                          toast.error('Archivo demasiado grande (max 2 MB)');
+                          return;
+                        }
+                        const fd = new FormData();
+                        fd.append('file', f);
+                        try {
+                          const res = await axios.post(`${API}/uploads/logo`, fd, {
+                            headers: { 'Content-Type': 'multipart/form-data' },
+                          });
+                          update('logo_url', res.data.url);
+                          toast.success('Logo subido');
+                        } catch (err) {
+                          toast.error(err.response?.data?.detail || 'Error subiendo logo');
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    Subir
+                  </label>
+                </div>
+                {data.logo_url && (
+                  <img src={data.logo_url} alt="Logo preview" className="le-logo-preview" />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -278,6 +312,11 @@ export default function LandingEditor() {
                 <ContrastHint result={accentContrast} />
               </div>
             </CardContent>
+            {paletteHarmony.level !== 'ok' || paletteHarmony.message ? (
+              <div className={`le-palette-hint le-palette-${paletteHarmony.level}`} data-testid="palette-hint">
+                {paletteHarmony.message}
+              </div>
+            ) : null}
           </Card>
 
           <Card>
