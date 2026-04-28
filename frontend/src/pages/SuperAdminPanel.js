@@ -208,6 +208,29 @@ export default function SuperAdminPanel() {
 
 function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
   const [updating, setUpdating] = useState(false);
+  const [editingBranding, setEditingBranding] = useState(false);
+  const [brandData, setBrandData] = useState({
+    business_name: tenant.business_name || tenant.name || '',
+    business_tagline: tenant.business_tagline || '',
+    template_id: tenant.template_id || 'servicios',
+    contact_phone: tenant.contact_phone || '',
+    logo_url: tenant.logo_url || '',
+    primary_color: tenant.primary_color || '#3b82f6',
+    accent_color: tenant.accent_color || '#8b5cf6',
+  });
+
+  const saveBranding = async () => {
+    setUpdating(true);
+    try {
+      await axios.put(`${API}/auth/tenants/${tenant.tenant_id}`, brandData);
+      setEditingBranding(false);
+      onUpdate();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const toggleActive = async () => {
     setUpdating(true);
@@ -276,6 +299,25 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
             </div>
           </div>
           <div className="sa-detail-actions">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditingBranding(!editingBranding)}
+              data-testid={`edit-branding-${tenant.tenant_id}`}
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              {editingBranding ? 'Cerrar editor' : 'Editar branding'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              asChild
+              data-testid={`view-landing-${tenant.tenant_id}`}
+            >
+              <a href={`/inicio/${tenant.tenant_id}`} target="_blank" rel="noopener noreferrer">
+                <Globe className="w-3 h-3 mr-1" /> Ver landing
+              </a>
+            </Button>
             <Button 
               size="sm" 
               variant={tenant.active ? "destructive" : "default"}
@@ -287,6 +329,76 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
               {tenant.active ? 'Desactivar' : 'Reactivar'}
             </Button>
           </div>
+
+          {editingBranding && (
+            <div className="sa-branding-edit" data-testid={`branding-form-${tenant.tenant_id}`}>
+              <div className="sa-branding-grid">
+                <div>
+                  <label>Nombre del negocio</label>
+                  <input
+                    value={brandData.business_name}
+                    onChange={e => setBrandData({...brandData, business_name: e.target.value})}
+                    data-testid="sa-bn"
+                  />
+                </div>
+                <div>
+                  <label>Tagline</label>
+                  <input
+                    value={brandData.business_tagline}
+                    onChange={e => setBrandData({...brandData, business_tagline: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label>WhatsApp</label>
+                  <input
+                    value={brandData.contact_phone}
+                    onChange={e => setBrandData({...brandData, contact_phone: e.target.value})}
+                    placeholder="5491133334444"
+                  />
+                </div>
+                <div>
+                  <label>Template</label>
+                  <select
+                    value={brandData.template_id}
+                    onChange={e => setBrandData({...brandData, template_id: e.target.value})}
+                  >
+                    <option value="inmobiliaria">Inmobiliaria</option>
+                    <option value="clinica">Clínica / Salud</option>
+                    <option value="restaurante">Restaurante</option>
+                    <option value="ecommerce">E-commerce</option>
+                    <option value="servicios">Servicios</option>
+                  </select>
+                </div>
+                <div className="sa-branding-full">
+                  <label>URL del logo</label>
+                  <input
+                    value={brandData.logo_url}
+                    onChange={e => setBrandData({...brandData, logo_url: e.target.value})}
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label>Color primario</label>
+                  <div className="sa-color-group">
+                    <input type="color" value={brandData.primary_color} onChange={e => setBrandData({...brandData, primary_color: e.target.value})} />
+                    <input value={brandData.primary_color} onChange={e => setBrandData({...brandData, primary_color: e.target.value})} />
+                  </div>
+                </div>
+                <div>
+                  <label>Color acento</label>
+                  <div className="sa-color-group">
+                    <input type="color" value={brandData.accent_color} onChange={e => setBrandData({...brandData, accent_color: e.target.value})} />
+                    <input value={brandData.accent_color} onChange={e => setBrandData({...brandData, accent_color: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+              <div className="sa-branding-actions">
+                <Button size="sm" onClick={saveBranding} disabled={updating} data-testid={`save-branding-${tenant.tenant_id}`}>
+                  {updating ? 'Guardando...' : 'Guardar branding'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>

@@ -21,12 +21,14 @@ import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import DynamicLanding from './pages/DynamicLanding';
+import { getTenantFromSubdomain } from './utils/subdomain';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
 import PublicCatalog from './pages/PublicCatalog';
 import WidgetAnalytics from './pages/WidgetAnalytics';
+import LandingEditor from './pages/LandingEditor';
 import Broadcast from './pages/Broadcast';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
@@ -209,6 +211,16 @@ function Navigation() {
             </Link>
 
             <Link
+              to="/landing/editor"
+              className={`nav-link ${isActive('/landing/editor') ? 'active' : ''}`}
+              data-testid="nav-landing-editor"
+              title="Editor de Landing"
+            >
+              <span className="icon">🎨</span>
+              {!isCollapsed && <span>Landing</span>}
+            </Link>
+
+            <Link
               to="/auditoria"
               className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
               data-testid="nav-audit"
@@ -360,6 +372,13 @@ function AppContent() {
   const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/p/'];
   const isPublicPage = publicPages.some(page => location.pathname.startsWith(page));
 
+  // Subdomain routing: si llega por {tenant}.platform.com y no esta en una ruta especifica,
+  // redirigir a /inicio/{tenant} para mostrar la landing del tenant
+  const subdomainTenant = getTenantFromSubdomain();
+  if (subdomainTenant && (location.pathname === '/' || location.pathname === '/inicio')) {
+    return <Navigate to={`/inicio/${subdomainTenant}`} replace />;
+  }
+
   if (loading) {
     return <div className="loading-container">Cargando aplicación...</div>;
   }
@@ -433,6 +452,11 @@ function AppContent() {
           <Route path="/catalogo/analytics" element={
             <ProtectedRoute adminOnly>
               <WidgetAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/landing/editor" element={
+            <ProtectedRoute adminOnly>
+              <LandingEditor />
             </ProtectedRoute>
           } />
           <Route path="/flujo" element={

@@ -360,6 +360,66 @@ async def update_tenant(
 
     return {"message": "Tenant actualizado"}
 
+
+# Branding: campos que el tenant admin puede editar de su propio tenant
+_BRANDING_ALLOWED_FIELDS = {
+    "business_name", "business_tagline", "logo_url",
+    "primary_color", "accent_color", "hero_bg_url",
+    "template_id", "contact_phone", "country",
+    "custom_features", "custom_steps",
+}
+
+
+@router.get("/tenant/branding")
+async def get_my_branding(
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Tenant admin: lee la branding de su propio tenant"""
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="Sin tenant")
+    tenant = await db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id},
+        {"_id": 0}
+    )
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    # Solo devolver campos de branding (no leak credenciales)
+    _LIST_FIELDS = {"custom_features", "custom_steps"}
+    out = {}
+    for k in list(_BRANDING_ALLOWED_FIELDS) + ["tenant_id", "name"]:
+        default = [] if k in _LIST_FIELDS else ""
+        val = tenant.get(k, default)
+        # Normalizar: si por datos legados custom_features/steps vienen como "" -> []
+        if k in _LIST_FIELDS and not isinstance(val, list):
+            val = [] if not val else val
+        out[k] = val
+    return out
+
+
+@router.put("/tenant/branding")
+async def update_my_branding(
+    update_data: dict,
+    current_user: User = Depends(require_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    """Tenant admin: actualiza la branding/landing de su propio tenant"""
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="Sin tenant")
+    # Filtrar solo campos permitidos
+    safe = {k: v for k, v in (update_data or {}).items() if k in _BRANDING_ALLOWED_FIELDS}
+    if not safe:
+        raise HTTPException(status_code=400, detail="Sin campos validos")
+    safe["updated_at"] = datetime.utcnow().isoformat()
+    result = await db.tenants.update_one(
+        {"tenant_id": current_user.tenant_id},
+        {"$set": safe}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    return {"message": "Branding actualizado", "updated_fields": list(safe.keys())}
+
+
 @router.delete("/tenants/{tenant_id}")
 async def deactivate_tenant(
     tenant_id: str,

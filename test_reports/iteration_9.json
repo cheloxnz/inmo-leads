@@ -1,0 +1,42 @@
+{
+  "summary": "E2E validado del editor de branding/landing (iter_9). 11/11 backend tests PASS en /app/backend/tests/test_iter9_branding.py cubriendo GET/PUT /api/auth/tenant/branding (whitelist, body vacio, solo campos invalidos -> 400, asesor -> 403, unauth -> 401, isolation cross-tenant) y /api/public/catalog/{tenant_id} con los nuevos campos primary_color/accent_color/hero_bg_url/custom_features/custom_steps. Bug reportado por main agent confirmado y arreglado: GET /tenant/branding devolvia custom_features y custom_steps como string vacio '' en lugar de []; aplicado fix en get_my_branding para devolver [] por default. UI flows validados en produccion: (1) login demo -> nav 'Landing' (data-testid=nav-landing-editor) -> Editor carga con 10+ inputs y data-testids (le-business-name, le-tagline, le-phone, le-template, le-logo-url, le-primary-color, le-accent-color, le-use-defaults, le-feature-N, le-add-feature, le-save-btn, le-preview-btn), (2) edit+save muestra toast verde 'Branding guardado' y persiste en DB, (3) vista previa lado derecho refleja cambios sin guardar en tiempo real, (4) 'Usar default del template' regenera features del template, (5) Preview abre /inicio/{tenant_id} en nueva pestana con el business_name y features actualizados (confirmado: 'UI_TEST_1777345735' + feature 'F1/D1' visible), (6) SuperAdmin /superadmin muestra cards (data-testid=tenant-<id>) con testids edit-branding-<id>, view-landing-<id>; click expande form branding-form-<id> con input sa-bn y boton save-branding-<id>. Tenant isolation confirmado a nivel backend: PUT /tenant/branding del tenant A NO altera business_name del tenant B. Regresion backend prior suite (test_auth_and_metrics.py) muestra fallos pre-existentes NO relacionados a este feature (asesor de test no seedeado).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/auth/tenant/branding", "issue": "RESUELTO en iter_9: custom_features/custom_steps retornaban '' (string) en lugar de [] cuando el tenant no los tenia. Fix aplicado en get_my_branding (/app/backend/auth_routes.py) para normalizar a list."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/inicio/demo-inmobiliaria", "issues": ["El primary_color seteado (#111111) se aplica pero por ser casi negro el badge y CTA 'Escribinos por WhatsApp' se ven completamente oscuros; es esperado dado el input. Sugerir validacion UX: recomendar colores con contraste suficiente o mostrar warning si primary_color es demasiado oscuro/claro."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter9_branding.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [
+    "Ninguno bloqueante. El fix del default [] para custom_features/custom_steps ya fue aplicado por el testing agent (edit en auth_routes.py linea 388-397).",
+    "Opcional: agregar hint UX en LandingEditor sugiriendo colores con contraste adecuado (accesibilidad WCAG)."
+  ],
+  "critical_code_review_comments": [
+    "auth_routes.py _BRANDING_ALLOWED_FIELDS es un set correcto. Sugerencia: agregar validacion de primary_color/accent_color como hex (#rrggbb) y logo_url/hero_bg_url como URLs validas via Pydantic model, en vez de dict crudo, para evitar XSS si el valor se interpola directamente en CSS de la landing publica.",
+    "auth_routes.py update_my_branding acepta dict libre pero luego filtra por whitelist. Correcto. Considerar loggear los campos rechazados (fuera de whitelist) para auditoria (tenant admin intentando cambiar max_ai_messages, stripe_customer_id, etc.).",
+    "catalog.py get_public_catalog expone contact_phone como whatsapp_phone publicamente. Si es un numero personal, considerar un campo whatsapp_display_phone separado del contact_phone administrativo.",
+    "subdomain.js esta bien: whitelist de reservados + validacion regex. Con REACT_APP_PLATFORM_DOMAIN vacio retorna null -> comportamiento seguro. Recomendar documentar como setear en produccion.",
+    "No existen tests automatizados del flujo UI del Landing Editor en Playwright; si el feature es critico agregar un script Playwright permanente en /app/frontend/e2e/ (fuera del alcance de esta iteracion)."
+  ],
+  "updated_files": [
+    "/app/backend/auth_routes.py (fix: get_my_branding devuelve [] por default para custom_features y custom_steps)",
+    "/app/backend/tests/test_iter9_branding.py (nuevo: 11 tests)"
+  ],
+  "success_rate": {"backend": "100% (11/11 tests del feature de iter_9)", "frontend": "100% de los flujos testeados (login->editor->save->preview->superadmin->dynamic landing)"},
+  "test_credentials": "demo@inmobot.com / Demo123!  |  admin@inmobot.com / Admin123!",
+  "seed_data_creation": "El editor dejo business_name='UI_TEST_1777345735', tagline='Agente IA 24/7 - TEST', phone='+5491100000000', template='inmobiliaria', primary_color='#111111', accent_color='#222222', custom_features=[{title:F1,desc:D1}], custom_steps=[{title:S1,desc:DS1}] en demo-inmobiliaria. Si se requiere restaurar, el main agent puede volver a guardar branding desde la UI o correr init_admin.py.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "El feature de branding/landing editor esta completo y funciona end-to-end. El bug del default [] ya esta arreglado en auth_routes.py. Si se amplia el set de campos en _BRANDING_ALLOWED_FIELDS, actualizar _LIST_FIELDS si alguno nuevo es lista, y agregar tests correspondientes en test_iter9_branding.py. Para testear subdomain routing real, setear REACT_APP_PLATFORM_DOMAIN en .env (actualmente vacio -> getTenantFromSubdomain siempre retorna null, esperado).",
+  "rca of the issue": "Bug: GET /api/auth/tenant/branding retornaba custom_features y custom_steps como '' (string) en vez de [] (list) cuando el documento del tenant en Mongo no tenia esos campos. Root cause: `tenant.get(k, \"\")` usa '' como default para TODOS los campos, pero el frontend (LandingEditor.js) hace .map() sobre esos valores asumiendo que son arrays -> puede tirar error. Fix en auth_routes.py get_my_branding: iterar con default tipado por campo ([] para custom_features/custom_steps, '' para el resto) y normalizar legacy data: if not isinstance(val, list): val = []. Validado con test_custom_features_and_steps_are_lists que ahora pasa."
+}

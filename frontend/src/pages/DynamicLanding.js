@@ -72,8 +72,16 @@ export default function DynamicLanding() {
     ? `https://wa.me/${phone}?text=${encodeURIComponent(tpl.cta_text)}`
     : '#';
 
+  // Custom branding overrides
+  const features = (t.custom_features && t.custom_features.length > 0) ? t.custom_features : tpl.features;
+  const steps = (t.custom_steps && t.custom_steps.length > 0) ? t.custom_steps : tpl.steps;
+  const customStyle = {
+    '--immo-primary': t.primary_color || '#3b82f6',
+    '--immo-accent': t.accent_color || '#8b5cf6',
+  };
+
   return (
-    <div className="immo-landing" data-testid="dynamic-landing" data-template={t.template_id}>
+    <div className="immo-landing" style={customStyle} data-testid="dynamic-landing" data-template={t.template_id}>
       {/* Navbar */}
       <nav className="immo-nav">
         <div className="immo-nav-inner">
@@ -145,7 +153,7 @@ export default function DynamicLanding() {
         <h2>{tpl.section_features_title}</h2>
         <p className="immo-section-sub">{tpl.section_features_sub}</p>
         <div className="immo-services-grid">
-          {tpl.features.map((f, i) => {
+          {features.map((f, i) => {
             const Icon = FEATURE_ICONS[f.icon] || Bot;
             return (
               <div key={i} className="immo-service-card" data-testid={`feature-${i}`}>
@@ -168,14 +176,14 @@ export default function DynamicLanding() {
         <h2>Cómo Funciona</h2>
         <p className="immo-section-sub">En 3 simples pasos</p>
         <div className="immo-steps">
-          {tpl.steps.map((s, i) => (
+          {steps.map((s, i) => (
             <React.Fragment key={i}>
               <div className="immo-step">
                 <div className="immo-step-number">{i + 1}</div>
                 <h3>{s.title}</h3>
                 <p>{s.desc}</p>
               </div>
-              {i < tpl.steps.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className="immo-step-arrow"><ArrowRight className="w-6 h-6" /></div>
               )}
             </React.Fragment>
