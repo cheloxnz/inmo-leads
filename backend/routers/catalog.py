@@ -119,6 +119,12 @@ async def get_public_catalog(tenant_id: str, category: Optional[str] = None):
     products = await catalog_service.get_products(tenant_id, category=category)
     categories = await catalog_service.get_categories(tenant_id)
 
+    # template_id: prefer tenant.template_id, fallback bot_config.template_id, default servicios
+    template_id = tenant.get("template_id")
+    if not template_id:
+        bot_cfg = await _db.bot_config.find_one({"tenant_id": tenant_id}, {"_id": 0, "template_id": 1})
+        template_id = (bot_cfg or {}).get("template_id", "servicios")
+
     # Quitar tenant_id de la respuesta publica (no leak)
     for p in products:
         p.pop("tenant_id", None)
@@ -129,7 +135,9 @@ async def get_public_catalog(tenant_id: str, category: Optional[str] = None):
             "business_name": tenant.get("business_name", ""),
             "business_tagline": tenant.get("business_tagline", ""),
             "country": tenant.get("country", ""),
-            "whatsapp_phone": tenant.get("contact_phone", "")
+            "whatsapp_phone": tenant.get("contact_phone", ""),
+            "template_id": template_id,
+            "logo_url": tenant.get("logo_url", ""),
         },
         "products": products,
         "categories": categories

@@ -34,7 +34,16 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Backlog: Rate-limit + Attribution + auto-resize + refactor)
+### 2026-04-28 (Sesión Actual - Landing Dinámica por Tenant)
+- **Landing dinámica `/inicio/:tenantId`** con copy adaptado por `template_id`:
+  - 5 plantillas: `inmobiliaria`, `clinica`, `restaurante`, `ecommerce`, `servicios` (en `/app/frontend/src/data/landingTemplates.js`).
+  - Cada plantilla define: hero_title (función con businessName), subtitle, CTA WhatsApp, 3 features con íconos, 3 steps de "cómo funciona".
+  - `/inicio` sin tenant → landing genérica del SaaS InmoBot ("el bot inteligente para tu negocio").
+- **Backend:** `GET /api/public/catalog/{tenant_id}` ahora retorna `template_id`, `logo_url` (con fallback a `bot_config.template_id` o `'servicios'`).
+- **Branding:** Footer muestra "Powered by InmoBot" en cada landing de tenant. La marca InmoBot queda como bot platform genérica.
+- **Reemplaza `/inicio` antiguo** (era hardcoded inmobiliaria) por componente dinámico `DynamicLanding.js`.
+
+### 2026-04-28 (Sesión Anterior - Backlog: Rate-limit + Attribution + auto-resize + refactor)
 - **Rate-limit en `/api/public/catalog/{tenant_id}/track`:** Sliding window en memoria (deque). 30 reqs/60s por IP+tenant; 429 si excede. _Nota:_ in-memory ⇒ válido sólo single-instance.
 - **iframe auto-resize:** PublicCatalog (con `?embed=1`) emite `postMessage({type:'inmobot-resize', tenant, height})` con ResizeObserver. widget.js drop-in escucha y ajusta el iframe al contenido.
 - **🌟 Lead Attribution Engine:** Lead que llega por WhatsApp con click_whatsapp <30min se marca con `source='widget'`, `referring_product_id`, `widget_session_id` y emite event `lead_generated`. UI muestra "Leads del widget / Total / Share %".

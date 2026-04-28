@@ -20,6 +20,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import InmobiliariaLanding from './pages/InmobiliariaLanding';
+import DynamicLanding from './pages/DynamicLanding';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
@@ -357,7 +358,7 @@ function AppContent() {
   
   // Páginas públicas que no necesitan el layout del dashboard
   const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/p/'];
-  const isPublicPage = publicPages.some(page => location.pathname.startsWith(page)) || location.pathname === '/inicio';
+  const isPublicPage = publicPages.some(page => location.pathname.startsWith(page));
 
   if (loading) {
     return <div className="loading-container">Cargando aplicación...</div>;
@@ -372,7 +373,8 @@ function AppContent() {
             <Route path="/login" element={
               isAuthenticated ? <Navigate to={isSuperAdmin ? "/superadmin" : isAdmin ? "/" : "/mi-dashboard"} replace /> : <Login />
             } />
-            <Route path="/inicio" element={<InmobiliariaLanding />} />
+            <Route path="/inicio" element={<DynamicLanding />} />
+            <Route path="/inicio/:tenantId" element={<DynamicLanding />} />
             <Route path="/p/catalogo/:tenantId" element={<PublicCatalog />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
