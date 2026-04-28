@@ -34,7 +34,24 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Landing Dinámica por Tenant)
+### 2026-04-28 (Sesión Actual - Editor SuperAdmin + Subdomain Routing + Editor Visual de Landing)
+- **Editor de branding en SuperAdminPanel:** botón "Editar branding" en cada tenant card → form inline con business_name, tagline, template, phone, logo, colores. Botón "Ver landing" abre `/inicio/{tenant_id}`.
+- **Editor Visual de Landing (`/landing/editor`)** para tenant admin:
+  - Form completo + **vista previa en tiempo real** (lado derecho) que refleja cambios sin guardar.
+  - Color pickers (primary + accent), upload URL de logo.
+  - Custom features (hasta 5, cada uno con icon + título + desc), custom steps.
+  - Botón "Usar default del template" carga features/steps del template seleccionado.
+  - Botón "Preview" abre la landing pública en nueva pestaña.
+- **Backend nuevos endpoints (auth_routes.py):**
+  - `GET /api/auth/tenant/branding` (tenant admin) → lee branding del tenant del JWT (custom_features y custom_steps siempre [] por default).
+  - `PUT /api/auth/tenant/branding` (tenant admin) → whitelist estricta: solo `business_name, business_tagline, logo_url, primary_color, accent_color, hero_bg_url, template_id, contact_phone, country, custom_features, custom_steps`. Campos sensibles (max_ai_messages, stripe_customer_id) bloqueados.
+- **Subdomain routing (`utils/subdomain.js`):** Detecta `{tenant_id}.platform.com` solo si `REACT_APP_PLATFORM_DOMAIN` está seteado. Whitelist de reservados (www, app, api, admin, preview...). Redirige `/` y `/inicio` a `/inicio/{tenant_id}` cuando matchea. 10/10 tests unitarios PASS.
+- **DynamicLanding** aplica `primary_color` / `accent_color` vía CSS vars (override del tema base) y usa `custom_features`/`custom_steps` si existen, sino fallback al template.
+- **Endpoint público `/api/public/catalog/{tenant_id}`** ahora retorna también: `primary_color`, `accent_color`, `hero_bg_url`, `custom_features`, `custom_steps`.
+- **Bug HIGH fixado** (testing agent iter_9): `GET /tenant/branding` devolvía `''` para `custom_features`/`custom_steps` cuando no existían → ahora devuelve `[]`.
+- **Testing 100% PASS (11/11 + frontend E2E):** `/app/test_reports/iteration_9.json`
+
+### 2026-04-28 (Sesión Anterior - Landing Dinámica por Tenant)
 - **Landing dinámica `/inicio/:tenantId`** con copy adaptado por `template_id`:
   - 5 plantillas: `inmobiliaria`, `clinica`, `restaurante`, `ecommerce`, `servicios` (en `/app/frontend/src/data/landingTemplates.js`).
   - Cada plantilla define: hero_title (función con businessName), subtitle, CTA WhatsApp, 3 features con íconos, 3 steps de "cómo funciona".
