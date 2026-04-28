@@ -1675,6 +1675,7 @@ from routers.onboarding import router as onboarding_router
 from routers.bot_config_ai import router as bot_config_ai_router
 from routers.flow_ai import router as flow_ai_router
 from routers.coach import router as coach_router
+from routers.public_share import router as public_share_router
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1689,6 +1690,7 @@ app.include_router(onboarding_router, prefix="/api")
 app.include_router(bot_config_ai_router, prefix="/api")
 app.include_router(flow_ai_router, prefix="/api")
 app.include_router(coach_router, prefix="/api")
+app.include_router(public_share_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

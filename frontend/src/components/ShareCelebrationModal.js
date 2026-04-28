@@ -3,7 +3,7 @@ import axios from 'axios';
 import { API } from '../App';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { X, Download, Copy, Twitter, Linkedin, Loader2, Sparkles } from 'lucide-react';
+import { X, Download, Copy, Twitter, Linkedin, Loader2, Sparkles, Link as LinkIcon } from 'lucide-react';
 
 const CARD_W = 1200;
 const CARD_H = 630;
@@ -172,16 +172,36 @@ export default function ShareCelebrationModal({ celebration, onClose }) {
 
   const shareTwitter = async () => {
     await trackPlatform('twitter');
-    const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    const publicUrl = getPublicShareUrl();
+    const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(publicUrl)}`;
     window.open(intent, '_blank', 'noopener,noreferrer,width=600,height=600');
   };
 
   const shareLinkedIn = async () => {
     await trackPlatform('linkedin');
-    // LinkedIn requiere URL para preview con OG image; usamos el origin de la app
-    const url = window.location.origin;
-    const intent = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+    const publicUrl = getPublicShareUrl();
+    const intent = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(publicUrl)}`;
     window.open(intent, '_blank', 'noopener,noreferrer,width=600,height=600');
+  };
+
+  const getPublicShareUrl = () => {
+    // Sin auth requerida. Cuando el tenant pega esta URL en LinkedIn/X,
+    // el crawler lee meta tags og:image y previsualiza la imagen automáticamente.
+    const tenantId = celebration.tenant_id || cardData?.tenant_id || '';
+    const base = (process.env.REACT_APP_BACKEND_URL || window.location.origin).replace(/\/$/, '');
+    return `${base}/api/public/share/${encodeURIComponent(tenantId)}/${encodeURIComponent(celebration.celebration_id)}`;
+  };
+
+  const copyPublicLink = async () => {
+    const url = getPublicShareUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      await trackPlatform('copy');
+      toast.success('Link copiado — al pegarlo, redes sociales mostrarán la imagen automáticamente');
+    } catch {
+      // Fallback: prompt
+      window.prompt('Copiá este link:', url);
+    }
   };
 
   return (
@@ -238,12 +258,21 @@ export default function ShareCelebrationModal({ celebration, onClose }) {
               <Download className="w-4 h-4 mr-2" /> Descargar imagen
             </Button>
             <Button
+              data-testid="share-copy-link-btn"
+              variant="outline"
+              onClick={copyPublicLink}
+              disabled={busy || loading}
+              className="border-purple-400 text-purple-700 hover:bg-purple-50"
+            >
+              <LinkIcon className="w-4 h-4 mr-2" /> Copiar link público
+            </Button>
+            <Button
               data-testid="share-copy-btn"
               variant="outline"
               onClick={copyImage}
               disabled={busy || loading}
             >
-              <Copy className="w-4 h-4 mr-2" /> Copiar
+              <Copy className="w-4 h-4 mr-2" /> Copiar imagen
             </Button>
             <Button
               data-testid="share-twitter-btn"
@@ -261,6 +290,13 @@ export default function ShareCelebrationModal({ celebration, onClose }) {
             >
               <Linkedin className="w-4 h-4 mr-2" /> LinkedIn
             </Button>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-md p-3 text-xs">
+            <p className="font-semibold text-purple-900 mb-1">💡 Tip de viralidad</p>
+            <p className="text-purple-700">
+              Pegá el <strong>link público</strong> en LinkedIn/X y la red social mostrará automáticamente la imagen branded como preview — sin que tengas que adjuntarla manualmente.
+            </p>
           </div>
 
           {shareText && (

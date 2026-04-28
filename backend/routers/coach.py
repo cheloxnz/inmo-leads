@@ -479,6 +479,7 @@ async def track_celebration_share(
             "title": cel.get("title"),
             "body": cel.get("body"),
             "metric": cel.get("metric"),
+            "tenant_id": current_user.tenant_id,
             "business_name": business,
             "logo_url": tenant.get("logo_url") or "",
             "primary_color": tenant.get("primary_color") or DEFAULT_PRIMARY,
