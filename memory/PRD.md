@@ -34,7 +34,26 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Backlog + Sugerencia SaaS)
+### 2026-04-28 (Sesión Actual - Widget Tracking + SuperAdmin Dashboard)
+- **🌟 Widget Conversion Tracking (sugerencia SaaS implementada):**
+  - Servicio `widget_analytics_service.py` con eventos: `view`, `click_product`, `click_whatsapp`, `ai_search`, `lead_generated`. IP hasheada (SHA256 truncado, no PII).
+  - Endpoint público `POST /api/public/catalog/{tenant_id}/track` (sin auth). 404 si tenant inactivo/inexistente.
+  - Endpoint admin `GET /api/widget/analytics?days=30`: KPIs (vistas, únicos, clicks, IA, leads), CTR, conversion rate, by_day, top_products, top_queries.
+  - Endpoint superadmin `GET /api/superadmin/widget/analytics`: rollup global por tenant.
+  - Tracking integrado en `PublicCatalog.js` (view 1x/sesión, click_product, click_whatsapp, ai_search).
+  - Página `/catalogo/analytics` con KPIs cards, snippet drop-in copiable, top productos/búsquedas, actividad diaria.
+- **Widget.js Drop-in:**
+  - `GET /api/public/catalog/{tenant_id}/widget.js` retorna JS que crea iframe auto-resizable.
+  - Respeta `x-forwarded-proto` para HTTPS detrás del ingress, Cache-Control 5min, CORS abierto.
+  - Uso: `<div id="inmobot-catalog"></div><script src=".../widget.js" async></script>`
+- **SuperAdmin Dashboard Global:**
+  - `GET /api/superadmin/metrics`: MRR, ARR, distribución por plan, churn rate 30d, overage total, revenue 30d, leads totales.
+  - `GET /api/superadmin/tenants/usage`: tabla de uso del periodo por tenant.
+  - Bloque "Global SaaS Metrics" añadido al inicio de SuperAdminPanel (5 cards: MRR, Activos, Churn, Overage, Revenue 30d).
+- **Routers nuevos:** `routers/widget.py`, `routers/superadmin.py` (refactor pattern continuado).
+- **Testing 100% PASS (22/22 + frontend E2E):** `/app/test_reports/iteration_6.json`
+
+### 2026-04-28 (Sesión Anterior - Backlog + Sugerencia SaaS)
 - **Backlog completados:**
   - **Bulk-write backfill** de `product_id` en `catalog_service.get_products` (1 op vs N ops).
   - **Router metrics.py** extraído: 5 endpoints (`/metrics/leads-by-day`, `/leads-by-status`, `/leads-by-intent`, `/conversion-funnel`, `/messages`).
