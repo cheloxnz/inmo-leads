@@ -34,7 +34,20 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Lifespan + share/marketing orgánico + SPA navigation + cache celebrations)
+### 2026-04-28 (Sesión Actual - OG Image meta tags + viralidad pasiva)
+- **Endpoints públicos para preview automático en redes sociales:**
+  - `GET /api/public/share/{tenant_id}/{celebration_id}.png` — renderiza PNG branded 1200x630 con Pillow + LiberationSans. Incluye gradient diagonal (primary→accent del tenant), card blanca, badge circular con inicial del celebration_type, título wrappeado a 3 líneas, métrica grande, business_name + "Hecho con InmoBot AI".
+  - `GET /api/public/share/{tenant_id}/{celebration_id}` (sin `.png`) — HTML público con meta tags Open Graph + Twitter Card completas (`og:image:width=1200/height=630`, `twitter:card=summary_large_image`). Cuando el tenant pega esta URL en LinkedIn/X/WhatsApp/Slack/Discord, el crawler **previsualiza automáticamente la imagen branded** sin que el usuario tenga que adjuntar nada.
+  - Hostname público detectado vía: env `PUBLIC_BASE_URL` > headers `X-Forwarded-Host/Proto` > `request.base_url` (fallback). Garantiza que `og:image` use la URL públicamente accesible (no host interno del cluster).
+  - **ETag** basado en `sha1(title|metric|colors|business)` con conditional GET (304 Not Modified), `Cache-Control: public, max-age=3600, s-maxage=86400` (al menos a nivel backend; el ingress externo puede sobreescribir).
+  - **Cache TTL 3600s** para PNG bytes en memoria. Render <100ms en caches hit, ~1-2s en cold (Pillow gradient pixel-by-pixel; aceptable con cache).
+  - **Tracking via BackgroundTasks** (no bloquea response): cada GET incrementa `shares.preview_views` (PNG) o `shares.html_views` (HTML).
+- **Frontend (`ShareCelebrationModal.js`):** nuevo botón **"Copiar link público"** (morado, destacado). Llama `navigator.clipboard.writeText(getPublicShareUrl())`. La URL copiada apunta al HTML (no al PNG) para que las redes lean meta tags. Twitter intent ahora incluye `&url=` con la URL pública (preview auto en X). Banner morado de tip de viralidad explica el flujo. Total 5 botones: Descargar / **Copiar link público** / Copiar imagen / X·Twitter / LinkedIn.
+- **`coach.py`:** POST `/share` ahora devuelve `tenant_id` en `card_data` (necesario para construir la URL pública en frontend).
+- **Tests:** Backend iter18 12/12 PASS — PNG/HTML endpoints, ETag conditional GET 304, X-Forwarded-Host honored, tracking shares incrementa, 404 missing celebrations. Regression iter12+13+16+17 32/32 PASS. Frontend E2E 100%.
+- **Archivos:** `/app/backend/routers/public_share.py` (nuevo), `/app/backend/server.py` (router registered), `/app/backend/routers/coach.py` (tenant_id en card_data), `/app/frontend/src/components/ShareCelebrationModal.js` (copy public link + tip banner).
+
+### 2026-04-28 (Sesión Anterior - Lifespan + share/marketing orgánico + SPA navigation + cache celebrations)
 - **Marketing orgánico (share cards):** ShareCelebrationModal con canvas 1200x630 que renderiza la card branded del tenant (gradient primary→accent, emoji grande, título, métrica, business_name, "Hecho con InmoBot AI"). Botones: Descargar imagen, Copiar al clipboard, X/Twitter intent, LinkedIn intent.
   - Endpoint `POST /api/coach/celebrations/{id}/share` con body `{platform: twitter|linkedin|download|copy}`. Trackea `shares.{platform}` y `shares.total` en el doc + audit_log con `action='celebration_shared'`. Devuelve `card_data` con branding del tenant + `share_text` prellenado con hashtags `#SaaS #AI #WhatsApp #PyME`.
   - Validación: platform whitelist (fuera → `unknown`), 404 si celebration no existe.

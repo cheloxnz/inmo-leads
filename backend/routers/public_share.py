@@ -16,7 +16,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from PIL import Image, ImageDraw, ImageFont
@@ -229,15 +229,27 @@ def _escape_html(s: str) -> str:
 
 # ---------------- endpoints ----------------
 
+async def _bump_counter(db, tenant_id: str, celebration_id: str, field: str):
+    """Best-effort, no bloquea response. Usado via BackgroundTasks."""
+    try:
+        await db.coach_celebrations.update_one(
+            {"celebration_id": celebration_id, "tenant_id": tenant_id},
+            {"$inc": {f"shares.{field}": 1}},
+        )
+    except Exception:
+        pass
+
+
 @router.get("/public/share/{tenant_id}/{celebration_id}.png")
 async def share_card_png(
     tenant_id: str,
     celebration_id: str,
     request: Request,
+    background: BackgroundTasks,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """PNG renderizada de la celebracion. Publica, cacheada agresivamente con ETag.
-    Incrementa shares.preview_views para tracking de virality."""
+    Incrementa shares.preview_views (background task, no bloquea response)."""
     cache_key = f"{tenant_id}/{celebration_id}"
     cached = ttl_cache_get("share_png", cache_key)
     if cached is None:
@@ -255,14 +267,8 @@ async def share_card_png(
     if inm and etag in inm:
         return Response(status_code=304, headers={"ETag": f'"{etag}"'})
 
-    # Tracking sin bloquear: aumentar contador (best-effort)
-    try:
-        await db.coach_celebrations.update_one(
-            {"celebration_id": celebration_id, "tenant_id": tenant_id},
-            {"$inc": {"shares.preview_views": 1}},
-        )
-    except Exception:
-        pass
+    # Tracking en background (no bloquea el response)
+    background.add_task(_bump_counter, db, tenant_id, celebration_id, "preview_views")
 
     headers = {
         "ETag": f'"{etag}"',
@@ -277,6 +283,7 @@ async def share_html_page(
     tenant_id: str,
     celebration_id: str,
     request: Request,
+    background: BackgroundTasks,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """Pagina HTML con meta tags Open Graph + Twitter Card.
@@ -298,14 +305,8 @@ async def share_html_page(
     description = body or f"{business} alcanzó un nuevo logro con InmoBot AI"
     primary = _escape_html(data.get("primary_color") or DEFAULT_PRIMARY)
 
-    # Tracking: increment shares.html_views
-    try:
-        await db.coach_celebrations.update_one(
-            {"celebration_id": celebration_id, "tenant_id": tenant_id},
-            {"$inc": {"shares.html_views": 1}},
-        )
-    except Exception:
-        pass
+    # Tracking: increment shares.html_views (background)
+    background.add_task(_bump_counter, db, tenant_id, celebration_id, "html_views")
 
     html = f"""<!DOCTYPE html>
 <html lang="es">

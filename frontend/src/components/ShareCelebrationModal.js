@@ -254,6 +254,7 @@ export default function ShareCelebrationModal({ celebration, onClose }) {
               data-testid="share-download-btn"
               onClick={downloadImage}
               disabled={busy || loading}
+              className="shrink-0 whitespace-nowrap"
             >
               <Download className="w-4 h-4 mr-2" /> Descargar imagen
             </Button>
