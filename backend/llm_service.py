@@ -145,7 +145,17 @@ Escribi en ESPANOL rioplatense (vos en lugar de tu)."""
             for f in features:
                 if f.get("icon") not in valid_icons:
                     f["icon"] = "bot"
+                # Truncar para evitar UI rota
+                if f.get("title"):
+                    f["title"] = str(f["title"])[:50]
+                if f.get("desc"):
+                    f["desc"] = str(f["desc"])[:120]
             steps = parsed.get("steps", [])[:3]
+            for s in steps:
+                if s.get("title"):
+                    s["title"] = str(s["title"])[:50]
+                if s.get("desc"):
+                    s["desc"] = str(s["desc"])[:120]
             return {
                 "business_tagline": (parsed.get("business_tagline") or "")[:120],
                 "features": features,

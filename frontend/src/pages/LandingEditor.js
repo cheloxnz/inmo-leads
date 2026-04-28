@@ -139,17 +139,20 @@ export default function LandingEditor() {
     try {
       const res = await axios.post(`${API}/auth/tenant/branding/ai-generate`, { description: aiDescription });
       const r = res.data;
-      if (!r.ai_enabled) {
-        toast.warning('IA no configurada en este tenant. Configurá tu OpenAI API Key en /configuracion.');
-        return;
+      // Aplicar el tagline igualmente (es un fallback util) y mostrar warning si IA off
+      if (r.business_tagline) {
+        setData(prev => ({
+          ...prev,
+          business_tagline: r.business_tagline,
+          custom_features: r.features?.length ? r.features : prev.custom_features,
+          custom_steps: r.steps?.length ? r.steps : prev.custom_steps,
+        }));
       }
-      setData(prev => ({
-        ...prev,
-        business_tagline: r.business_tagline || prev.business_tagline,
-        custom_features: r.features?.length ? r.features : prev.custom_features,
-        custom_steps: r.steps?.length ? r.steps : prev.custom_steps,
-      }));
-      toast.success('Copy generado por IA. Revisalo y ajustá lo que necesites.');
+      if (!r.ai_enabled) {
+        toast.warning('IA no configurada. Aplicamos un tagline genérico. Configurá tu OpenAI Key en /configuracion para mejores resultados.');
+      } else {
+        toast.success('Copy generado por IA. Revisalo y ajustá lo que necesites.');
+      }
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error generando copy');
     } finally {

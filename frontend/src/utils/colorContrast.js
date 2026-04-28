@@ -31,25 +31,29 @@ export function contrastRatio(c1, c2) {
 }
 
 export function evaluateColorContrast(primary) {
-  const ratioWhite = contrastRatio(primary, '#ffffff');
-  const ratioBlack = contrastRatio(primary, '#000000');
-  const bestRatio = Math.max(ratioWhite, ratioBlack);
-  const bestText = ratioWhite >= ratioBlack ? '#ffffff' : '#000000';
+  // Evaluamos contraste contra los 2 backgrounds reales que usa la landing:
+  // - Texto del CTA blanco sobre el color (badge, step-number, button bg)
+  // - El color sobre fondo claro (#fafafa) cuando se usa como icon/accent
+  const ratioOnWhite = contrastRatio(primary, '#ffffff');
+  const ratioOnLightBg = contrastRatio(primary, '#fafafa');
+  // El "peor caso" relevante: el color como elemento sobre fondo claro
+  // (lo que ven los usuarios al usar el primary_color como ícono/border).
+  const worstUseCase = Math.min(ratioOnWhite, ratioOnLightBg);
 
   let level = 'fail';
   let message = '';
-  if (bestRatio >= 7) {
+  if (worstUseCase >= 7) {
     level = 'aaa';
-    message = `Excelente contraste (${bestRatio.toFixed(1)}:1) — WCAG AAA`;
-  } else if (bestRatio >= 4.5) {
+    message = `Excelente contraste (${worstUseCase.toFixed(1)}:1) — WCAG AAA`;
+  } else if (worstUseCase >= 4.5) {
     level = 'aa';
-    message = `Buen contraste (${bestRatio.toFixed(1)}:1) — WCAG AA`;
-  } else if (bestRatio >= 3) {
+    message = `Buen contraste (${worstUseCase.toFixed(1)}:1) — WCAG AA`;
+  } else if (worstUseCase >= 3) {
     level = 'aa-large';
-    message = `Contraste limitado (${bestRatio.toFixed(1)}:1) — solo apto para texto grande/UI`;
+    message = `Contraste limitado (${worstUseCase.toFixed(1)}:1) — solo apto para texto grande/UI`;
   } else {
     level = 'fail';
-    message = `Contraste insuficiente (${bestRatio.toFixed(1)}:1) — el texto puede ser ilegible`;
+    message = `Contraste insuficiente (${worstUseCase.toFixed(1)}:1) — el texto blanco será ilegible`;
   }
-  return { level, message, bestRatio, bestText };
+  return { level, message, bestRatio: worstUseCase, bestText: '#ffffff' };
 }

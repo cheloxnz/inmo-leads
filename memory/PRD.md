@@ -34,7 +34,30 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Editor SuperAdmin + Subdomain Routing + Editor Visual de Landing)
+### 2026-04-28 (Sesión Actual - Validaciones Backend + IA Copy + Hints WCAG)
+- **Backend validaciones (`auth_routes.py`):**
+  - `_validate_branding_payload` con regex hex (`#rrggbb`), URL http(s), template_id en whitelist (5 rubros), custom_features/steps debe ser lista (max 5), max 500 chars por string.
+  - 400 con `validation_errors` array para errores de tipo.
+  - **Audit log**: cada PUT con campos rechazados por whitelist se persiste en `db.audit_log` con `tenant_id, user_email, action='branding_rejected_fields', rejected_fields, timestamp`.
+- **🌟 IA Copy Generator (sugerencia SaaS):**
+  - `LLMService.generate_landing_copy(description)` → JSON estructurado: `business_tagline`, 3 features `{icon, title, desc}`, 3 steps. Iconos validados (home/calendar/message/shield/bot), title truncado a 50 chars, desc a 120.
+  - Endpoint `POST /api/auth/tenant/branding/ai-generate` (admin only).
+  - Fallback graceful sin LLM (`ai_enabled=false` con tagline genérico).
+  - UI: box morado "Generar con IA" en LandingEditor que aplica el copy generado al form (incluso fallback, con toast warning).
+- **Separación `whatsapp_display_phone`:**
+  - Nuevo campo en branding whitelist + helper text en UI: "WhatsApp principal" (recibe mensajes) vs "WhatsApp para mostrar" (CTA de la landing).
+  - DynamicLanding usa `whatsapp_display_phone || contact_phone`.
+- **Hints WCAG (`utils/colorContrast.js`):**
+  - `evaluateColorContrast(primary)` calcula ratio WCAG 2.1 contra el peor caso real (white + #fafafa).
+  - Niveles: AAA (≥7), AA (≥4.5), AA-large (≥3), fail (<3).
+  - UI: badge debajo de cada color picker con color verde/rojo según nivel.
+- **Testing 100% PASS (20/20 backend + UI E2E):** `/app/test_reports/iteration_10.json`
+- **Mejoras post-test aplicadas** (sugeridas por testing agent):
+  - colorContrast usa peor-caso real (no best-case).
+  - LLM trunca title/desc para evitar UI rota.
+  - Aplica tagline fallback aunque IA off (mejor UX).
+
+### 2026-04-28 (Sesión Anterior - Editor SuperAdmin + Subdomain Routing + Editor Visual de Landing)
 - **Editor de branding en SuperAdminPanel:** botón "Editar branding" en cada tenant card → form inline con business_name, tagline, template, phone, logo, colores. Botón "Ver landing" abre `/inicio/{tenant_id}`.
 - **Editor Visual de Landing (`/landing/editor`)** para tenant admin:
   - Form completo + **vista previa en tiempo real** (lado derecho) que refleja cambios sin guardar.
