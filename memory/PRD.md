@@ -34,7 +34,18 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Rate-limit AI + Upload Logo + Paleta + Auto-onboarding)
+### 2026-04-28 (Sesión Actual - AI Configuration Assistant + Hardening)
+- **AI Configuration Assistant** (`POST /api/bot-config/ai-edit`, `GET /api/bot-config/ai-edit/info`):
+  - Tenant admin escribe en lenguaje natural (ej. "Cambia horario a 9-19hs y los sabados de 10 a 13") y la IA traduce a JSON contra whitelist de 9 campos del modelo `BotConfig` (business_hours_start/end, business_days, saturday_hours_*, auto_handoff_score, warm_lead_reactivation_days, appointment_reminder_hours, welcome_message).
+  - Flujo de 2 pasos: (1) preview con LLM → devuelve `actions` válidas + `invalid` + `summary` + `previous` para diff visual; (2) apply manda `confirmed_actions` ya validadas (sin llamar LLM otra vez) → evita drift entre preview y apply.
+  - Defensa en capas: type check, rangos por campo (0-23 horas, 1-12 score, 1-72hs reminder, 1-30 días reactivación), validación de días contra set fijo, normalización a minúsculas.
+  - Rate-limit: 10 req/h por tenant (sliding window Redis/in-memory). Solo se consume cuando se llama al LLM, no en la rama apply ni cuando IA no está configurada (503 antes de consumir slot).
+  - Audit log `audit_log` con `action=bot_config_ai_edit`, `instruction`, `applied_changes` (campo + valor para compliance/debug).
+  - UI en `/config` (Configuration.js): tarjeta destacada "Asistente IA de Configuración" con badge Beta, textarea (max 500 chars + counter), 5 chips de ejemplos clickeables, indicador de rate-limit, panel de preview con diff `previous → new` color-coded (verde válido, rojo rechazado), botones Previsualizar/Aplicar/Reiniciar.
+  - Tests: backend 11/11 PASS (info, validaciones 400, no-auth 401/403, sin-key 503, rate-limit 429, regresión /api/config), frontend E2E 12/12 PASS.
+  - Archivos: `/app/backend/routers/bot_config_ai.py`, `/app/frontend/src/components/AIBotConfigAssistant.js`, integración en `Configuration.js` + `server.py`.
+
+### 2026-04-28 (Sesión Anterior - Rate-limit AI + Upload Logo + Paleta + Auto-onboarding)
 - **Rate-limit `/ai-generate`:** sliding window in-memory 5 calls/hora por tenant. Header rate_limit en respuesta. 429 cuando se excede con segundos de retry.
 - **Comparación paleta primary vs accent (`evaluatePaletteHarmony`):**
   - <1.5 → warn-low "casi idénticos, no se va a notar"

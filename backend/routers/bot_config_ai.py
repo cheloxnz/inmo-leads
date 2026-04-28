@@ -111,13 +111,75 @@ async def ai_edit_bot_config(
     Retorna preview de los cambios; si confirm=true, los aplica."""
     instruction = (body or {}).get("instruction", "").strip()
     confirm = bool((body or {}).get("confirm", False))
+    confirmed_actions = (body or {}).get("confirmed_actions")  # opcional: preview ya validado
 
     if not instruction:
         raise HTTPException(status_code=400, detail="instruction requerido")
     if len(instruction) > 500:
         raise HTTPException(status_code=400, detail="instruction demasiado largo (>500 chars)")
 
-    # Rate-limit
+    # Si viene confirmed_actions desde el frontend, NO llamamos al LLM otra vez:
+    # re-validamos la whitelist (defense in depth) y aplicamos directo.
+    # Esto evita la inconsistencia "el usuario edita el textarea entre preview y apply".
+    if confirm and isinstance(confirmed_actions, list) and confirmed_actions:
+        valid_actions = []
+        invalid = []
+        for action in confirmed_actions:
+            if not isinstance(action, dict):
+                continue
+            field = action.get("field")
+            value = action.get("value")
+            if field == "business_days" and isinstance(value, list):
+                value = [d.lower() if isinstance(d, str) else d for d in value]
+            reason = _validate_action(field, value)
+            if reason:
+                invalid.append({"field": field, "value": value, "reason": reason})
+                continue
+            valid_actions.append({"field": field, "value": value})
+
+        if not valid_actions:
+            raise HTTPException(status_code=400, detail="confirmed_actions invalidas")
+
+        update_doc = {a["field"]: a["value"] for a in valid_actions}
+        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+        update_doc["updated_by_ai"] = True
+        await db.bot_config.update_one(
+            {"tenant_id": current_user.tenant_id},
+            {"$set": update_doc, "$setOnInsert": {"tenant_id": current_user.tenant_id}},
+            upsert=True,
+        )
+        try:
+            await db.audit_log.insert_one({
+                "tenant_id": current_user.tenant_id,
+                "user_email": current_user.email,
+                "action": "bot_config_ai_edit",
+                "instruction": instruction,
+                "applied_changes": [
+                    {"field": a["field"], "value": a["value"]}
+                    for a in valid_actions
+                ],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"audit_log insert failed: {e}")
+
+        return {
+            "applied": True,
+            "applied_fields": [a["field"] for a in valid_actions],
+            "invalid": invalid,
+        }
+
+    # Pre-check: si IA no esta configurada, retornar 503 ANTES de consumir rate-limit.
+    from llm_service import create_llm_for_tenant
+    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
+    llm = create_llm_for_tenant(tenant)
+    if not llm.client:
+        raise HTTPException(
+            status_code=503,
+            detail="IA no configurada. Configura tu OpenAI Key en Configuracion."
+        )
+
+    # Rate-limit (solo cuando vamos a llamar al LLM)
     rate_key = f"bot-cfg-ai:{current_user.tenant_id}"
     allowed, remaining = await check_rate_limit(rate_key, _RATE_MAX, _RATE_WINDOW)
     if not allowed:
@@ -132,17 +194,6 @@ async def ai_edit_bot_config(
         {"tenant_id": current_user.tenant_id}, {"_id": 0}
     ) or {}
     current_view = {k: v for k, v in bot_config.items() if k in _BOT_CONFIG_FIELDS}
-
-    # Llamar LLM
-    from llm_service import create_llm_for_tenant
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    llm = create_llm_for_tenant(tenant)
-
-    if not llm.client:
-        raise HTTPException(
-            status_code=503,
-            detail="IA no configurada. Configura tu OpenAI Key en Configuracion."
-        )
 
     user_prompt = (
         f"Configuracion actual del bot:\n{json.dumps(current_view, indent=2, ensure_ascii=False)}\n\n"
@@ -178,17 +229,12 @@ async def ai_edit_bot_config(
             continue
         field = action.get("field")
         value = action.get("value")
-        # Normalizar dias a minusculas
         if field == "business_days" and isinstance(value, list):
             value = [d.lower() if isinstance(d, str) else d for d in value]
 
         reason = _validate_action(field, value)
         if reason:
-            invalid.append({
-                "field": field,
-                "value": value,
-                "reason": reason,
-            })
+            invalid.append({"field": field, "value": value, "reason": reason})
             continue
         valid_actions.append({
             "field": field,
@@ -197,7 +243,7 @@ async def ai_edit_bot_config(
             "previous": current_view.get(field),
         })
 
-    response_data = {
+    return {
         "preview": {
             "actions": valid_actions,
             "invalid": invalid,
@@ -210,34 +256,6 @@ async def ai_edit_bot_config(
             "window_seconds": _RATE_WINDOW,
         },
     }
-
-    # Aplicar cambios solo si confirm=true y hay acciones validas
-    if confirm and valid_actions:
-        update_doc = {a["field"]: a["value"] for a in valid_actions}
-        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-        update_doc["updated_by_ai"] = True
-        await db.bot_config.update_one(
-            {"tenant_id": current_user.tenant_id},
-            {"$set": update_doc, "$setOnInsert": {"tenant_id": current_user.tenant_id}},
-            upsert=True,
-        )
-        # Audit log
-        try:
-            await db.audit_log.insert_one({
-                "tenant_id": current_user.tenant_id,
-                "user_email": current_user.email,
-                "action": "bot_config_ai_edit",
-                "instruction": instruction,
-                "applied_fields": [a["field"] for a in valid_actions],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-        except Exception as e:
-            logger.warning(f"audit_log insert failed: {e}")
-
-        response_data["applied"] = True
-        response_data["applied_fields"] = [a["field"] for a in valid_actions]
-
-    return response_data
 
 
 @router.get("/bot-config/ai-edit/info")

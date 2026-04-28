@@ -84,9 +84,15 @@ export default function AIBotConfigAssistant({ onApplied }) {
     if (!preview || !preview.actions?.length) return;
     setApplying(true);
     try {
+      // Mandamos las acciones validadas del preview, NO la instruction de nuevo.
+      // Asi evitamos que un edit del textarea entre preview y apply cambie lo aplicado.
       const r = await axios.post(`${API}/bot-config/ai-edit`, {
         instruction: instruction.trim(),
         confirm: true,
+        confirmed_actions: preview.actions.map(a => ({
+          field: a.field,
+          value: a.value,
+        })),
       });
       if (r.data.applied) {
         toast.success(`Aplicados ${r.data.applied_fields?.length || 0} cambio(s)`);
