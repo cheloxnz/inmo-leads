@@ -39,7 +39,63 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="Inmobiliaria WhatsApp Bot")
+# Lifespan handler (reemplaza @app.on_event deprecado)
+from contextlib import asynccontextmanager  # noqa: E402
+
+# scheduler/assignment_engine se inician dentro del lifespan (defs mas abajo).
+@asynccontextmanager
+async def lifespan(_app):
+    # Startup
+    global assignment_engine
+    logger.info("Iniciando tareas programadas...")
+    assignment_engine = AssignmentEngine(db)
+    try:
+        await db.tenants.create_index("tenant_id", unique=True)
+        await db.agents.create_index("email", unique=True)
+        await db.products.create_index([("tenant_id", 1), ("product_id", 1)], unique=True)
+        await db.widget_analytics.create_index([("tenant_id", 1), ("event_type", 1), ("created_at", -1)])
+        # Coach: indices y TTL
+        await db.coach_nudges.create_index([("tenant_id", 1), ("nudge_type", 1), ("dismissed_at", 1)])
+        await db.coach_nudges.create_index([("nudge_id", 1)], unique=True)
+        await db.coach_nudges.create_index(
+            "dismissed_at", expireAfterSeconds=90 * 86400, name="dismissed_at_ttl"
+        )
+        await db.coach_celebrations.create_index(
+            [("tenant_id", 1), ("celebration_type", 1)], unique=True
+        )
+        await db.coach_celebrations.create_index([("celebration_id", 1)], unique=True)
+        await db.coach_celebrations.create_index(
+            "seen_at", expireAfterSeconds=30 * 86400, name="seen_at_ttl"
+        )
+
+        # Migracion one-shot: legacy ISO strings -> BSON datetime para TTL
+        from datetime import datetime as _dt
+        for col, field in (("coach_nudges", "dismissed_at"), ("coach_nudges", "created_at")):
+            legacy = await db[col].count_documents({field: {"$type": "string"}})
+            if legacy:
+                cursor = db[col].find({field: {"$type": "string"}}, {"_id": 1, field: 1})
+                migrated = 0
+                async for doc in cursor:
+                    try:
+                        parsed = _dt.fromisoformat(str(doc[field]).replace("Z", "+00:00"))
+                        await db[col].update_one({"_id": doc["_id"]}, {"$set": {field: parsed}})
+                        migrated += 1
+                    except Exception:
+                        pass
+                logger.info(f"Migrated {migrated} legacy {col}.{field} strings -> BSON datetime")
+        logger.info("Indices unique creados/verificados")
+    except Exception as e:
+        logger.warning(f"No se pudieron crear indices unique: {e}")
+
+    await scheduler.start()
+    yield
+    # Shutdown
+    logger.info("Deteniendo tareas programadas...")
+    await scheduler.stop()
+    client.close()
+
+
+app = FastAPI(title="Inmobiliaria WhatsApp Bot", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(
@@ -1643,67 +1699,3 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Inicia tareas programadas al arrancar el servidor"""
-    global assignment_engine
-    logger.info("Iniciando tareas programadas...")
-    assignment_engine = AssignmentEngine(db)
-
-    # Indices uniqueness para evitar race conditions
-    try:
-        await db.tenants.create_index("tenant_id", unique=True)
-        await db.agents.create_index("email", unique=True)
-        await db.products.create_index([("tenant_id", 1), ("product_id", 1)], unique=True)
-        await db.widget_analytics.create_index([("tenant_id", 1), ("event_type", 1), ("created_at", -1)])
-        # Coach: indice compuesto para acelerar lookup de nudges activos
-        await db.coach_nudges.create_index([("tenant_id", 1), ("nudge_type", 1), ("dismissed_at", 1)])
-        await db.coach_nudges.create_index([("nudge_id", 1)], unique=True)
-        # Coach: TTL index sobre dismissed_at -> auto-purge de nudges descartados tras 90 dias.
-        # Mongo NO borra docs donde el campo es null (solo aplica si es BSON Date).
-        await db.coach_nudges.create_index(
-            "dismissed_at", expireAfterSeconds=90 * 86400, name="dismissed_at_ttl"
-        )
-        # Celebrations: idempotencia (1 por tenant_id + tipo) y TTL 30 dias sobre seen_at
-        await db.coach_celebrations.create_index(
-            [("tenant_id", 1), ("celebration_type", 1)], unique=True
-        )
-        await db.coach_celebrations.create_index([("celebration_id", 1)], unique=True)
-        await db.coach_celebrations.create_index(
-            "seen_at", expireAfterSeconds=30 * 86400, name="seen_at_ttl"
-        )
-
-        # Migracion one-shot: dismissed_at legacy como string ISO -> BSON datetime
-        # (necesario para que el TTL index dismissed_at_ttl pueda purgarlos tras 90d)
-        legacy_count = await db.coach_nudges.count_documents({
-            "dismissed_at": {"$type": "string"}
-        })
-        if legacy_count:
-            from datetime import datetime as _dt
-            cursor = db.coach_nudges.find({"dismissed_at": {"$type": "string"}}, {"_id": 1, "dismissed_at": 1})
-            migrated = 0
-            async for doc in cursor:
-                try:
-                    val = doc["dismissed_at"]
-                    parsed = _dt.fromisoformat(val.replace("Z", "+00:00"))
-                    await db.coach_nudges.update_one(
-                        {"_id": doc["_id"]},
-                        {"$set": {"dismissed_at": parsed}},
-                    )
-                    migrated += 1
-                except Exception:
-                    pass
-            logger.info(f"Migrated {migrated} legacy dismissed_at strings -> BSON datetime")
-        logger.info("Indices unique creados/verificados")
-    except Exception as e:
-        logger.warning(f"No se pudieron crear indices unique: {e}")
-
-    await scheduler.start()
-
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    """Detiene tareas y cierra conexiones al apagar el servidor"""
-    logger.info("Deteniendo tareas programadas...")
-    await scheduler.stop()
-    client.close()

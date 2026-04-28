@@ -32,6 +32,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from auth_routes import require_admin, get_db, get_current_user
 from models import User
+from cache_util import ttl_cache_get, ttl_cache_set, ttl_cache_invalidate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["coach"])
@@ -42,6 +43,7 @@ DEFAULT_ACCENT = "#8b5cf6"
 # Retencion de nudges descartados (TTL Mongo).
 NUDGE_DISMISS_TTL_DAYS = 90
 CELEBRATION_TTL_DAYS = 30
+CELEBRATIONS_DETECT_TTL = 60.0  # cache 60s para evitar N find_one por GET
 
 
 class Severity(str, Enum):
@@ -173,7 +175,7 @@ async def _evaluate_tenant(tenant: dict, db) -> int:
             "cta_text": payload["cta_text"],
             "cta_url": payload["cta_url"],
             "severity": sev,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc),  # BSON datetime (consistencia con dismissed_at)
             "dismissed_at": None,
         }
         await db.coach_nudges.insert_one(doc)
@@ -213,6 +215,12 @@ async def list_nudges(
         {"tenant_id": current_user.tenant_id, "dismissed_at": None},
         {"_id": 0},
     ).sort("created_at", -1).to_list(length=20)
+    # Normalizar datetime BSON -> ISO string para JSON
+    for d in docs:
+        for k in ("created_at", "dismissed_at"):
+            v = d.get(k)
+            if isinstance(v, datetime):
+                d[k] = v.isoformat()
     return {"nudges": docs, "count": len(docs)}
 
 
@@ -236,6 +244,8 @@ async def dismiss_nudge(
     # Tras dismiss, evaluar si el signal subyacente esta resuelto -> crear celebracion
     try:
         await _maybe_create_celebration(current_user.tenant_id, nudge_id, db)
+        # Invalidar cache de detection: el proximo GET evaluara fresco
+        ttl_cache_invalidate("celebrations_detected", current_user.tenant_id)
     except Exception as e:
         logger.warning(f"celebration check fallo: {e}")
     return {"dismissed": True}
@@ -373,15 +383,17 @@ async def list_celebrations(
     current_user: User = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    """Detecta nuevas celebraciones y devuelve las no vistas del tenant."""
-    # Evaluar signals en cada request (lazy detection)
-    await _detect_celebrations_for_tenant(current_user.tenant_id, db)
+    """Detecta nuevas celebraciones (lazy, cacheado 60s) y devuelve las no vistas del tenant."""
+    # Cache: solo correr la deteccion completa cada 60s por tenant
+    cache_key = current_user.tenant_id
+    if ttl_cache_get("celebrations_detected", cache_key) is None:
+        await _detect_celebrations_for_tenant(current_user.tenant_id, db)
+        ttl_cache_set("celebrations_detected", cache_key, True, ttl=CELEBRATIONS_DETECT_TTL)
 
     docs = await db.coach_celebrations.find(
         {"tenant_id": current_user.tenant_id, "seen_at": None},
         {"_id": 0},
     ).sort("created_at", -1).to_list(length=10)
-    # Convertir datetimes a ISO para JSON
     for d in docs:
         if isinstance(d.get("created_at"), datetime):
             d["created_at"] = d["created_at"].isoformat()
@@ -402,6 +414,79 @@ async def mark_celebration_seen(
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Celebracion no encontrada o ya vista")
     return {"seen": True}
+
+
+@router.post("/coach/celebrations/{celebration_id}/share")
+async def track_celebration_share(
+    celebration_id: str,
+    body: dict = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Registra que el usuario compartio una celebracion (analytics + KPI Coach effectiveness).
+
+    Body: {"platform": "twitter|linkedin|download|copy"}.
+    Devuelve datos para construir la card en frontend (canvas) y el share text.
+    """
+    platform = ((body or {}).get("platform") or "unknown")[:20].lower()
+    if platform not in {"twitter", "linkedin", "facebook", "download", "copy", "unknown"}:
+        platform = "unknown"
+
+    cel = await db.coach_celebrations.find_one(
+        {"celebration_id": celebration_id, "tenant_id": current_user.tenant_id},
+        {"_id": 0},
+    )
+    if not cel:
+        raise HTTPException(status_code=404, detail="Celebracion no encontrada")
+
+    tenant = await db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id},
+        {"_id": 0, "business_name": 1, "name": 1, "logo_url": 1,
+         "primary_color": 1, "accent_color": 1},
+    ) or {}
+
+    # Persistir share count
+    await db.coach_celebrations.update_one(
+        {"celebration_id": celebration_id, "tenant_id": current_user.tenant_id},
+        {"$inc": {f"shares.{platform}": 1, "shares.total": 1},
+         "$set": {"last_shared_at": datetime.now(timezone.utc)}},
+    )
+    # Audit log
+    try:
+        await db.audit_log.insert_one({
+            "tenant_id": current_user.tenant_id,
+            "user_email": current_user.email,
+            "action": "celebration_shared",
+            "celebration_type": cel.get("celebration_type"),
+            "platform": platform,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+
+    business = tenant.get("business_name") or tenant.get("name") or "Mi negocio"
+    share_text = (
+        f"{cel.get('emoji', '🎉')} {cel.get('title', 'Logre un milestone')} "
+        f"con InmoBot AI 🚀\n\n#SaaS #AI #WhatsApp #PyME"
+    )
+
+    return {
+        "tracked": True,
+        "platform": platform,
+        "card_data": {
+            "celebration_type": cel.get("celebration_type"),
+            "emoji": cel.get("emoji", "🎉"),
+            "title": cel.get("title"),
+            "body": cel.get("body"),
+            "metric": cel.get("metric"),
+            "business_name": business,
+            "logo_url": tenant.get("logo_url") or "",
+            "primary_color": tenant.get("primary_color") or DEFAULT_PRIMARY,
+            "accent_color": tenant.get("accent_color") or DEFAULT_ACCENT,
+            "powered_by": "InmoBot AI",
+        },
+        "share_text": share_text,
+    }
 
 
 @router.post("/coach/run")

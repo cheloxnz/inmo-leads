@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { API } from '../App';
 import { toast } from 'sonner';
 import { X, AlertCircle, Lightbulb, Zap, ArrowRight } from 'lucide-react';
@@ -94,13 +95,25 @@ export default function CoachNudges() {
             <div className="flex-1 min-w-0">
               <h4 className={`font-semibold text-sm ${style.title}`}>{n.title}</h4>
               <p className={`text-sm mt-1 ${style.body}`}>{n.body}</p>
-              <a
-                href={n.cta_url}
-                data-testid={`coach-nudge-cta-${n.nudge_type}`}
-                className={`inline-flex items-center gap-1 mt-3 text-xs px-3 py-1.5 text-white rounded-full font-medium transition-colors ${style.cta}`}
-              >
-                {n.cta_text} <ArrowRight className="w-3 h-3" />
-              </a>
+              {n.cta_url?.startsWith('/') ? (
+                <Link
+                  to={n.cta_url}
+                  data-testid={`coach-nudge-cta-${n.nudge_type}`}
+                  className={`inline-flex items-center gap-1 mt-3 text-xs px-3 py-1.5 text-white rounded-full font-medium transition-colors ${style.cta}`}
+                >
+                  {n.cta_text} <ArrowRight className="w-3 h-3" />
+                </Link>
+              ) : (
+                <a
+                  href={n.cta_url}
+                  data-testid={`coach-nudge-cta-${n.nudge_type}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex items-center gap-1 mt-3 text-xs px-3 py-1.5 text-white rounded-full font-medium transition-colors ${style.cta}`}
+                >
+                  {n.cta_text} <ArrowRight className="w-3 h-3" />
+                </a>
+              )}
             </div>
             <button
               data-testid={`coach-nudge-dismiss-${n.nudge_type}`}
