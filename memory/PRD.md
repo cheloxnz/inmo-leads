@@ -34,7 +34,15 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Widget Tracking + SuperAdmin Dashboard)
+### 2026-04-28 (Sesión Actual - Backlog: Rate-limit + Attribution + auto-resize + refactor)
+- **Rate-limit en `/api/public/catalog/{tenant_id}/track`:** Sliding window en memoria (deque). 30 reqs/60s por IP+tenant; 429 si excede. _Nota:_ in-memory ⇒ válido sólo single-instance.
+- **iframe auto-resize:** PublicCatalog (con `?embed=1`) emite `postMessage({type:'inmobot-resize', tenant, height})` con ResizeObserver. widget.js drop-in escucha y ajusta el iframe al contenido.
+- **🌟 Lead Attribution Engine:** Lead que llega por WhatsApp con click_whatsapp <30min se marca con `source='widget'`, `referring_product_id`, `widget_session_id` y emite event `lead_generated`. UI muestra "Leads del widget / Total / Share %".
+- **Refactor adicional:** `routers/templates.py` extraído.
+- **Bugs HIGH fixados** (testing agent iter_7): `lead.source` ya no se sobreescribe por save_lead; `NameError updated_lead` en branch generic_flow resuelto.
+- **Testing 100% PASS (19/20 backend - 1 skip intencional):** `/app/test_reports/iteration_8.json`
+
+### 2026-04-28 (Sesión Anterior - Widget Tracking + SuperAdmin Dashboard)
 - **🌟 Widget Conversion Tracking (sugerencia SaaS implementada):**
   - Servicio `widget_analytics_service.py` con eventos: `view`, `click_product`, `click_whatsapp`, `ai_search`, `lead_generated`. IP hasheada (SHA256 truncado, no PII).
   - Endpoint público `POST /api/public/catalog/{tenant_id}/track` (sin auth). 404 si tenant inactivo/inexistente.
