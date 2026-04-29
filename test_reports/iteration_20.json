@@ -1,0 +1,37 @@
+{
+  "summary": "Iter21 - Programa de Comisiones por Referidos. Backend: 12/12 iter21 pytest PASS + 48/48 regression (iter17-20) PASS. Frontend: ReferralProgramSection renders for tenant admin with all KPIs, copy link, table; superadmin does NOT see section; regression routes /flujo, /landing/editor, /marketing render OK.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/config Programa de referidos -> Tu link de referido", "issues": ["Botón 'Copiar' en la fila del link de referido aparece visualmente con bajo contraste / texto casi invisible (parece transparente). Sugerir verificar variant/className del Button (size='sm') frente al fondo claro de la card. El botón 'Compartir' (variant='outline') sí se ve correcto."]},
+    {"screen": "/config Facturacion y Plan", "issues": ["Botón previo a 'Cancelar suscripcion' aparece sin texto/transparente — fuera de scope iter21 pero detectado por contraste pobre."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter21_commissions.py",
+    "/app/test_reports/pytest/iter21_results.xml",
+    "/app/test_reports/pytest/iter17_21_regression.xml"
+  ],
+  "action_items": [
+    "(Opcional, design polish) Aumentar contraste/visibilidad del botón 'Copiar' en rp-link-row — actualmente queda casi invisible sobre fondo claro. Confirmar que tema default de shadcn Button size='sm' (variant default) tenga estilos cargados para .rp-link-row > button."
+  ],
+  "critical_code_review_comments": [
+    "commission_service.py: cálculo correcto, idempotencia OK, anti-fraude cubre 3 vectores. Bien tipado y con logging.",
+    "routers/commissions.py: usa require_admin (correcto); excluye _id en find; bloquea superadmin acceso indirecto via require_admin (superadmin SIN tenant_id no podría usar este endpoint, pero el frontend ya lo gatea con isSuperAdmin return null).",
+    "ReferralProgramSection.js: clean, usa data-testid en KPIs/link/table/empty. eslint-disable de exhaustive-deps justificado. navigator.share fallback a copy OK.",
+    "Pequeña sugerencia (no crítico): considerar manejar 401/403 en fetchSummary para mostrar mensaje claro si endpoint deniega; actualmente cae al bloque error genérico."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com/Demo123! (tenant admin), admin@inmobot.com/Admin123! (superadmin) — verificadas en /app/memory/test_credentials.md",
+  "seed_data_creation": "Tests crean fixtures temporales en colecciones tenants/agents/audit_log/commissions con prefijo TEST_iter21_ y limpian en teardown via cleanup_tracker.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter21 completamente validado. Backend 12/12 + 48/48 regression. Frontend confirmó: rp-section visible solo para tenant admin (no superadmin), KPIs (active-credit/active-count/lifetime), rp-link-input con /signup?ref={tenant_id}, tabla rp-commissions-table O empty state rp-empty según haya datos. Demo tenant en runtime mostró la tabla (residual de tests previos en mongo) — el empty state está implementado y testeado en código pero requiere DB limpia para verse. Endpoint /api/commissions/summary 200 con bearer, 401 sin token. Endpoints regression /api/billing /api/coach/effectiveness /api/coach/referral-stats todos 200. Único hallazgo cosmético: botón 'Copiar' del link tiene contraste bajo.",
+  "rca of the issue": "N/A - no critical issues encountered."
+}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import BillingSection from '../components/BillingSection';
+import ReferralProgramSection from '../components/ReferralProgramSection';
 import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 
 export default function Configuration() {
@@ -226,6 +227,8 @@ export default function Configuration() {
       </div>
 
       <BillingSection />
+
+      <ReferralProgramSection />
     </div>
   );
 }
