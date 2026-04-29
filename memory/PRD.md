@@ -34,6 +34,32 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-29 (Sesión Actual - Iter21 - Programa de Comisiones por Referidos)
+- **Servicio `commission_service.py`**: lifecycle completo de comisiones por referidos.
+  - **Reglas:** $5/mes por cada referido convertido y pagando, durante 365 días, topeado al 100% del precio del plan del referrer (`SUBSCRIPTION_PLANS[plan].price_monthly`).
+  - **Estados:** `pending` (registrado, no pagó) → `active` (1ra factura paga) → `expired` (cumplió 365d) / `cancelled` (referido canceló).
+  - **`is_self_referral(db, ref, email, ip)`**: anti-fraude triple — (1) email exacto coincide con un agent del referrer, (2) dominio corporativo no-free coincide (whitelist `gmail.com`, `yahoo.com`, etc. excluidos), (3) IP del signup matchea `audit_log` del referrer en últimas 24h.
+  - **`create_commission_on_first_payment(db, referred_tenant_id)`**: idempotente por par `(referrer_tenant_id, referred_tenant_id)`. Si ya existía pending, la activa.
+  - **`calculate_active_credit_for_tenant(db, referrer)`**: auto-expira las que vencieron + suma `amount_per_month_usd` de las activas + cap a `plan_price_usd`. Devuelve `{amount_usd, capped_amount_usd, plan_price_usd, plan_id, is_capped, active_count, breakdown[]}`.
+  - **`cancel_commissions_for_referred`** + **`expire_due_commissions`** (cron 24h).
+- **Stripe Webhooks (`payment_service.py`):**
+  - `invoice.paid`: detecta 1ra factura paga (`prior_paid==0`) → si `tenant.referred_by`, llama `create_commission_on_first_payment`. Llama `_record_applied_commission` para distribuir el descuento facturado entre commissions activas (FIFO por `created_at`, suma a `total_credited_usd`, push a `applied_invoices`).
+  - `invoice.upcoming`: ~1h antes del cobro, calcula `capped_amount_usd` del referrer y crea `stripe.InvoiceItem` con `amount=-int(round(amount*100))` cents (negativo = descuento).
+  - `customer.subscription.deleted`: cancela commissions del referido.
+- **Anti-fraude en onboarding (`routers/onboarding.py` L166-186):** captura IP via `request.client.host`, valida con `is_self_referral` antes de persistir `referred_by`. Si fraude detectado, log silencioso y no se persiste el ref.
+- **Endpoint `GET /api/commissions/summary`** (admin): expone `{config: {amount_per_referral_usd, duration_days}, active_credit, total_lifetime_credit_usd, by_status, commissions[]}` enriquecido con `referred_business_name`, `applied_invoices_count`, fechas ISO.
+- **Scheduler:** `run_commission_expiry` cada 24h marca como expired las que pasaron `expires_at`.
+- **Indices Mongo (`server.py`):** `commissions.commission_id` unique, compuesto `(referrer_tenant_id, referred_tenant_id)` unique, `(referrer_tenant_id, status)`, `(status, expires_at)`.
+- **UI `ReferralProgramSection.js`** (montado en `/config` debajo de Facturación):
+  - Tres KPI cards: **Crédito activo este mes** (verde, capped o no), **Referidos activos**, **Total ahorrado histórico**.
+  - **Banner de cap** (Sparkles): solo si `is_capped`, mensaje "¡Tu suscripción es gratis!".
+  - **Link copiable**: `${origin}/signup?ref=${tenant_id}` con botones Copiar (toast inline `¡Copiado!`) y Compartir (navigator.share fallback a clipboard).
+  - **Tabla de comisiones** con status pill (active/pending/expired/cancelled), $/mes, total acreditado, fecha de expiración + días restantes.
+  - **Empty state** con icono Gift cuando `commissions.length === 0`.
+  - SuperAdmin: `return null` (no aplicable a SuperAdmin).
+- **Tests:** Backend 12/12 PASS (`/app/backend/tests/test_iter21_commissions.py`) — anti-fraud x3, lifecycle (create/idempotent/no-ref), credit cap (capped/not-capped/auto-expired), cancellation, summary endpoint shape + integration. Regression 48/48 (iter17-20). Frontend E2E 100%: rp-section visible para tenant admin, oculta para superadmin, KPIs/link/tabla/empty state OK. Único hallazgo cosmético: contraste del botón "Copiar" — corregido con `.rp-btn-primary` (background #6366f1).
+- **Archivos:** `/app/backend/commission_service.py` (nuevo), `/app/backend/routers/commissions.py` (nuevo), `/app/backend/payment_service.py` (webhook hooks), `/app/backend/routers/onboarding.py` (anti-fraud), `/app/backend/scheduler.py` (expire job), `/app/backend/server.py` (indices + router), `/app/frontend/src/components/ReferralProgramSection.js` (nuevo), `/app/frontend/src/pages/Configuration.js` (mount), `/app/frontend/src/App.css` (estilos `.rp-*`), `/app/backend/tests/test_iter21_commissions.py` (nuevo).
+
 ### 2026-04-28 (Sesión Actual - Coach Effectiveness Dashboard)
 - **Endpoint `GET /api/coach/effectiveness?days=N`** (admin):
   - **funnel agregado:** shares_explicit, preview_views, html_views, leads_captured, signups_converted.

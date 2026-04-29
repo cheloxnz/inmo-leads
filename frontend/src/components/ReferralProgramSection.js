@@ -176,7 +176,7 @@ export default function ReferralProgramSection() {
               data-testid="rp-link-input"
               onClick={(e) => e.target.select()}
             />
-            <Button size="sm" onClick={handleCopy} data-testid="rp-copy-btn">
+            <Button size="sm" onClick={handleCopy} data-testid="rp-copy-btn" className="rp-btn-primary">
               {copied ? <CheckCircle className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
               {copied ? '¡Copiado!' : 'Copiar'}
             </Button>

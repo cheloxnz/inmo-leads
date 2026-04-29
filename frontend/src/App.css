@@ -7557,3 +7557,14 @@ body {
 @media (max-width: 768px) {
   .rp-kpis { grid-template-columns: 1fr; }
 }
+
+/* Forzar contraste del botón principal de copy en referral section */
+.rp-link-row .rp-btn-primary {
+  background: #6366f1 !important;
+  color: #fff !important;
+  border: 0 !important;
+  font-weight: 600;
+}
+.rp-link-row .rp-btn-primary:hover {
+  background: #4f46e5 !important;
+}
