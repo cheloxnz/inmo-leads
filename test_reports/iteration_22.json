@@ -1,0 +1,25 @@
+{
+  "summary": "Iter23 Stripe Coupon Codes + generic Login refresh tested end-to-end. Backend: 23/23 iter23 tests PASS + 34/34 iter20-22 regression PASS + 15/15 iter19 regression PASS = 72/72 backend tests PASS. Frontend: Login page shows new tagline 'Bot de WhatsApp con IA para tu negocio' (old text removed), /logo-generic.svg loads (HTTP 200, image/svg+xml, naturalWidth=150). /config Programa de referidos shows purple promo card with code 'DEMOIN-G8AUAA' in monospace font ('SF Mono', Menlo, monospace) + functional copy button. Referral link with UTM still works (regression OK).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_stripe_coupons.py",
+    "/app/test_reports/pytest/iter23_results.xml",
+    "/app/test_reports/pytest/iter20_22_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "commission_service.find_referrer_by_promo_code already normalizes via .upper().strip(), well done.",
+    "get_or_create_referral_code Stripe block correctly handles missing STRIPE_API_KEY by skipping silently and returning stripe_enabled=false (graceful).",
+    "Promo card UI uses monospace + tracking; copy button gracefully degrades when Clipboard API blocked (logs to console, no crash).",
+    "Note: navigator.clipboard fails in headless/non-secure contexts but works in user browsers — consider fallback (textarea + execCommand) for older browsers, but low priority."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (72/72)", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant admin), admin@inmobot.com / Admin123! (superadmin)",
+  "seed_data_creation": "None — used existing demo-inmobiliaria seed. Demo tenant code persisted: DEMOIN-G8AUAA. All test data cleaned up via cleanup_tracker fixture.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter23 fully validated. STRIPE_API_KEY not set in preview → stripe_enabled=false expected. Real Stripe webhook attribution via promo metadata is unit-tested with mocks (PromotionCode.retrieve). When STRIPE_API_KEY is added in production, lazy creation of Coupon + PromotionCode will trigger on first GET /api/commissions/promo-code per tenant. Frontend served via 'serve -s build' — main agent must rebuild frontend after JS/CSS changes.",
+  "rca of the issue": "N/A — no issues found."
+}

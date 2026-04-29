@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#bg)"/>
+  <g transform="translate(60 60)">
+    <!-- chat bubble shape -->
+    <path d="M-32 -22 Q-32 -34 -20 -34 L20 -34 Q32 -34 32 -22 L32 6 Q32 18 20 18 L4 18 L-4 28 L-4 18 L-20 18 Q-32 18 -32 6 Z"
+          fill="#ffffff" opacity="0.96"/>
+    <!-- bot eyes -->
+    <circle cx="-10" cy="-9" r="4.2" fill="#6366f1"/>
+    <circle cx="10" cy="-9" r="4.2" fill="#6366f1"/>
+    <!-- mouth/grin -->
+    <path d="M-9 4 Q0 11 9 4" stroke="#6366f1" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+    <!-- sparkle -->
+    <path d="M22 -32 L24 -27 L29 -25 L24 -23 L22 -18 L20 -23 L15 -25 L20 -27 Z" fill="url(#spark)"/>
+  </g>
+</svg>

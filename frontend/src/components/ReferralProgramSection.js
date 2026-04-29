@@ -33,6 +33,7 @@ export default function ReferralProgramSection() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [copiedPromo, setCopiedPromo] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -82,6 +83,8 @@ export default function ReferralProgramSection() {
   const credit = data.active_credit || {};
   const config = data.config || {};
   const lifetime = data.total_lifetime_credit_usd || 0;
+  const promoCode = data.promo_code?.code || '';
+  const stripeEnabled = !!data.promo_code?.stripe_enabled;
 
   const handleCopy = async () => {
     if (!refLink) return;
@@ -105,6 +108,17 @@ export default function ReferralProgramSection() {
       } catch (e) { /* user cancelled */ }
     } else {
       handleCopy();
+    }
+  };
+
+  const handleCopyPromo = async () => {
+    if (!promoCode) return;
+    try {
+      await navigator.clipboard.writeText(promoCode);
+      setCopiedPromo(true);
+      setTimeout(() => setCopiedPromo(false), 2000);
+    } catch (err) {
+      console.error('clipboard failed', err);
     }
   };
 
@@ -156,6 +170,38 @@ export default function ReferralProgramSection() {
             queda topeado al 100% del plan, pero los meses extra siguen contando si en algún momento subís de plan.
           </div>
         </div>
+      )}
+
+      {/* Promo Code (Stripe) */}
+      {promoCode && (
+        <Card className="rp-promo-card" data-testid="rp-promo-card">
+          <CardHeader className="rp-promo-card-header">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Gift className="w-4 h-4" />
+              Tu código de cupón
+              {stripeEnabled && (
+                <span className="rp-stripe-badge">Stripe activo</span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="rp-promo-card-content">
+            <div className="rp-promo-row">
+              <div className="rp-promo-code-display" data-testid="rp-promo-code-display">{promoCode}</div>
+              <Button
+                size="sm"
+                onClick={handleCopyPromo}
+                data-testid="rp-promo-copy-btn"
+                className="rp-btn-primary"
+              >
+                {copiedPromo ? <CheckCircle className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                {copiedPromo ? '¡Copiado!' : 'Copiar código'}
+              </Button>
+            </div>
+            <p className="rp-promo-hint">
+              Tus referidos pueden ingresar este código directo al pagar en <strong>Stripe Checkout</strong> y reciben <strong>5% off el primer mes</strong>. Vos seguís ganando ${config.amount_per_referral_usd || 5}/mes durante 12 meses por cada uno que active su plan. Funciona aunque pierdan el link.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Referral link */}

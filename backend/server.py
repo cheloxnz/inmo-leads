@@ -84,6 +84,14 @@ async def lifespan(_app):
         await db.commissions.create_index([("referrer_tenant_id", 1), ("status", 1)])
         await db.commissions.create_index([("status", 1), ("expires_at", 1)])
 
+        # Referral codes (Stripe Promotion Code attribution): unique parcial
+        await db.tenants.create_index(
+            [("referral_code", 1)],
+            unique=True,
+            partialFilterExpression={"referral_code": {"$type": "string"}},
+            name="tenant_referral_code_unique",
+        )
+
         # Migracion one-shot: legacy ISO strings -> BSON datetime para TTL
         from datetime import datetime as _dt
         for col, field in (("coach_nudges", "dismissed_at"), ("coach_nudges", "created_at")):

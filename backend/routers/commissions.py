@@ -1,19 +1,60 @@
 """Endpoints del programa de comisiones por referidos."""
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
+from pydantic import BaseModel
 
 from auth_routes import require_admin, get_db
 from models import User
 from commission_service import (
     calculate_active_credit_for_tenant,
+    get_or_create_referral_code,
+    find_referrer_by_promo_code,
     COMMISSION_AMOUNT_USD,
     COMMISSION_DURATION_DAYS,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["commissions"])
+
+
+@router.get("/commissions/promo-code")
+async def get_promo_code(
+    current_user: User = Depends(require_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Devuelve (o crea) el referral_code y promotion_code del tenant actual."""
+    res = await get_or_create_referral_code(db, current_user.tenant_id)
+    if not res.get("code"):
+        raise HTTPException(500, detail="No se pudo generar el código de referido")
+    return res
+
+
+class ResolvePromoBody(BaseModel):
+    code: str
+
+
+@router.post("/commissions/resolve-promo")
+async def resolve_promo_public(body: ResolvePromoBody, db: AsyncIOMotorDatabase = Depends(get_db)):
+    """Endpoint público (sin auth): valida un código y devuelve el tenant_id del referrer +
+    el business_name. Lo usa el wizard de signup cuando alguien pega un código.
+    """
+    code = (body.code or "").upper().strip()
+    if not code or len(code) > 40:
+        raise HTTPException(400, detail="Código inválido")
+    tid = await find_referrer_by_promo_code(db, code)
+    if not tid:
+        return {"valid": False}
+    t = await db.tenants.find_one(
+        {"tenant_id": tid},
+        {"_id": 0, "tenant_id": 1, "business_name": 1, "name": 1},
+    )
+    return {
+        "valid": True,
+        "ref_tenant_id": tid,
+        "business_name": (t or {}).get("business_name") or (t or {}).get("name") or "—",
+    }
 
 
 @router.get("/commissions/summary")
@@ -88,4 +129,5 @@ async def commissions_summary(
             for s, d in by_status.items()
         },
         "commissions": enriched,
+        "promo_code": await get_or_create_referral_code(db, current_user.tenant_id),
     }

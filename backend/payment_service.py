@@ -116,6 +116,7 @@ class PaymentService:
                 success_url=success_url,
                 cancel_url=cancel_url,
                 customer=customer.id,
+                allow_promotion_codes=True,
                 metadata={
                     "plan_id": plan_id,
                     "tenant_id": tenant_id,
@@ -204,11 +205,76 @@ class PaymentService:
             logger.error(f"Error webhook: {e}")
             raise
 
+    async def _attribute_via_promo_code(self, session, tenant_id: str):
+        """Si el checkout incluyó un promotion_code, atribuir al referrer.
+        Se llama antes de _handle_checkout_completed para que la atribución
+        quede grabada antes de cualquier facturación recurrente.
+        """
+        if not tenant_id:
+            return
+
+        # Si el tenant ya tiene referred_by, NO sobrescribir (atribución congelada)
+        existing = await self.db.tenants.find_one(
+            {"tenant_id": tenant_id, "referred_by": {"$exists": True, "$ne": None}},
+            {"_id": 1},
+        )
+        if existing:
+            return
+
+        # 1) Buscar promotion_code en el session
+        promo_code_str = None
+        try:
+            # Stripe expone el código aplicado en session.total_details.breakdown.discounts[].discount.promotion_code
+            # o como session.discounts si fue creado con discounts en checkout.
+            if hasattr(session, "total_details") and session.total_details:
+                breakdown = getattr(session.total_details, "breakdown", None)
+                if breakdown and getattr(breakdown, "discounts", None):
+                    for d in breakdown.discounts:
+                        promo_id = getattr(getattr(d, "discount", None), "promotion_code", None)
+                        if promo_id:
+                            try:
+                                promo = stripe.PromotionCode.retrieve(promo_id)
+                                promo_code_str = getattr(promo, "code", None)
+                                # También podemos leer directo metadata.referrer_tenant_id
+                                meta = getattr(promo, "metadata", None) or {}
+                                ref_meta = meta.get("referrer_tenant_id") if isinstance(meta, dict) else getattr(meta, "referrer_tenant_id", None)
+                                if ref_meta:
+                                    await self.db.tenants.update_one(
+                                        {"tenant_id": tenant_id},
+                                        {"$set": {"referred_by": ref_meta,
+                                                  "referred_via_promo_code": promo_code_str}},
+                                    )
+                                    logger.info(f"Attribution via promo metadata: {tenant_id} <- {ref_meta} ({promo_code_str})")
+                                    return
+                            except Exception as e:
+                                logger.debug(f"No se pudo retrieve promo {promo_id}: {e}")
+                                continue
+        except Exception as e:
+            logger.debug(f"Parse session.total_details falló: {e}")
+
+        # 2) Fallback: buscar el código en nuestra DB
+        if promo_code_str:
+            from commission_service import find_referrer_by_promo_code
+            ref_tid = await find_referrer_by_promo_code(self.db, promo_code_str)
+            if ref_tid and ref_tid != tenant_id:
+                await self.db.tenants.update_one(
+                    {"tenant_id": tenant_id},
+                    {"$set": {"referred_by": ref_tid,
+                              "referred_via_promo_code": promo_code_str}},
+                )
+                logger.info(f"Attribution via DB lookup: {tenant_id} <- {ref_tid} ({promo_code_str})")
+
     async def _handle_checkout_completed(self, session):
         """Checkout completado: activar suscripcion del tenant"""
         tenant_id = session.metadata.get("tenant_id", "")
         plan_id = session.metadata.get("plan_id", "pro")
         subscription_id = session.subscription
+
+        # Detectar promotion_code aplicado para attribution via Stripe
+        try:
+            await self._attribute_via_promo_code(session, tenant_id)
+        except Exception as e:
+            logger.warning(f"Attribution via promo code falló para {tenant_id}: {e}")
 
         if tenant_id and subscription_id:
             plan = SUBSCRIPTION_PLANS.get(plan_id) or SUBSCRIPTION_PLANS.get("pro")

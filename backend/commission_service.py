@@ -290,3 +290,124 @@ async def expire_due_commissions(db: AsyncIOMotorDatabase) -> int:
     if res.modified_count:
         logger.info(f"Comisiones expiradas: {res.modified_count}")
     return res.modified_count
+
+
+# ---------------- Stripe Promotion Codes (attribution) ----------------
+
+# Coupon global compartido (5% off primer mes para el referido). Lazy created en Stripe.
+GLOBAL_REFERRAL_COUPON_ID = "INMOBOT_REFERRAL_5_PERCENT_OFF_FIRST_MONTH"
+
+
+def _generate_referral_code(tenant_id: str) -> str:
+    """Genera un código legible para el tenant: prefijo (slugified) + 6 chars random.
+    Ej: tenant_id='demo-inmobiliaria' -> 'DEMO-XYZ123'.
+    """
+    import re
+    import secrets
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sin chars confusos (0/O, 1/I)
+    prefix = re.sub(r"[^A-Za-z0-9]", "", tenant_id).upper()[:6] or "REF"
+    suffix = "".join(secrets.choice(alphabet) for _ in range(6))
+    return f"{prefix}-{suffix}"
+
+
+async def get_or_create_referral_code(
+    db: AsyncIOMotorDatabase,
+    tenant_id: str,
+    create_in_stripe: bool = True,
+) -> dict:
+    """Obtiene (o crea idempotentemente) el referral_code del tenant.
+    Si Stripe está configurado y create_in_stripe=True, también crea el promotion_code en Stripe.
+    Devuelve {code, stripe_promotion_code_id, stripe_enabled}.
+    """
+    tenant = await db.tenants.find_one(
+        {"tenant_id": tenant_id},
+        {"_id": 0, "tenant_id": 1, "referral_code": 1,
+         "stripe_promotion_code_id": 1, "business_name": 1, "name": 1},
+    )
+    if not tenant:
+        return {"code": None, "stripe_promotion_code_id": None, "stripe_enabled": False, "error": "tenant_not_found"}
+
+    code = tenant.get("referral_code")
+    if not code:
+        # Generar y persistir (con retry por colisión, aunque la prob es minúscula)
+        for _ in range(5):
+            candidate = _generate_referral_code(tenant_id)
+            existing = await db.tenants.find_one(
+                {"referral_code": candidate}, {"_id": 1}
+            )
+            if not existing:
+                code = candidate
+                break
+        if not code:
+            return {"code": None, "stripe_promotion_code_id": None, "stripe_enabled": False, "error": "could_not_generate"}
+        await db.tenants.update_one(
+            {"tenant_id": tenant_id},
+            {"$set": {"referral_code": code}},
+        )
+        # Index unique se asegura en startup; si no existe aún, igualmente la búsqueda anterior previene colisiones
+        logger.info(f"Referral code generado: {tenant_id} -> {code}")
+
+    promo_id = tenant.get("stripe_promotion_code_id")
+    stripe_enabled = False
+    stripe_error = None
+    if create_in_stripe:
+        try:
+            import os
+            import stripe
+            api_key = os.getenv("STRIPE_API_KEY")
+            if api_key:
+                stripe.api_key = api_key
+                if not promo_id:
+                    # Lazy create del coupon global (idempotente por id)
+                    try:
+                        stripe.Coupon.retrieve(GLOBAL_REFERRAL_COUPON_ID)
+                    except stripe.error.InvalidRequestError:
+                        stripe.Coupon.create(
+                            id=GLOBAL_REFERRAL_COUPON_ID,
+                            percent_off=5,
+                            duration="once",
+                            name="InmoBot Referral - 5% off first month",
+                        )
+                    # Crear PromotionCode mapeado al tenant via metadata
+                    promo = stripe.PromotionCode.create(
+                        coupon=GLOBAL_REFERRAL_COUPON_ID,
+                        code=code,
+                        max_redemptions=None,  # ilimitado
+                        metadata={"referrer_tenant_id": tenant_id},
+                    )
+                    promo_id = promo.id
+                    await db.tenants.update_one(
+                        {"tenant_id": tenant_id},
+                        {"$set": {"stripe_promotion_code_id": promo_id}},
+                    )
+                    logger.info(f"Stripe PromotionCode creado: {code} -> {promo_id}")
+                stripe_enabled = True
+        except Exception as e:
+            stripe_error = str(e)
+            logger.warning(f"Stripe promo code skip para {tenant_id}: {e}")
+
+    out = {
+        "code": code,
+        "stripe_promotion_code_id": promo_id,
+        "stripe_enabled": stripe_enabled,
+    }
+    if stripe_error:
+        out["stripe_error"] = stripe_error
+    return out
+
+
+async def find_referrer_by_promo_code(
+    db: AsyncIOMotorDatabase,
+    code: str,
+) -> str | None:
+    """Devuelve el tenant_id del referrer que es dueño del referral_code, o None."""
+    if not code:
+        return None
+    tenant = await db.tenants.find_one(
+        {"referral_code": code.upper().strip()},
+        {"_id": 0, "tenant_id": 1, "active": 1},
+    )
+    if not tenant or not tenant.get("active"):
+        return None
+    return tenant["tenant_id"]
+
