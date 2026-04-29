@@ -186,6 +186,8 @@ class PaymentService:
                 await self._handle_checkout_completed(event.data.object)
             elif event.type == "invoice.paid":
                 await self._handle_invoice_paid(event.data.object)
+            elif event.type == "invoice.upcoming":
+                await self._handle_invoice_upcoming(event.data.object)
             elif event.type == "invoice.payment_failed":
                 await self._handle_payment_failed(event.data.object)
             elif event.type == "customer.subscription.updated":
@@ -235,13 +237,21 @@ class PaymentService:
         )
 
     async def _handle_invoice_paid(self, invoice):
-        """Factura pagada: registrar pago recurrente"""
+        """Factura pagada: registrar pago recurrente + activar comisión si aplica"""
         subscription_id = invoice.subscription
         if not subscription_id:
             return
 
         tenant = await self.db.tenants.find_one({"stripe_subscription_id": subscription_id})
         if tenant:
+            # Detectar si es la PRIMERA factura paga del tenant
+            prior_paid = await self.db.payment_transactions.count_documents({
+                "tenant_id": tenant["tenant_id"],
+                "type": "recurring",
+                "payment_status": "paid",
+            })
+            is_first_paid = prior_paid == 0
+
             await self.db.payment_transactions.insert_one({
                 "tenant_id": tenant["tenant_id"],
                 "type": "recurring",
@@ -253,6 +263,97 @@ class PaymentService:
                 "created_at": datetime.utcnow().isoformat()
             })
             logger.info(f"Pago recurrente registrado: tenant={tenant['tenant_id']}")
+
+            # Activar comisión si es la primera factura del referido
+            if is_first_paid and tenant.get("referred_by"):
+                try:
+                    from commission_service import create_commission_on_first_payment
+                    await create_commission_on_first_payment(self.db, tenant["tenant_id"])
+                except Exception as e:
+                    logger.warning(f"No se pudo crear commission: {e}")
+
+            # Registrar el descuento aplicado (si la invoice incluyó nuestros line items negativos)
+            try:
+                await self._record_applied_commission(tenant["tenant_id"], invoice)
+            except Exception as e:
+                logger.warning(f"No se pudo registrar applied commission: {e}")
+
+    async def _handle_invoice_upcoming(self, invoice):
+        """Factura proxima (~1h antes del cobro). Inyectar credito de comisiones del referrer."""
+        subscription_id = invoice.subscription
+        customer_id = invoice.customer
+        if not subscription_id or not customer_id:
+            return
+
+        tenant = await self.db.tenants.find_one(
+            {"stripe_subscription_id": subscription_id},
+            {"_id": 0, "tenant_id": 1, "stripe_customer_id": 1},
+        )
+        if not tenant:
+            return
+
+        try:
+            from commission_service import calculate_active_credit_for_tenant
+            credit = await calculate_active_credit_for_tenant(self.db, tenant["tenant_id"])
+            amount = credit.get("capped_amount_usd", 0)
+            if amount <= 0:
+                return
+
+            # Crear invoice item negativo (descuento) sobre la proxima factura
+            stripe.InvoiceItem.create(
+                customer=customer_id,
+                amount=-int(round(amount * 100)),  # cents, negativo = descuento
+                currency=invoice.currency or "usd",
+                description=f"Crédito por referidos ({credit.get('active_count', 0)} activos)",
+                subscription=subscription_id,
+            )
+            logger.info(
+                f"Descuento aplicado a tenant={tenant['tenant_id']}: "
+                f"-${amount} ({credit.get('active_count', 0)} comisiones activas)"
+            )
+        except Exception as e:
+            logger.error(f"Error aplicando descuento de referidos: {e}")
+
+    async def _record_applied_commission(self, tenant_id: str, invoice):
+        """Si la invoice paga incluyó descuento, registrar el monto en applied_invoices.
+        Buscamos invoice items con descripcion 'Crédito por referidos'."""
+        try:
+            items = invoice.lines.data if hasattr(invoice, "lines") else []
+        except Exception:
+            return
+        total_credit = 0
+        for it in items:
+            desc = (getattr(it, "description", "") or "")
+            amount = getattr(it, "amount", 0)
+            if "Crédito por referidos" in desc and amount < 0:
+                total_credit += -amount / 100  # convertir a USD positivo
+
+        if total_credit <= 0:
+            return
+
+        # Distribuir el credito entre commissions activas (FIFO por created_at)
+        actives_cursor = self.db.commissions.find(
+            {"referrer_tenant_id": tenant_id, "status": "active"},
+            {"_id": 0, "commission_id": 1, "amount_per_month_usd": 1},
+        ).sort("created_at", 1)
+        remaining = total_credit
+        async for c in actives_cursor:
+            per_month = c.get("amount_per_month_usd", 0)
+            if remaining <= 0 or per_month <= 0:
+                break
+            chunk = min(per_month, remaining)
+            await self.db.commissions.update_one(
+                {"commission_id": c["commission_id"]},
+                {
+                    "$inc": {"total_credited_usd": chunk},
+                    "$push": {"applied_invoices": {
+                        "invoice_id": getattr(invoice, "id", ""),
+                        "amount_usd": chunk,
+                        "applied_at": datetime.utcnow().isoformat(),
+                    }},
+                },
+            )
+            remaining -= chunk
 
     async def _handle_payment_failed(self, invoice):
         """Pago fallido: marcar tenant como suspendido"""
@@ -307,6 +408,12 @@ class PaymentService:
                 "updated_at": datetime.utcnow().isoformat()
             }}
         )
+        # Cancelar comisiones donde este tenant era el REFERIDO (su referrer deja de cobrar)
+        try:
+            from commission_service import cancel_commissions_for_referred
+            await cancel_commissions_for_referred(self.db, tenant["tenant_id"])
+        except Exception as e:
+            logger.warning(f"No se pudieron cancelar commissions: {e}")
         logger.info(f"Suscripcion cancelada: tenant={tenant['tenant_id']}")
 
     async def cancel_subscription(self, tenant_id: str) -> Dict:

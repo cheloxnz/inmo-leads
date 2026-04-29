@@ -26,6 +26,20 @@ class ScheduledTasks:
         asyncio.create_task(self.check_whatsapp_appointment_reminders())
         asyncio.create_task(self.bill_monthly_overage())
         asyncio.create_task(self.run_onboarding_coach())
+        asyncio.create_task(self.run_commission_expiry())
+
+    async def run_commission_expiry(self):
+        """Cada 24h, marca como EXPIRED las commissions que cumplieron 365 dias."""
+        await asyncio.sleep(180)
+        from commission_service import expire_due_commissions
+        while self.running:
+            try:
+                count = await expire_due_commissions(self.db)
+                if count:
+                    logger.info(f"[Scheduler] {count} comisiones expiradas")
+            except Exception as e:
+                logger.error(f"[Scheduler] commission expiry error: {e}")
+            await asyncio.sleep(24 * 3600)
 
     async def run_onboarding_coach(self):
         """Cada 6 horas, evalua todos los tenants y crea nudges del Coach."""

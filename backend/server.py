@@ -75,6 +75,14 @@ async def lifespan(_app):
             [("ref_tenant_id", 1), ("email", 1), ("converted_tenant_id", 1)],
             name="upsert_filter"
         )
+        # Comisiones: idempotencia + lookups por referrer / status / expiracion
+        await db.commissions.create_index([("commission_id", 1)], unique=True)
+        await db.commissions.create_index(
+            [("referrer_tenant_id", 1), ("referred_tenant_id", 1)],
+            unique=True, name="referral_pair_unique"
+        )
+        await db.commissions.create_index([("referrer_tenant_id", 1), ("status", 1)])
+        await db.commissions.create_index([("status", 1), ("expires_at", 1)])
 
         # Migracion one-shot: legacy ISO strings -> BSON datetime para TTL
         from datetime import datetime as _dt
@@ -1684,6 +1692,7 @@ from routers.bot_config_ai import router as bot_config_ai_router
 from routers.flow_ai import router as flow_ai_router
 from routers.coach import router as coach_router
 from routers.public_share import router as public_share_router
+from routers.commissions import router as commissions_router
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1699,6 +1708,7 @@ app.include_router(bot_config_ai_router, prefix="/api")
 app.include_router(flow_ai_router, prefix="/api")
 app.include_router(coach_router, prefix="/api")
 app.include_router(public_share_router, prefix="/api")
+app.include_router(commissions_router, prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

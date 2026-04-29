@@ -3,7 +3,7 @@ import re
 import unicodedata
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from auth_routes import get_db
@@ -78,6 +78,7 @@ async def suggest_tenant_id(
 @router.post("/onboarding/auto-setup")
 async def auto_setup_tenant(
     body: dict,
+    request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """
@@ -162,15 +163,27 @@ async def auto_setup_tenant(
         "created_at": now_iso,
         "updated_at": now_iso,
     }
-    # Referral attribution: persistir SOLO si el ref_tenant_id existe en la DB
+    # Referral attribution: persistir SOLO si el ref_tenant_id existe en la DB y NO es auto-referido
+    referrer_ip = (request.client.host if request and request.client else None)
+    fraud_reason = None
     if ref_tenant_id:
         ref_exists = await db.tenants.find_one(
             {"tenant_id": ref_tenant_id, "active": True}, {"_id": 1}
         )
         if ref_exists:
-            tenant_doc["referred_by"] = ref_tenant_id
-            if ref_celebration_id:
-                tenant_doc["referred_via_celebration"] = ref_celebration_id
+            from commission_service import is_self_referral
+            is_fraud, fraud_reason = await is_self_referral(
+                db, ref_tenant_id, email, referrer_ip
+            )
+            if not is_fraud:
+                tenant_doc["referred_by"] = ref_tenant_id
+                if ref_celebration_id:
+                    tenant_doc["referred_via_celebration"] = ref_celebration_id
+            else:
+                logger.info(
+                    f"Anti-fraud: ref={ref_tenant_id} descartado para {email}. "
+                    f"Reason={fraud_reason}"
+                )
 
     # 5. Llamar IA para tagline + features + steps (mejor effort)
     try:
@@ -261,8 +274,45 @@ async def auto_setup_tenant(
                 {"tenant_id": tenant_doc["referred_by"]},
                 {"$inc": {"referral_stats.signups": 1}},
             )
+            # Crear commission en estado PENDING (se activara cuando pague la 1ra factura)
+            from commission_service import COMMISSION_AMOUNT_USD, COMMISSION_DURATION_DAYS
+            from datetime import timedelta as _td
+            now = datetime.now(timezone.utc)
+            await db.commissions.update_one(
+                {
+                    "referrer_tenant_id": tenant_doc["referred_by"],
+                    "referred_tenant_id": tenant_id,
+                },
+                {"$setOnInsert": {
+                    "commission_id": __import__("uuid").uuid4().hex,
+                    "referrer_tenant_id": tenant_doc["referred_by"],
+                    "referred_tenant_id": tenant_id,
+                    "referred_via_celebration": tenant_doc.get("referred_via_celebration"),
+                    "amount_per_month_usd": COMMISSION_AMOUNT_USD,
+                    "status": "pending",
+                    "created_at": now,
+                    "expires_at": now + _td(days=COMMISSION_DURATION_DAYS),
+                    "total_credited_usd": 0.0,
+                    "applied_invoices": [],
+                }},
+                upsert=True,
+            )
         except Exception as e:
             logger.warning(f"referral conversion tracking fallo: {e}")
+
+    # Audit log con IP del signup (para anti-fraude cross-tenant futuro)
+    try:
+        await db.audit_log.insert_one({
+            "tenant_id": tenant_id,
+            "action": "tenant_signup",
+            "ip": referrer_ip,
+            "user_agent": (request.headers.get("user-agent") or "")[:300] if request else "",
+            "ref_tenant_id": ref_tenant_id or None,
+            "fraud_blocked_reason": fraud_reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
 
     return {
         "tenant_id": tenant_id,
