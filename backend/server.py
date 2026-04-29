@@ -1377,8 +1377,9 @@ async def get_audit_log(
     logs = await db.audit_log.find(query, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
     
     for log in logs:
-        if log.get("timestamp"):
-            log["timestamp"] = log["timestamp"].isoformat()
+        ts = log.get("timestamp")
+        if ts and not isinstance(ts, str):
+            log["timestamp"] = ts.isoformat()
     
     return logs
 
