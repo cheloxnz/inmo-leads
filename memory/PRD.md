@@ -34,6 +34,43 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-29 (Sesión Actual - Iter25 - AI Lead Summary + Premium Features Showcase)
+- **AI Lead Summary** (primer feature real del catálogo, gated by `ai_lead_summary`):
+  - **Servicio `/app/backend/lead_summary_service.py`** (nuevo):
+    - `generate_lead_summary(db, tenant_id, phone, force=False)`: lee `conversation_history`, formatea (últimos 30 turnos), llama a GPT-4 con system prompt estricto en JSON, sanitiza output (clamp urgency 1-10, trim listas, max chars).
+    - **Cache:** persistido en `leads.ai_summary` con `generated_at` + `history_len_at_gen`. **Freshness:** TTL 7 días; invalida automáticamente si la conversación creció.
+    - **Robustez:** unwrap de markdown ```` ```json ... ``` ```` que GPT a veces devuelve.
+  - **Endpoint:** `POST /api/leads/{phone}/ai-summary?force=true` con gating duro (`has_feature(tenant, "ai_lead_summary")` → 403 con mensaje "Contactá soporte para activarla" si off).
+  - **Output shape:** `{narrative, urgency, urgency_reason, next_step, insights[], buying_signals[], generated_at, history_len_at_gen, cached}`.
+- **UI `/app/frontend/src/components/AILeadSummary.js`** montado en `LeadDetail` antes de las notas:
+  - **Feature OFF** → upsell card morada con badge "Premium" + botón "Contactar para activar" deshabilitado (`data-testid="ai-summary-upsell"`).
+  - **Feature ON sin summary aún** → CTA "Generar resumen IA" con gradient morado.
+  - **Loading state** con spinner.
+  - **Render del summary:**
+    - Narrative en bold como headline.
+    - **Urgency pill** colorida (rojo crítica 9-10, naranja alta 7-8, amarilla media 4-6, azul baja 1-3) con razón en hover.
+    - **Próximo paso** destacado en banner amarillo con `⚡` (alta visibilidad para los agentes).
+    - Lista de **insights** con bullets morados.
+    - **Buying signals** en cards verdes con itálicas (señales de compra textuales del lead).
+  - Botón refresh para re-generar (force=true).
+  - Hook `useFeature` con cache módulo + invalidación on logout (de iter24).
+- **Premium Features Showcase** (P2 del backlog):
+  - **Endpoint `GET /api/tenant/features-showcase`** retorna `{active:[], available:[], total}` con shape per item `{key, label, description, category, enabled}` derivado del registry + overrides.
+  - **Componente `/app/frontend/src/components/PremiumFeaturesShowcase.js`** montado en Dashboard:
+    - Header: "Funcionalidades Premium" + count "X activas / Y disponibles".
+    - Sección **Activas** (icono Check verde): cards con borde verde y label en verde oscuro.
+    - Sección **Disponibles** (icono Lock): cards con CTA "Solicitar activación" → modal con texto explicativo + botón "Enviar solicitud" que abre `mailto:soporte@inmobot.com` con subject y body pre-rellenados (incluye nombre y key del feature).
+- **CSS:** estilos `.pf-*` (showcase) y `.ai-summary-*` (lead summary) con tema dark, responsive, gradients morados.
+- **Tests:** `test_iter25_ai_summary.py` 17/17 PASS:
+  - Showcase: auth required, shape correcto, active flow tras enable.
+  - AI Summary endpoint: 401/403/404 correctos.
+  - Service units: `_format_history` (empty/truncate), `_is_summary_fresh` (sin cache, expirado, history changed, válido).
+  - Mocked LLM full flow: shape completo, cache funciona (2da call no llama LLM), `force=true` regenera.
+  - Sanitización: urgency=99 → 10, markdown unwrap.
+  - **Total backend acumulado: 82/82 PASS** (iter21+22+23+24+25).
+  - Frontend E2E 100% (testing_agent_v3_fork iteration_24.json) — feature toggle funciona end-to-end con re-login (cache invalidación correcta), upsell card visible cuando off, real card visible cuando on.
+- **Archivos:** `/app/backend/lead_summary_service.py` (nuevo), `/app/backend/server.py` (endpoint), `/app/backend/routers/commissions.py` (endpoint showcase), `/app/frontend/src/components/AILeadSummary.js` (nuevo), `/app/frontend/src/components/PremiumFeaturesShowcase.js` (nuevo), `/app/frontend/src/pages/LeadDetail.js` (mount), `/app/frontend/src/pages/Dashboard.js` (mount), `/app/frontend/src/App.css` (estilos `.pf-*` + `.ai-summary-*`), `/app/backend/tests/test_iter25_ai_summary.py` (nuevo).
+
 ### 2026-04-29 (Sesión Actual - Iter24 - Feature Flags por tenant)
 - **Sistema de Feature Flags multi-tenant** — patrón estándar SaaS B2B para personalizar funcionalidades por cliente sin forkear código.
 - **Backend `/app/backend/feature_flags.py`** (nuevo módulo):
