@@ -34,6 +34,43 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-29 (Sesión Actual - Iter24 - Feature Flags por tenant)
+- **Sistema de Feature Flags multi-tenant** — patrón estándar SaaS B2B para personalizar funcionalidades por cliente sin forkear código.
+- **Backend `/app/backend/feature_flags.py`** (nuevo módulo):
+  - **Registry** central con 8 flags iniciales agrupados por categoría:
+    - `bot`: `mortgage_calculator`, `voice_response_tts`, `ai_lead_summary`
+    - `dashboard`: `advanced_analytics_export`
+    - `integrations`: `salesforce_sync`, `custom_webhook_lead_hot`
+    - `beta`: `priority_support`, `white_label`
+  - Cada flag tiene `{key, label, description, category, default}`.
+  - **Helpers:** `has_feature(tenant, name)` (acepta bool o dict como override), `get_tenant_features(tenant)` (devuelve estado efectivo de TODAS las flags), `update_tenant_feature(db, tid, name, enabled, config?)`.
+- **Endpoints SuperAdmin (3 nuevos en `routers/superadmin.py`):**
+  - `GET /api/superadmin/feature-flags/registry` — catálogo para construir UI.
+  - `GET /api/superadmin/tenants/{tid}/features` — estado efectivo + raw_overrides.
+  - `PUT /api/superadmin/tenants/{tid}/features` body `{feature, enabled, config?}` — validaciones: 400 si feature desconocida, 404 tenant. Escribe `audit_log` con `action="feature_flag_updated"` + email del superadmin.
+- **`/api/auth/tenant/branding`** ahora incluye campo `features: dict` con todos los flags resueltos. Permite al frontend gateaer UI condicionalmente sin requerir endpoints adicionales.
+- **Modelo `Tenant`** (en `models.py`): nuevo campo `features: dict = {}`.
+- **UI SuperAdminPanel:**
+  - Nuevo botón **"Feature Flags"** en cada `TenantCard` (junto a "Editar branding"), `data-testid="feature-flags-btn-{tid}"`.
+  - Componente nuevo **`/app/frontend/src/components/TenantFeatureFlags.js`** que carga el registry + features del tenant en paralelo y renderiza switches agrupados por categoría con colores propios.
+  - Cada flag muestra: label en negrita, descripción, key en monospace + botón toggle (estado "Activo" gradient morado / "Inactivo" outline). Toast al guardar. Persistencia inmediata.
+- **Hook `/app/frontend/src/hooks/useFeature.js`** (nuevo):
+  - `useFeatures()` → `{features, hasFeature, loading}` con cache módulo (1 fetch por sesión).
+  - `useFeature(name)` → `{enabled, loading}` para checks granulares.
+  - `invalidateFeaturesCache()` exportado y llamado desde `AuthContext.logout()` para evitar leak entre tenants.
+- **CSS:** estilos `.sa-ff-*` (gradient violeta sutil, switches con feedback visual on/off, responsive). Tema dark soportado.
+- **Tests:** Backend `test_iter24_feature_flags.py` 20/20 PASS:
+  - Helper unit tests (5): default, truthy override, dict override, dict disabled, unknown.
+  - `get_tenant_features` retorna todas las keys del registry.
+  - Registry endpoint: 403 tenant, 401 sin auth, 200 superadmin con shape correcto.
+  - GET tenant features: 403 tenant, 200 superadmin, 404 unknown tenant.
+  - PUT toggle: 403 tenant, 400 unknown feature, 404 unknown tenant, 200 enable+persist, 200 disable, audit_log escrito.
+  - Branding incluye features (todas las keys del registry, refleja overrides en vivo).
+  - **Total backend acumulado: 92/92 PASS** (iter21+iter22+iter23+iter24+regression iter17-20).
+  - Frontend E2E 100% (testing_agent_v3_fork iteration_23.json) — expand tenant → click FF button → toggle on/off + persistencia + reset.
+- **Archivos:** `/app/backend/feature_flags.py` (nuevo), `/app/backend/routers/superadmin.py` (3 endpoints), `/app/backend/auth_routes.py` (features en branding), `/app/backend/models.py` (Tenant.features), `/app/frontend/src/components/TenantFeatureFlags.js` (nuevo), `/app/frontend/src/hooks/useFeature.js` (nuevo), `/app/frontend/src/pages/SuperAdminPanel.js` (botón + montaje), `/app/frontend/src/context/AuthContext.js` (cache invalidation on logout), `/app/frontend/src/App.css` (estilos `.sa-ff-*`), `/app/backend/tests/test_iter24_feature_flags.py` (nuevo).
+- **Cómo agregar un nuevo flag** (para el agente futuro): (1) agregar entrada en `FEATURE_FLAGS` dict en `feature_flags.py`, (2) usar `has_feature(tenant, "tu_flag")` en backend o `useFeature("tu_flag")` en frontend para gateaer. La UI del SuperAdmin se actualiza sola.
+
 ### 2026-04-29 (Sesión Actual - Iter23 - Stripe Coupon Codes + Login genérico)
 - **Stripe Coupon Codes para attribution nativa:**
   - **`commission_service._generate_referral_code(tenant_id)`**: genera código legible `PREFIX-XXXXXX` con charset sin chars confusos (excluye 0/O/1/I; conserva L). Prefijo del tenant_id slugified (max 6 chars), sufijo random de 6 chars cripto-seguros.

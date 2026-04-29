@@ -15,6 +15,10 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];
+    // Invalidar cache de feature flags al cerrar sesión (evita leak entre tenants)
+    import('../hooks/useFeature').then(({ invalidateFeaturesCache }) => {
+      invalidateFeaturesCache();
+    }).catch(() => { /* noop */ });
   }, []);
 
   // Configurar axios con token
