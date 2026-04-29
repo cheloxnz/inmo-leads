@@ -34,7 +34,28 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - Acquisition Loop sobre OG Share Pages)
+### 2026-04-28 (Sesión Actual - Coach Effectiveness Dashboard)
+- **Endpoint `GET /api/coach/effectiveness?days=N`** (admin):
+  - **funnel agregado:** shares_explicit, preview_views, html_views, leads_captured, signups_converted.
+  - **funnel_rates:** view_to_lead, lead_to_signup, share_to_view, overall_share_to_signup (clamped 100%, 1 decimal).
+  - **by_platform:** breakdown twitter/linkedin/download.
+  - **timeseries:** leads + converted por día YYYY-MM-DD via `$dateToString` (ascending).
+  - **top_celebrations:** top 10 ordenadas por shares_total desc, con leads/converted por celebration.
+  - **in_window:** counts limitados a la ventana temporal.
+  - Query param `days` clamped 1..90 (default 30) con manejo robusto de TypeError/None/0.
+- **Frontend `/marketing` (`MarketingEffectiveness.js`):**
+  - 4 KPI cards (Compartidas, Vistas, Leads, Signups) con border-color por etapa.
+  - Funnel visual con barras decrecientes proporcionales + porcentaje al siguiente paso (clamped 100%, sufijo `+` cuando overflow).
+  - Time-series chart (recharts LineChart) con 2 líneas: leads y convertidos.
+  - Platform breakdown (BarChart vertical horizontal) + iconos Twitter/LinkedIn/Download con counters.
+  - Tabla "Top celebrations por impacto" con shares/vistas/leads/signups por celebration, sorted desc.
+  - Selector de ventana 7d/30d/90d (`data-testid="window-selector"`) con refetch.
+  - Estado de error con feedback al usuario (data-testid='marketing-error').
+- **Nav sidebar:** nuevo link `🏆 Marketing` (`data-testid="nav-marketing"`) entre Landing y Auditoría.
+- **Tests:** Backend 12/12 PASS (post-fix de `days=0` clamping). Frontend E2E 100%. Regression iter17+18+19+20: 47/48 → 48/48.
+- **Archivos:** `/app/backend/routers/coach.py` (effectiveness endpoint), `/app/frontend/src/pages/MarketingEffectiveness.js` (nuevo), `/app/frontend/src/App.js` (route + nav link).
+
+### 2026-04-28 (Sesión Anterior - Acquisition Loop sobre OG Share Pages)
 - **Mini-form de captura de lead en el HTML público** (`/api/public/share/{tid}/{cid}`):
   - Form con input email + botón "Quiero mi bot" + script JS inline que POSTea a `/api/public/share/{tid}/{cid}/lead`.
   - Banner ámbar "✦ Te trajo {business_name}" (attribution visible al visitante).

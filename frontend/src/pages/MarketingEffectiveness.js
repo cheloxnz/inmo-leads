@@ -31,17 +31,21 @@ export default function MarketingEffectiveness() {
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
+  const [error, setError] = useState('');
+
   useEffect(() => {
     fetchData(days);
   }, [days]);
 
   const fetchData = async (d) => {
     setLoading(true);
+    setError('');
     try {
       const r = await axios.get(`${API}/coach/effectiveness?days=${d}`);
       setData(r.data);
     } catch (e) {
-      // silencioso (401 → interceptor)
+      const msg = e?.response?.data?.detail || 'No se pudo cargar el dashboard';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -51,6 +55,16 @@ export default function MarketingEffectiveness() {
     return (
       <div className="page-container flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="page-container" data-testid="marketing-error">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
+          {error}
+        </div>
       </div>
     );
   }
@@ -142,7 +156,9 @@ export default function MarketingEffectiveness() {
               {funnelChartData.map((d, i) => {
                 const pct = (d.value / funnelMax) * 100;
                 const next = funnelChartData[i + 1];
-                const stepRate = next && d.value > 0 ? ((next.value / d.value) * 100).toFixed(1) : null;
+                const stepRateRaw = next && d.value > 0 ? (next.value / d.value) * 100 : null;
+                const stepRate = stepRateRaw !== null ? Math.min(100, stepRateRaw).toFixed(1) : null;
+                const stepOverflow = stepRateRaw !== null && stepRateRaw > 100;
                 return (
                   <div key={d.name}>
                     <div className="flex items-center justify-between text-sm mb-1">
@@ -160,7 +176,7 @@ export default function MarketingEffectiveness() {
                     {stepRate !== null && (
                       <div className="text-xs text-gray-500 mt-1 ml-2 flex items-center gap-1">
                         <ArrowDown className="w-3 h-3" />
-                        {stepRate}% al siguiente paso
+                        {stepRate}%{stepOverflow ? '+' : ''} al siguiente paso
                       </div>
                     )}
                   </div>

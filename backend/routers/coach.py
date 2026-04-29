@@ -559,9 +559,13 @@ async def get_coach_effectiveness(
     Devuelve funnel agregado + time series + top celebrations.
 
     Query params:
-      days: ventana temporal (default 30, max 90)
+      days: ventana temporal (default 30, clamped 1..90)
     """
-    days = max(1, min(int(days or 30), 90))
+    try:
+        d = int(days) if days is not None else 30
+    except (TypeError, ValueError):
+        d = 30
+    days = max(1, min(d, 90))
     since = datetime.now(timezone.utc) - timedelta(days=days)
     tenant_id = current_user.tenant_id
 
