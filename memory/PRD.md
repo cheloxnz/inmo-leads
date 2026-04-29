@@ -34,6 +34,39 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-29 (Sesión Actual - Iter22 - Retención + Atribución sobre Comisiones)
+- **Email automático "Conseguiste un nuevo referido"** (`email_service.send_new_referral_commission`):
+  - HTML branded (gradient verde) con headline "+$5/mes · 12 meses", grid de stats (crédito activo + referidos activos), nota especial cuando `is_capped` ("¡Tu suscripción es gratis!").
+  - Disparado en `commission_service.create_commission_on_first_payment` tras `insert_one` cuando se crea la commission ACTIVE — best-effort (no bloquea flujo si falla SMTP).
+  - Lookup automático del email del admin del referrer (`agents.role=admin AND active`).
+  - Skip silencioso si SMTP no configurado.
+- **Banner en `/marketing`** con "Llevás $X ahorrados en facturación gracias a referidos":
+  - `data-testid="marketing-referral-savings-banner"`, gradient verde, sparkles icon, sublínea con `active_count` + estado `is_capped`.
+  - Fuente: nuevo campo `commission_summary` en `GET /api/coach/effectiveness` (función `_commission_summary_for_marketing`) — devuelve `{active_count, capped_amount_usd, total_credited_usd, is_capped, plan_price_usd}`.
+  - Visible solo si `active_count>0 OR total_credited_usd>0`.
+  - CTA "Ver detalle" → `/config`.
+- **Trial ending soon — Nudge + Email:**
+  - `routers/coach.py`: `TRIAL_DURATION_DAYS=14`, `TRIAL_WARN_THRESHOLD_DAYS=3`. Helper `_trial_days_left(tenant)` retorna None si `subscription_status=active`, días restantes si está en trial, 0 si expiró.
+  - Nuevo nudge `trial_ending_soon` (severity=high, `days_min=11`) agregado a `_CHECKS`. Mensaje contextual según días restantes (1, 2, 3 o 0 días).
+  - Scheduler task `send_trial_ending_emails` (cada 24h): itera tenants con `_trial_days_left ≤3`, envía `send_trial_ending_soon` al admin email; dedupe via `email_logs` por `(email_type, days_left bucket)` para no enviar 2 veces el mismo aviso.
+- **Email digest semanal** (`scheduler.send_weekly_digest_emails`):
+  - Disparo: lunes 09:00 UTC, una vez por semana (`last_run_iso = now.strftime('%G-W%V')` evita duplicados).
+  - Modo dev: env var `DIGEST_FORCE=1` para trigger inmediato.
+  - Stats por tenant: leads_new (7d), leads_total, conversiones (hot/appointment/completed en 7d), ai_messages (collection `usage_log`), `referral_credit_capped_usd` + `referral_active_count`.
+  - HTML responsive con grid 2 cols + bloque destacado verde para ahorro de referidos.
+- **UTM tracking + atribución persistente:**
+  - `ReferralProgramSection.js`: el link copiable ahora incluye `?ref={tenant_id}&utm_source=referral&utm_medium=link&utm_campaign=tenant_share`.
+  - `Signup.js`: persiste `?ref=` + `utm_*` en `localStorage.inmobot_ref_attribution` con TTL 30 días. Si el usuario navega/recarga sin query string, lee del storage y mantiene atribución (badge "Te trajo X" sigue apareciendo). Tras conversión exitosa, limpia el storage para no contaminar futuros usuarios del mismo navegador.
+- **EmailType enum** extendido: `NEW_REFERRAL_COMMISSION`, `TRIAL_ENDING_SOON`, `WEEKLY_DIGEST`.
+- **Tests:** Backend `test_iter22_retention_emails.py` 10/10 PASS:
+  - Effectiveness incluye commission_summary (shape + datos seed).
+  - Email new commission disparado con SMTP configurado (mock); NO disparado sin SMTP.
+  - `_trial_days_left` para 3 escenarios (active=None, mid-trial, expired=0).
+  - Nudge `trial_ending_soon` creado solo en warning window con sub no-active.
+  - EmailService expone los 3 nuevos métodos.
+  - Combinado con iter21: 22/22 PASS. Regression iter17-20: 48/48 PASS. Frontend E2E: banner + UTM + Signup persistence todos validados.
+- **Archivos:** `/app/backend/email_service.py` (3 métodos), `/app/backend/commission_service.py` (`_notify_referrer_new_commission`), `/app/backend/routers/coach.py` (trial helpers + nudge + commission_summary), `/app/backend/scheduler.py` (2 nuevas tasks), `/app/backend/models.py` (EmailType extendido), `/app/frontend/src/pages/MarketingEffectiveness.js` (banner), `/app/frontend/src/components/ReferralProgramSection.js` (UTM), `/app/frontend/src/pages/Signup.js` (persistencia), `/app/backend/tests/test_iter22_retention_emails.py` (nuevo).
+
 ### 2026-04-29 (Sesión Actual - Iter21 - Programa de Comisiones por Referidos)
 - **Servicio `commission_service.py`**: lifecycle completo de comisiones por referidos.
   - **Reglas:** $5/mes por cada referido convertido y pagando, durante 365 días, topeado al 100% del precio del plan del referrer (`SUBSCRIPTION_PLANS[plan].price_monthly`).
