@@ -504,3 +504,46 @@ async def run_coach_now(
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
     created = await _evaluate_tenant(tenant, db)
     return {"created": created, "tenant_id": current_user.tenant_id}
+
+
+@router.get("/coach/referral-stats")
+async def get_referral_stats(
+    current_user: User = Depends(require_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Stats del programa de referidos del tenant (compartió celebraciones, gente que clickeó/se registro).
+    Funnel: html_views -> leads -> signups."""
+    tenant = await db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id},
+        {"_id": 0, "referral_stats": 1},
+    ) or {}
+    stats = tenant.get("referral_stats") or {}
+
+    # Total preview/html views agregando todas las celebrations del tenant
+    pipeline = [
+        {"$match": {"tenant_id": current_user.tenant_id}},
+        {"$group": {
+            "_id": None,
+            "preview_views": {"$sum": {"$ifNull": ["$shares.preview_views", 0]}},
+            "html_views": {"$sum": {"$ifNull": ["$shares.html_views", 0]}},
+            "shares_total": {"$sum": {"$ifNull": ["$shares.total", 0]}},
+        }},
+    ]
+    agg = await db.coach_celebrations.aggregate(pipeline).to_list(length=1)
+    share_views = agg[0] if agg else {"preview_views": 0, "html_views": 0, "shares_total": 0}
+
+    leads_count = await db.referral_leads.count_documents({"ref_tenant_id": current_user.tenant_id})
+    converted = await db.referral_leads.count_documents({
+        "ref_tenant_id": current_user.tenant_id,
+        "converted_tenant_id": {"$ne": None},
+    })
+
+    return {
+        "shares_explicit": share_views["shares_total"],
+        "preview_views": share_views["preview_views"],
+        "html_views": share_views["html_views"],
+        "leads_captured": leads_count,
+        "signups_converted": converted,
+        "tenant_signups_via_ref": stats.get("signups", 0),
+        "conversion_rate": round((converted / leads_count) * 100, 1) if leads_count else 0,
+    }

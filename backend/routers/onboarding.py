@@ -95,6 +95,8 @@ async def auto_setup_tenant(
     email = (body or {}).get("email", "").strip().lower()
     password = (body or {}).get("password", "").strip()
     template_hint = (body or {}).get("template_id", "").strip()
+    ref_tenant_id = (body or {}).get("ref", "").strip()[:60] or None
+    ref_celebration_id = (body or {}).get("ref_celebration_id", "").strip()[:60] or None
 
     if not business_name or not description or not email or not password:
         raise HTTPException(status_code=400, detail="business_name, description, email y password son requeridos")
@@ -160,6 +162,15 @@ async def auto_setup_tenant(
         "created_at": now_iso,
         "updated_at": now_iso,
     }
+    # Referral attribution: persistir SOLO si el ref_tenant_id existe en la DB
+    if ref_tenant_id:
+        ref_exists = await db.tenants.find_one(
+            {"tenant_id": ref_tenant_id, "active": True}, {"_id": 1}
+        )
+        if ref_exists:
+            tenant_doc["referred_by"] = ref_tenant_id
+            if ref_celebration_id:
+                tenant_doc["referred_via_celebration"] = ref_celebration_id
 
     # 5. Llamar IA para tagline + features + steps (mejor effort)
     try:
@@ -234,6 +245,24 @@ async def auto_setup_tenant(
         "tenant_id": tenant_id,
         "role": "admin",
     })
+
+    # 10. Si vino con ref, marcar referral_lead como convertido + bump counter del referrer
+    if tenant_doc.get("referred_by"):
+        try:
+            await db.referral_leads.update_many(
+                {"ref_tenant_id": tenant_doc["referred_by"], "email": email,
+                 "converted_tenant_id": None},
+                {"$set": {
+                    "converted_tenant_id": tenant_id,
+                    "converted_at": datetime.now(timezone.utc),
+                }},
+            )
+            await db.tenants.update_one(
+                {"tenant_id": tenant_doc["referred_by"]},
+                {"$inc": {"referral_stats.signups": 1}},
+            )
+        except Exception as e:
+            logger.warning(f"referral conversion tracking fallo: {e}")
 
     return {
         "tenant_id": tenant_id,

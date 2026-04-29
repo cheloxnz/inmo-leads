@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, ArrowRight, CheckCircle2, Bot, Rocket } from 'lucide-react';
+import { Sparkles, ArrowRight, CheckCircle2, Bot, Rocket, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 export default function Signup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refTenantId = searchParams.get('ref') || '';
+  const refCelebrationId = searchParams.get('ref_celebration_id') || '';
+  const [refBusiness, setRefBusiness] = useState('');
   const [step, setStep] = useState(1);
   const [data, setData] = useState({
     business_name: '',
@@ -23,6 +27,14 @@ export default function Signup() {
   const [tenantSuggested, setTenantSuggested] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+
+  // Si vino con ?ref=, fetchear el business_name del referrer para el badge
+  useEffect(() => {
+    if (!refTenantId) return;
+    axios.get(`${BACKEND}/api/public/catalog/${encodeURIComponent(refTenantId)}`)
+      .then(r => setRefBusiness(r.data?.tenant?.business_name || r.data?.tenant?.name || ''))
+      .catch(() => { /* ref invalido o tenant inactivo, ignorar */ });
+  }, [refTenantId]);
 
   const update = (k, v) => setData(prev => ({ ...prev, [k]: v }));
 
@@ -60,7 +72,10 @@ export default function Signup() {
     }
     setSubmitting(true);
     try {
-      const res = await axios.post(`${BACKEND}/api/onboarding/auto-setup`, data);
+      const payload = { ...data };
+      if (refTenantId) payload.ref = refTenantId;
+      if (refCelebrationId) payload.ref_celebration_id = refCelebrationId;
+      const res = await axios.post(`${BACKEND}/api/onboarding/auto-setup`, payload);
       setResult(res.data);
       // Guardar token para auto-login
       localStorage.setItem('token', res.data.access_token);
@@ -79,6 +94,15 @@ export default function Signup() {
         <Bot className="w-8 h-8 text-purple-500" />
         <h1>Empezá con InmoBot</h1>
         <p>Tu bot de WhatsApp con IA listo en 60 segundos.</p>
+        {refBusiness && (
+          <div
+            data-testid="signup-ref-badge"
+            className="inline-flex items-center gap-2 mt-2 px-3 py-1.5 bg-amber-50 border border-amber-300 rounded-full text-xs text-amber-800"
+          >
+            <UserPlus className="w-3 h-3" />
+            Te trajo <strong>{refBusiness}</strong>
+          </div>
+        )}
         <div className="sw-stepper">
           <div className={`sw-step ${step > 1 ? 'completed' : step === 1 ? 'active' : ''}`}>1. Tu negocio</div>
           <div className={`sw-step ${step > 2 ? 'completed' : step === 2 ? 'active' : ''}`}>2. Tu cuenta</div>

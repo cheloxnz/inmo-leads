@@ -289,15 +289,21 @@ async def share_html_page(
     """Pagina HTML con meta tags Open Graph + Twitter Card.
     Cuando se comparte la URL, LinkedIn/X/WhatsApp/Slack/Discord crawlean este HTML
     y previsualizan automaticamente la imagen + titulo.
+
+    INCLUYE: mini formulario de captura de lead con attribution al tenant referrer.
+    Cada celebracion compartida se vuelve un canal de adquisicion trackeable.
     """
     data = await _fetch_card_data(db, tenant_id, celebration_id)
     if not data:
         raise HTTPException(status_code=404, detail="Celebration no encontrada")
 
-    # URL absoluta para og:image (necesario - relative URLs no las leen los crawlers)
     base = _public_base_url(request)
     image_url = f"{base}/api/public/share/{tenant_id}/{celebration_id}.png"
     page_url = f"{base}/api/public/share/{tenant_id}/{celebration_id}"
+    # URL del wizard de signup con attribution
+    signup_url = f"{base}/signup?ref={tenant_id}&ref_celebration_id={celebration_id}"
+    # URL del endpoint de captura (POST)
+    capture_url = f"{base}/api/public/share/{tenant_id}/{celebration_id}/lead"
 
     title = _escape_html(_strip_emoji(data.get("title") or "Logro alcanzado"))
     body = _escape_html(_strip_emoji(data.get("body") or ""))
@@ -305,7 +311,6 @@ async def share_html_page(
     description = body or f"{business} alcanzó un nuevo logro con InmoBot AI"
     primary = _escape_html(data.get("primary_color") or DEFAULT_PRIMARY)
 
-    # Tracking: increment shares.html_views (background)
     background.add_task(_bump_counter, db, tenant_id, celebration_id, "html_views")
 
     html = f"""<!DOCTYPE html>
@@ -334,19 +339,31 @@ async def share_html_page(
   <meta name="twitter:description" content="{description}">
   <meta name="twitter:image" content="{image_url}">
 
-  <!-- LinkedIn especifico (usa OG, pero refuerza) -->
   <meta property="article:author" content="{business}">
 
   <style>
     *{{box-sizing:border-box;margin:0;padding:0}}
     body{{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}}
-    .card{{max-width:720px;background:#1e293b;border-radius:16px;padding:48px;box-shadow:0 20px 60px rgba(0,0,0,0.4);border:1px solid #334155}}
+    .card{{max-width:720px;width:100%;background:#1e293b;border-radius:16px;padding:48px;box-shadow:0 20px 60px rgba(0,0,0,0.4);border:1px solid #334155}}
     img{{width:100%;height:auto;border-radius:12px;display:block;margin:0 auto 24px;box-shadow:0 10px 40px rgba(0,0,0,0.3)}}
     h1{{font-size:1.75rem;font-weight:bold;margin-bottom:12px;color:#fff}}
     p{{font-size:1rem;line-height:1.5;color:#94a3b8;margin-bottom:24px}}
+    .lead-box{{margin-top:32px;padding:24px;background:rgba({_hex_to_rgb(primary)[0]},{_hex_to_rgb(primary)[1]},{_hex_to_rgb(primary)[2]},0.08);border-radius:12px;border:1px solid rgba({_hex_to_rgb(primary)[0]},{_hex_to_rgb(primary)[1]},{_hex_to_rgb(primary)[2]},0.3)}}
+    .lead-box h2{{font-size:1.25rem;color:#fff;margin-bottom:8px}}
+    .lead-box .sub{{font-size:0.875rem;color:#94a3b8;margin-bottom:20px}}
+    .lead-form{{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}}
+    .lead-form input{{flex:1;min-width:200px;padding:12px 16px;border-radius:9999px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:0.95rem}}
+    .lead-form input:focus{{outline:none;border-color:{primary}}}
+    .lead-form button{{padding:12px 24px;background:{primary};color:#fff;border:none;border-radius:9999px;font-weight:600;font-size:0.95rem;cursor:pointer;transition:opacity 0.2s}}
+    .lead-form button:hover{{opacity:0.85}}
+    .lead-form button:disabled{{opacity:0.4;cursor:not-allowed}}
+    .lead-success{{padding:16px;background:rgba(16,185,129,0.15);border:1px solid #10b981;border-radius:8px;color:#a7f3d0;margin-top:12px;display:none}}
+    .lead-error{{padding:12px;background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;color:#fecaca;margin-top:12px;display:none;font-size:0.875rem}}
     a.cta{{display:inline-block;padding:12px 28px;background:{primary};color:#fff;text-decoration:none;border-radius:9999px;font-weight:600;transition:opacity 0.2s}}
     a.cta:hover{{opacity:0.85}}
+    a.secondary{{display:block;margin-top:16px;color:#94a3b8;font-size:0.875rem;text-decoration:underline}}
     footer{{margin-top:32px;font-size:0.75rem;color:#64748b}}
+    .ref-badge{{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(245,158,11,0.15);border:1px solid #f59e0b;border-radius:9999px;color:#fbbf24;font-size:0.7rem;margin-bottom:16px}}
   </style>
 </head>
 <body>
@@ -354,9 +371,62 @@ async def share_html_page(
     <img src="{image_url}" alt="{title}">
     <h1>{title}</h1>
     <p>{description}</p>
-    <a class="cta" href="https://inmobot.app" target="_blank" rel="noopener">Conocé InmoBot AI →</a>
+
+    <div class="lead-box">
+      <span class="ref-badge">✦ Te trajo {business}</span>
+      <h2>¿Querés un bot así para tu negocio?</h2>
+      <p class="sub">Probalo gratis 14 días. Sin tarjeta. Setup en 5 minutos.</p>
+
+      <form class="lead-form" id="lf" onsubmit="return submitLead(event)">
+        <input type="email" id="email" placeholder="tu@email.com" required autocomplete="email">
+        <button type="submit" id="btn">Quiero mi bot →</button>
+      </form>
+      <div class="lead-success" id="ok">
+        ✓ ¡Listo! Te enviamos info por email. <a href="{signup_url}" class="cta" style="margin-top:12px">Continuar registro completo</a>
+      </div>
+      <div class="lead-error" id="err"></div>
+
+      <a href="{signup_url}" class="secondary" target="_blank" rel="noopener">o registrate completo ahora →</a>
+    </div>
   </div>
   <footer>Hecho con InmoBot AI · {business}</footer>
+
+  <script>
+    async function submitLead(e) {{
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const btn = document.getElementById('btn');
+      const ok = document.getElementById('ok');
+      const err = document.getElementById('err');
+      err.style.display = 'none';
+      ok.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      try {{
+        const r = await fetch('{capture_url}', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ email }}),
+        }});
+        const data = await r.json();
+        if (!r.ok) {{
+          err.textContent = data.detail || 'Error al guardar el email';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Quiero mi bot →';
+          return false;
+        }}
+        document.getElementById('lf').style.display = 'none';
+        ok.style.display = 'block';
+      }} catch (ex) {{
+        err.textContent = 'Error de red, probá de nuevo';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Quiero mi bot →';
+      }}
+      return false;
+    }}
+  </script>
 </body>
 </html>
 """
@@ -364,3 +434,88 @@ async def share_html_page(
         content=html,
         headers={"Cache-Control": "public, max-age=600, s-maxage=3600"},
     )
+
+
+# ---------------- Lead capture endpoint ----------------
+
+@router.post("/public/share/{tenant_id}/{celebration_id}/lead")
+async def capture_referral_lead(
+    tenant_id: str,
+    celebration_id: str,
+    body: dict,
+    request: Request,
+    background: BackgroundTasks,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Captura email de visitante interesado. Trackea attribution al referrer.
+    Idempotente: mismo email + ref no genera duplicados (upsert).
+    """
+    email = ((body or {}).get("email") or "").strip().lower()
+    if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise HTTPException(status_code=400, detail="Email invalido")
+    if len(email) > 200:
+        raise HTTPException(status_code=400, detail="Email demasiado largo")
+
+    # Validar que la celebration existe (anti-abuse: solo emails desde URLs reales)
+    cel = await db.coach_celebrations.find_one(
+        {"celebration_id": celebration_id, "tenant_id": tenant_id},
+        {"_id": 1},
+    )
+    if not cel:
+        raise HTTPException(status_code=404, detail="Celebration no encontrada")
+
+    # Si el email ya es un agent registrado, NO crear lead (no sentido)
+    existing_agent = await db.agents.find_one({"email": email}, {"_id": 1, "tenant_id": 1})
+    if existing_agent:
+        return {
+            "captured": False,
+            "reason": "already_registered",
+            "message": "Ese email ya tiene cuenta. Iniciá sesión.",
+        }
+
+    now = datetime.now(timezone.utc)
+    ip = request.client.host if request.client else None
+    ua = (request.headers.get("user-agent") or "")[:300]
+
+    # Upsert: mismo email + mismo ref + sin convertir = no duplicar
+    res = await db.referral_leads.update_one(
+        {"ref_tenant_id": tenant_id, "email": email, "converted_tenant_id": None},
+        {
+            "$setOnInsert": {
+                "lead_id": __import__("uuid").uuid4().hex,
+                "ref_tenant_id": tenant_id,
+                "ref_celebration_id": celebration_id,
+                "email": email,
+                "ip": ip,
+                "user_agent": ua,
+                "created_at": now,
+                "converted_tenant_id": None,
+                "converted_at": None,
+            },
+            "$set": {"last_seen_at": now},
+            "$inc": {"submission_count": 1},
+        },
+        upsert=True,
+    )
+
+    is_new = res.upserted_id is not None
+
+    # Bump counters del referrer (background)
+    background.add_task(_bump_referral_counter, db, tenant_id, "leads" if is_new else "leads_repeat")
+
+    return {
+        "captured": True,
+        "is_new": is_new,
+        "message": "¡Listo! Te enviamos info por email." if is_new else "Ya tenemos tu email registrado.",
+    }
+
+
+async def _bump_referral_counter(db, tenant_id: str, field: str):
+    """Best-effort, background."""
+    try:
+        await db.tenants.update_one(
+            {"tenant_id": tenant_id},
+            {"$inc": {f"referral_stats.{field}": 1}},
+        )
+    except Exception:
+        pass

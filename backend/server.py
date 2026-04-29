@@ -67,6 +67,10 @@ async def lifespan(_app):
         await db.coach_celebrations.create_index(
             "seen_at", expireAfterSeconds=30 * 86400, name="seen_at_ttl"
         )
+        # Referral leads: indices para attribution
+        await db.referral_leads.create_index([("lead_id", 1)], unique=True)
+        await db.referral_leads.create_index([("ref_tenant_id", 1), ("created_at", -1)])
+        await db.referral_leads.create_index([("ref_tenant_id", 1), ("email", 1)])
 
         # Migracion one-shot: legacy ISO strings -> BSON datetime para TTL
         from datetime import datetime as _dt
