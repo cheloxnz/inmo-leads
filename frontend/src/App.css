@@ -7758,3 +7758,315 @@ body {
 @media (max-width: 768px) {
   .sa-ff-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ============================================================ */
+/* Premium Features Showcase (Dashboard)                         */
+/* ============================================================ */
+.pf-showcase-card {
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, rgba(139,92,246,0.04) 0%, rgba(99,102,241,0.04) 100%);
+  border: 1px solid rgba(139,92,246,0.15);
+}
+[data-theme="dark"] .pf-showcase-card {
+  background: linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.08) 100%);
+  border-color: rgba(139,92,246,0.25);
+}
+.pf-showcase-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.pf-showcase-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.pf-showcase-section {
+  margin-top: 0.85rem;
+}
+.pf-showcase-section + .pf-showcase-section { margin-top: 1.4rem; }
+.pf-showcase-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 0.6rem;
+}
+.pf-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.7rem;
+}
+.pf-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem 0.95rem;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pf-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+.pf-card-active {
+  border-color: rgba(16,185,129,0.35);
+  background: linear-gradient(135deg, rgba(16,185,129,0.04) 0%, rgba(5,150,105,0.04) 100%);
+}
+[data-theme="dark"] .pf-card-active {
+  background: linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(5,150,105,0.08) 100%);
+}
+.pf-card-cat {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+.pf-card-label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.pf-card-active .pf-card-label { color: #047857; }
+[data-theme="dark"] .pf-card-active .pf-card-label { color: #34d399; }
+.pf-card-desc {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.pf-card-cta {
+  align-self: flex-start;
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+}
+.pf-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.pf-modal {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 1.5rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+}
+.pf-modal-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.6rem;
+  color: var(--text-primary);
+}
+.pf-modal-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.85rem;
+  line-height: 1.5;
+}
+.pf-modal-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  background: rgba(139,92,246,0.06);
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border-left: 3px solid #8b5cf6;
+  margin: 0 0 1rem;
+}
+.pf-modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* ============================================================ */
+/* AI Lead Summary (Lead Detail page)                           */
+/* ============================================================ */
+.ai-summary-card {
+  background: linear-gradient(135deg, rgba(139,92,246,0.05) 0%, rgba(99,102,241,0.05) 100%);
+  border: 1px solid rgba(139,92,246,0.2);
+  margin-bottom: 1rem;
+}
+.ai-summary-card.upsell {
+  background: linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(168,85,247,0.06) 100%);
+  border-style: dashed;
+}
+.ai-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.ai-summary-actions { display: flex; gap: 0.3rem; }
+.ai-summary-premium-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ai-summary-upsell-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.85rem;
+  line-height: 1.5;
+}
+.ai-summary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.5rem 0;
+}
+.ai-summary-empty p { margin: 0; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; }
+.ai-summary-cta-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+.ai-summary-cta-btn:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
+}
+.ai-summary-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem 0;
+  color: var(--text-secondary);
+}
+.ai-summary-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+[data-theme="dark"] .ai-summary-error { background: rgba(220, 38, 38, 0.1); color: #fca5a5; }
+.ai-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.ai-summary-narrative {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+.ai-summary-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.ai-summary-urgency {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ai-summary-urgency-reason {
+  font-weight: 500;
+  font-size: 0.74rem;
+  opacity: 0.85;
+}
+.ai-summary-cache-tag {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ai-summary-next-step {
+  background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+  border-left: 3px solid #ca8a04;
+  border-radius: 8px;
+  padding: 0.75rem 0.95rem;
+}
+[data-theme="dark"] .ai-summary-next-step {
+  background: linear-gradient(135deg, rgba(202,138,4,0.12) 0%, rgba(234,179,8,0.18) 100%);
+  border-left-color: #facc15;
+}
+.ai-summary-next-step-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #92400e;
+  margin-bottom: 0.25rem;
+}
+[data-theme="dark"] .ai-summary-next-step-label { color: #fde68a; }
+.ai-summary-next-step-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #78350f;
+  line-height: 1.4;
+}
+[data-theme="dark"] .ai-summary-next-step-text { color: #fef08a; }
+.ai-summary-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+.ai-summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.ai-summary-list li {
+  font-size: 0.83rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  padding-left: 0.8rem;
+  position: relative;
+}
+.ai-summary-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #8b5cf6;
+  font-weight: 700;
+}
+.ai-summary-list.buying-signals li {
+  background: rgba(16,185,129,0.06);
+  padding: 0.35rem 0.7rem 0.35rem 1.1rem;
+  border-radius: 6px;
+  font-style: italic;
+  color: #047857;
+}
+.ai-summary-list.buying-signals li::before { color: #10b981; left: 0.45rem; }
+[data-theme="dark"] .ai-summary-list.buying-signals li {
+  background: rgba(16,185,129,0.1);
+  color: #6ee7b7;
+}

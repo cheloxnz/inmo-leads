@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import TagsManager from '../components/TagsManager';
+import AILeadSummary from '../components/AILeadSummary';
 
 export default function LeadDetail() {
   const { phone } = useParams();
@@ -295,7 +296,9 @@ export default function LeadDetail() {
             </CardContent>
           </Card>
         )}
-        
+
+        <AILeadSummary leadPhone={lead.phone} />
+
         <Card className="notes-card">
           <CardHeader>
             <CardTitle>📝 Notas Internas</CardTitle>

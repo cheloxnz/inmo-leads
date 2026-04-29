@@ -5,8 +5,9 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
 from pydantic import BaseModel
 
-from auth_routes import require_admin, get_db
+from auth_routes import require_admin, get_db, get_current_user
 from models import User
+from feature_flags import FEATURE_FLAGS, get_tenant_features
 from commission_service import (
     calculate_active_credit_for_tenant,
     get_or_create_referral_code,
@@ -17,6 +18,33 @@ from commission_service import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["commissions"])
+
+
+@router.get("/tenant/features-showcase")
+async def get_tenant_features_showcase(
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Para el dashboard del tenant: lista de features con su estado y metadata.
+    Devuelve {active:[...], available:[...]} para que la UI muestre activas + upsell de las disponibles."""
+    tenant = await db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id},
+        {"_id": 0, "features": 1},
+    ) if current_user.tenant_id else None
+
+    state = get_tenant_features(tenant or {})
+    active = []
+    available = []
+    for key, meta in FEATURE_FLAGS.items():
+        item = {
+            "key": key,
+            "label": meta["label"],
+            "description": meta["description"],
+            "category": meta["category"],
+            "enabled": bool(state.get(key)),
+        }
+        (active if item["enabled"] else available).append(item)
+    return {"active": active, "available": available, "total": len(FEATURE_FLAGS)}
 
 
 @router.get("/commissions/promo-code")

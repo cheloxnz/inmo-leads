@@ -6,6 +6,7 @@ import MetricsCharts from '../components/MetricsCharts';
 import UsagePanel from '../components/UsagePanel';
 import CoachNudges from '../components/CoachNudges';
 import CoachCelebrations from '../components/CoachCelebrations';
+import PremiumFeaturesShowcase from '../components/PremiumFeaturesShowcase';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
@@ -228,6 +229,9 @@ export default function Dashboard() {
       
       {/* Uso del mes */}
       <UsagePanel />
+
+      {/* Premium Features showcase */}
+      <PremiumFeaturesShowcase />
 
       {/* Gráficos de métricas */}
       <MetricsCharts />

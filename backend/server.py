@@ -714,6 +714,39 @@ async def remove_tag(phone: str, tag: str, current_user: User = Depends(get_curr
     return {"message": "Tag eliminado"}
 
 
+@api_router.post("/leads/{phone}/ai-summary")
+async def get_lead_ai_summary(
+    phone: str,
+    force: bool = False,
+    current_user: User = Depends(get_current_user),
+):
+    """Genera (o devuelve cache) el resumen IA del lead.
+    Gateado por feature flag `ai_lead_summary`. Solo el tenant del lead puede consultarlo."""
+    from feature_flags import has_feature
+    from lead_summary_service import generate_lead_summary
+
+    if not current_user.tenant_id:
+        raise HTTPException(403, detail="Tenant no resuelto")
+
+    tenant = await db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id},
+        {"_id": 0, "features": 1},
+    )
+    if not has_feature(tenant or {}, "ai_lead_summary"):
+        raise HTTPException(
+            status_code=403,
+            detail="Feature 'ai_lead_summary' no habilitada para tu cuenta. "
+                   "Contactá soporte para activarla.",
+        )
+
+    summary = await generate_lead_summary(
+        db, current_user.tenant_id, phone, force=force,
+    )
+    if summary is None:
+        raise HTTPException(404, detail="Lead no encontrado o LLM no configurado")
+    return summary
+
+
 @api_router.get("/tags")
 async def get_all_tags(current_user: User = Depends(get_current_user)):
     tf = tenant_filter(current_user)

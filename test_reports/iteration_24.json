@@ -1,0 +1,29 @@
+{
+  "summary": "Iter25 AI Lead Summary + Premium Features Showcase fully validated. Backend pytest 17/17 PASS (showcase auth/shape/active-flow, ai-summary 401/403/404, full mocked LLM flow + cache/force, service units: format_history, freshness TTL, history-len invalidation, sanitization clamp, markdown unwrap). Regression: /api/auth/tenant/branding 200, /api/tenant/features-showcase 200, ai-summary 401 unauth/403 feat-off intact. Frontend E2E with feature toggle: (a) Feature OFF on Dashboard shows PremiumFeaturesShowcase '0 activas / 8 disponibles' with 8 pf-cta-* buttons; modal opens with mailto:soporte@inmobot.com href. (b) On /leads/{phone} shows ai-summary-upsell with Premium badge + disabled 'Contactar para activar'. (c) After superadmin enables ai_lead_summary + relogin demo: dashboard shows '1 activas / 8 disponibles' + pf-active-ai_lead_summary; /leads/{phone} now shows ai-summary-card with 'Generar resumen IA' CTA. (d) Cleanup performed (feature disabled).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_ai_summary.py",
+    "/app/test_reports/pytest/iter25_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "lead_summary_service.generate_lead_summary correctly excludes _id projection and persists ai_summary atomically via update_one $set.",
+    "_is_summary_fresh invalidates on history_len change AND TTL — both branches covered by units.",
+    "Sanitization clamps urgency 1..10 and trims insights to 6 / buying_signals to 5 — defensive.",
+    "Markdown ``` ```json wrapper unwrap is handled before json.loads — robust against GPT formatting drift.",
+    "POST /api/leads/{phone}/ai-summary returns 403 with detail 'Feature ai_lead_summary no está activa para este tenant' (matches contract).",
+    "GET /api/tenant/features-showcase requires auth (get_current_user) — 401 without token; uses get_tenant_features so defaults always present.",
+    "AILeadSummary uses useFeature hook with module-level cache; since feature changes on backend require relogin to invalidate the FE cache, this is acceptable per design but worth documenting in UI somewhere or adding a manual refetch on visibility change.",
+    "PremiumFeaturesShowcase: minor — modal dismissal via overlay click works (onClick on overlay) but no Escape key handler. Non-blocking.",
+    "OPENAI_API_KEY is not set in this preview env; pytest sets a fake one via monkeypatch so LLMService.enabled=True for mocked tests. Real generation in /leads/{phone}/ai-summary would 404 ('Lead no encontrado o LLM no configurado'). Confirmed expected behaviour."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (17/17 iter25 + regression 200)", "frontend": "100% (showcase + upsell + feature-on flow + modal mailto all OK)"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant), admin@inmobot.com / Admin123! (superadmin)",
+  "seed_data_creation": "None new. reset_demo_features autouse fixture wipes tenants.demo-inmobiliaria.features={} before/after each test. Frontend test enabled ai_lead_summary then explicitly disabled at end (demo tenant restored to clean state).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter25 GREEN. Total backend cumulative still 82/82 PASS (iter21-25). Endpoints: GET /api/tenant/features-showcase, POST /api/leads/{phone}/ai-summary (gated by feature flag ai_lead_summary). data-testids verified: premium-features-showcase, pf-count, pf-cta-{key}, pf-contact-modal, pf-modal-email, pf-modal-cancel, pf-active-{key}, pf-available-{key}, ai-summary-upsell, ai-summary-upsell-cta, ai-summary-card, ai-summary-generate-btn, ai-summary-refresh, ai-summary-content, ai-summary-urgency, ai-summary-next-step, ai-summary-loading, ai-summary-error. To toggle feature in runtime: PUT /api/superadmin/tenants/{tid}/features {feature, enabled}. Note: pytest must be invoked with REACT_APP_BACKEND_URL/MONGO_URL/DB_NAME env vars (cd /app/backend; the .env is read by server via load_dotenv but tests use os.environ directly).",
+  "rca of the issue": "N/A — implementation matches spec; tests pass end-to-end across backend, service units, mocked LLM flow, and frontend feature-on/off rendering with real superadmin toggle."
+}
