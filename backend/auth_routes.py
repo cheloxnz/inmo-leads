@@ -464,6 +464,9 @@ async def get_my_branding(
     # Read-only: subscription info para que la UI muestre upsells/limites correctamente
     out["subscription_plan"] = tenant.get("subscription_plan", "")
     out["subscription_status"] = tenant.get("subscription_status", "")
+    # Feature flags efectivos del tenant (combina defaults + overrides)
+    from feature_flags import get_tenant_features
+    out["features"] = get_tenant_features(tenant)
     return out
 
 

@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Building2, Users, MessageSquare, Plus, Search, 
   ChevronDown, ChevronUp, Power, PowerOff, Settings,
-  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap
+  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag
 } from 'lucide-react';
+import TenantFeatureFlags from '../components/TenantFeatureFlags';
 
 export default function SuperAdminPanel() {
   const { isSuperAdmin } = useAuth();
@@ -209,6 +210,7 @@ export default function SuperAdminPanel() {
 function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
   const [updating, setUpdating] = useState(false);
   const [editingBranding, setEditingBranding] = useState(false);
+  const [showFeatureFlags, setShowFeatureFlags] = useState(false);
   const [brandData, setBrandData] = useState({
     business_name: tenant.business_name || tenant.name || '',
     business_tagline: tenant.business_tagline || '',
@@ -311,6 +313,15 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => setShowFeatureFlags(!showFeatureFlags)}
+              data-testid={`feature-flags-btn-${tenant.tenant_id}`}
+            >
+              <Flag className="w-3 h-3 mr-1" />
+              {showFeatureFlags ? 'Cerrar flags' : 'Feature Flags'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               asChild
               data-testid={`view-landing-${tenant.tenant_id}`}
             >
@@ -398,6 +409,10 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
                 </Button>
               </div>
             </div>
+          )}
+
+          {showFeatureFlags && (
+            <TenantFeatureFlags tenantId={tenant.tenant_id} />
           )}
         </div>
       )}

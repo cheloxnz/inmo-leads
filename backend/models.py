@@ -115,6 +115,8 @@ class Tenant(BaseModel):
     # Branding
     business_name: str = ""
     business_tagline: str = ""
+    # Feature flags por tenant (override del plan; valor truthy/falsy o objeto config)
+    features: dict = Field(default_factory=dict)
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

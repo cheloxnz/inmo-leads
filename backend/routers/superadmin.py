@@ -1,9 +1,13 @@
 """Router de metricas globales para SuperAdmin"""
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from auth_routes import get_current_user, get_db
 from payment_service import SUBSCRIPTION_PLANS
+from feature_flags import (
+    FEATURE_FLAGS, get_tenant_features, update_tenant_feature,
+)
 from models import User
 
 router = APIRouter(tags=["superadmin"])
@@ -149,3 +153,67 @@ async def get_tenants_usage(current_user: User = Depends(get_current_user)):
             "total_leads": leads_count,
         })
     return result
+
+
+# ---------------- Feature Flags ----------------
+
+@router.get("/superadmin/feature-flags/registry")
+async def get_feature_flags_registry(current_user: User = Depends(get_current_user)):
+    """Catálogo de features disponibles (para construir la UI del SuperAdmin Panel)."""
+    _require_superadmin(current_user)
+    return {
+        "flags": [
+            {"key": k, **v} for k, v in FEATURE_FLAGS.items()
+        ]
+    }
+
+
+@router.get("/superadmin/tenants/{tenant_id}/features")
+async def get_tenant_feature_flags(
+    tenant_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Estado efectivo de todas las features para un tenant (combina defaults + overrides)."""
+    _require_superadmin(current_user)
+    db = get_db()
+    t = await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0, "features": 1, "tenant_id": 1})
+    if not t:
+        raise HTTPException(404, "Tenant no encontrado")
+    return {
+        "tenant_id": tenant_id,
+        "features": get_tenant_features(t),
+        "raw_overrides": t.get("features") or {},
+    }
+
+
+class FeatureFlagUpdate(BaseModel):
+    feature: str
+    enabled: bool
+    config: dict | None = None
+
+
+@router.put("/superadmin/tenants/{tenant_id}/features")
+async def update_tenant_feature_flag(
+    tenant_id: str,
+    body: FeatureFlagUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Activa/desactiva un feature flag para un tenant. Solo superadmin."""
+    _require_superadmin(current_user)
+    if body.feature not in FEATURE_FLAGS:
+        raise HTTPException(400, f"Feature desconocida: {body.feature}")
+    db = get_db()
+    ok = await update_tenant_feature(db, tenant_id, body.feature, body.enabled, body.config)
+    if not ok:
+        raise HTTPException(404, "Tenant no encontrado")
+    # Audit log
+    await db.audit_log.insert_one({
+        "tenant_id": tenant_id,
+        "user_email": current_user.email,
+        "action": "feature_flag_updated",
+        "feature": body.feature,
+        "enabled": body.enabled,
+        "config": body.config or None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"ok": True, "tenant_id": tenant_id, "feature": body.feature, "enabled": body.enabled}
