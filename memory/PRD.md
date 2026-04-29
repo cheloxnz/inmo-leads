@@ -34,7 +34,29 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
-### 2026-04-28 (Sesión Actual - OG Image meta tags + viralidad pasiva)
+### 2026-04-28 (Sesión Actual - Acquisition Loop sobre OG Share Pages)
+- **Mini-form de captura de lead en el HTML público** (`/api/public/share/{tid}/{cid}`):
+  - Form con input email + botón "Quiero mi bot" + script JS inline que POSTea a `/api/public/share/{tid}/{cid}/lead`.
+  - Banner ámbar "✦ Te trajo {business_name}" (attribution visible al visitante).
+  - Texto: "¿Querés un bot así para tu negocio? Probalo gratis 14 días. Sin tarjeta. Setup en 5 minutos."
+  - Link secundario "o registrate completo ahora →" al wizard `/signup?ref={tid}&ref_celebration_id={cid}`.
+- **Endpoint `POST /api/public/share/{tid}/{cid}/lead`** (público):
+  - Validación email regex + max 200 chars + celebration debe existir (anti-abuse).
+  - Si email ya es agent registrado → `{captured:false, reason:'already_registered'}`.
+  - Upsert en collection `referral_leads`: `lead_id` UUID, `ref_tenant_id`, `ref_celebration_id`, `email` (lowercase), `ip`, `user_agent`, `created_at`, `converted_tenant_id`. Idempotente entre intentos no-convertidos.
+  - Tracking via `BackgroundTasks`: bump `tenant.referral_stats.leads` (o `leads_repeat`).
+- **Onboarding wizard acepta `ref` y `ref_celebration_id`:**
+  - Si ref válido + tenant.active=true → persiste `referred_by` y `referred_via_celebration` en el tenant nuevo.
+  - Tras crear el tenant: marca `referral_leads.converted_tenant_id` para email coincidente + bump `tenant.referral_stats.signups` del referrer.
+  - Frontend `/signup?ref=...` muestra badge **"👤 Te trajo {business}"** (color ámbar) tras GET `/api/public/catalog/{ref}` para resolver el nombre.
+- **Endpoint `GET /api/coach/referral-stats`** (admin):
+  - Funnel completo: `shares_explicit`, `preview_views`, `html_views`, `leads_captured`, `signups_converted`, `tenant_signups_via_ref`, `conversion_rate` (clamped a 100%).
+  - Permite al tenant medir el ROI de cada celebración compartida.
+- **Hardening:** index compuesto `referral_leads (ref_tenant_id, email, converted_tenant_id)` evita full scan en upsert. `conversion_rate` clamped a 100% (edge case de leads borrados post-conversión).
+- **Tests:** Backend iter19 15/15 PASS + 43/43 regression. Frontend E2E 100%. Cero bugs.
+- **Archivos:** `/app/backend/routers/public_share.py` (form HTML + capture endpoint), `/app/backend/routers/onboarding.py` (ref+attribution+conversion tracking), `/app/backend/routers/coach.py` (referral-stats endpoint), `/app/backend/server.py` (indices), `/app/frontend/src/pages/Signup.js` (badge ref + envío ref en payload).
+
+### 2026-04-28 (Sesión Anterior - OG Image meta tags + viralidad pasiva)
 - **Endpoints públicos para preview automático en redes sociales:**
   - `GET /api/public/share/{tenant_id}/{celebration_id}.png` — renderiza PNG branded 1200x630 con Pillow + LiberationSans. Incluye gradient diagonal (primary→accent del tenant), card blanca, badge circular con inicial del celebration_type, título wrappeado a 3 líneas, métrica grande, business_name + "Hecho con InmoBot AI".
   - `GET /api/public/share/{tenant_id}/{celebration_id}` (sin `.png`) — HTML público con meta tags Open Graph + Twitter Card completas (`og:image:width=1200/height=630`, `twitter:card=summary_large_image`). Cuando el tenant pega esta URL en LinkedIn/X/WhatsApp/Slack/Discord, el crawler **previsualiza automáticamente la imagen branded** sin que el usuario tenga que adjuntar nada.

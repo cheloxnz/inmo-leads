@@ -70,7 +70,11 @@ async def lifespan(_app):
         # Referral leads: indices para attribution
         await db.referral_leads.create_index([("lead_id", 1)], unique=True)
         await db.referral_leads.create_index([("ref_tenant_id", 1), ("created_at", -1)])
-        await db.referral_leads.create_index([("ref_tenant_id", 1), ("email", 1)])
+        # Indice compuesto para el upsert filter en POST /lead (evita full scan)
+        await db.referral_leads.create_index(
+            [("ref_tenant_id", 1), ("email", 1), ("converted_tenant_id", 1)],
+            name="upsert_filter"
+        )
 
         # Migracion one-shot: legacy ISO strings -> BSON datetime para TTL
         from datetime import datetime as _dt

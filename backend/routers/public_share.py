@@ -448,7 +448,9 @@ async def capture_referral_lead(
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
     """Captura email de visitante interesado. Trackea attribution al referrer.
-    Idempotente: mismo email + ref no genera duplicados (upsert).
+    Idempotente entre intentos NO convertidos: mismo email + ref + sin convertir = upsert.
+    Si el lead ya convirtio (signup completo), un nuevo submit del form crea un lead nuevo
+    (intencional: representa que el visitante volvio a la URL post-signup; util para retargeting).
     """
     email = ((body or {}).get("email") or "").strip().lower()
     if not email or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):

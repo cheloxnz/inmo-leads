@@ -545,5 +545,5 @@ async def get_referral_stats(
         "leads_captured": leads_count,
         "signups_converted": converted,
         "tenant_signups_via_ref": stats.get("signups", 0),
-        "conversion_rate": round((converted / leads_count) * 100, 1) if leads_count else 0,
+        "conversion_rate": min(100.0, round((converted / leads_count) * 100, 1)) if leads_count else 0,
     }
