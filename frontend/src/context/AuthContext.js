@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   // Global 401 interceptor: si el token expira, hacer logout y redirect a /login
+  // + reportar 5xx a Sentry
   useEffect(() => {
     const id = axios.interceptors.response.use(
       (resp) => resp,
@@ -45,6 +46,18 @@ export function AuthProvider({ children }) {
           if (window.location.pathname !== '/login') {
             window.location.href = '/login?expired=1';
           }
+        }
+        // Reportar errores de servidor (5xx + network errors) a Sentry
+        if (!status || status >= 500) {
+          import('@sentry/react').then((Sentry) => {
+            Sentry.captureException(error, {
+              tags: { source: 'axios', http_status: String(status || 'network') },
+              extra: {
+                url: error?.config?.url,
+                method: error?.config?.method,
+              },
+            });
+          }).catch(() => { /* sentry not loaded */ });
         }
         return Promise.reject(error);
       }

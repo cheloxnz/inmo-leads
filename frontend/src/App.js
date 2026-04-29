@@ -538,15 +538,48 @@ function AppContent() {
   );
 }
 
+import * as Sentry from '@sentry/react';
+
+function ErrorFallback({ error, resetError }) {
+  return (
+    <div style={{
+      minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '2rem', textAlign: 'center', fontFamily: 'system-ui, sans-serif',
+    }}>
+      <div style={{ maxWidth: 460 }}>
+        <div style={{ fontSize: '2.4rem', marginBottom: '0.5rem' }}>⚠️</div>
+        <h1 style={{ fontSize: '1.4rem', margin: '0 0 0.6rem', color: '#111827' }}>
+          Algo salió mal
+        </h1>
+        <p style={{ color: '#6b7280', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+          Ya recibimos el reporte del error. Nuestro equipo lo va a revisar.
+        </p>
+        <button
+          onClick={resetError}
+          style={{
+            padding: '10px 20px', background: '#6366f1', color: '#fff',
+            border: 0, borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+          }}
+          data-testid="error-boundary-retry"
+        >
+          Recargar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <Sentry.ErrorBoundary fallback={({ error, resetError }) => <ErrorFallback error={error} resetError={resetError} />}>
+      <BrowserRouter>
+        <AuthProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </Sentry.ErrorBoundary>
   );
 }
 

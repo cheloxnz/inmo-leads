@@ -35,6 +35,10 @@ from resend_service import send_welcome_email
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Initialize Sentry as early as possible (after env vars loaded, before app)
+from sentry_config import init_sentry
+init_sentry()
+
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
@@ -127,6 +131,35 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+@api_router.get("/health")
+async def healthcheck():
+    """Health check endpoint — usado por load balancer / UptimeRobot.
+    Verifica conectividad con MongoDB. NO trackeado por Sentry."""
+    try:
+        await db.command("ping")
+        mongo_ok = True
+    except Exception as e:
+        logger.error(f"Healthcheck Mongo failed: {e}")
+        mongo_ok = False
+    status = "ok" if mongo_ok else "degraded"
+    return JSONResponse(
+        status_code=200 if mongo_ok else 503,
+        content={
+            "status": status,
+            "mongo": "ok" if mongo_ok else "fail",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        },
+    )
+
+
+@api_router.get("/sentry-debug")
+async def sentry_debug(current_user: User = Depends(require_superadmin)):
+    """Endpoint de prueba: dispara una excepción para validar que Sentry captura.
+    Solo accesible para superadmin."""
+    division_by_zero = 1 / 0  # noqa: F841
+
 
 # ==============================================
 # WEBSOCKET NOTIFICATION MANAGER
