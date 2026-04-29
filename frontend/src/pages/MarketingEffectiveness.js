@@ -89,6 +89,46 @@ export default function MarketingEffectiveness() {
 
   return (
     <div className="page-container space-y-6" data-testid="marketing-effectiveness-page">
+      {/* Banner de ahorros por referidos */}
+      {data.commission_summary && (data.commission_summary.active_count > 0 || data.commission_summary.total_credited_usd > 0) && (
+        <div
+          className="rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm"
+          style={{
+            background: 'linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%)',
+            border: '1px solid #6ee7b7',
+            color: '#065f46',
+          }}
+          data-testid="marketing-referral-savings-banner"
+        >
+          <div
+            className="rounded-full w-10 h-10 flex items-center justify-center text-white shrink-0"
+            style={{ background: 'linear-gradient(135deg,#10b981 0%,#059669 100%)' }}
+          >
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-semibold">
+              Llevás <strong>${(data.commission_summary.total_credited_usd || 0).toFixed(0)}</strong> ahorrados en facturación gracias a referidos
+            </div>
+            <div className="text-xs mt-0.5" style={{ color: '#047857' }}>
+              {data.commission_summary.active_count > 0
+                ? <>Este mes: <strong>-${(data.commission_summary.capped_amount_usd || 0).toFixed(0)}</strong> de descuento ({data.commission_summary.active_count} {data.commission_summary.active_count === 1 ? 'referido activo' : 'referidos activos'}){data.commission_summary.is_capped ? ' · ¡Tu suscripción es gratis!' : ''}</>
+                : <>Compartí tu link y ganá $5/mes por referido durante 12 meses.</>
+              }
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.location.href = '/config'}
+            data-testid="marketing-referral-cta"
+            className="shrink-0"
+          >
+            Ver detalle
+          </Button>
+        </div>
+      )}
+
       <header className="page-header flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2">

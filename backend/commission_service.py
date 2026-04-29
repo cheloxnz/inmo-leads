@@ -147,7 +147,57 @@ async def create_commission_on_first_payment(
     }
     await db.commissions.insert_one(doc)
     logger.info(f"Commission creada: {referrer_id} <- {referred_tenant_id}, expires {doc['expires_at']}")
+    # Trigger email al referrer (best-effort, no bloquea si falla)
+    try:
+        await _notify_referrer_new_commission(db, referrer_id, referred_tenant_id)
+    except Exception as e:
+        logger.warning(f"No se pudo notificar al referrer {referrer_id}: {e}")
     return doc
+
+
+async def _notify_referrer_new_commission(
+    db: AsyncIOMotorDatabase,
+    referrer_tenant_id: str,
+    referred_tenant_id: str,
+):
+    """Envía email al admin del referrer cuando entra una nueva comisión activa."""
+    referrer = await db.tenants.find_one(
+        {"tenant_id": referrer_tenant_id},
+        {"_id": 0, "tenant_id": 1, "business_name": 1, "name": 1},
+    )
+    referred = await db.tenants.find_one(
+        {"tenant_id": referred_tenant_id},
+        {"_id": 0, "business_name": 1, "name": 1},
+    )
+    if not referrer:
+        return
+
+    # Email del admin del tenant referrer
+    agent = await db.agents.find_one(
+        {"tenant_id": referrer_tenant_id, "role": "admin", "active": True},
+        {"_id": 0, "email": 1},
+    )
+    if not agent or not agent.get("email"):
+        return
+
+    credit = await calculate_active_credit_for_tenant(db, referrer_tenant_id)
+
+    from email_service import EmailService
+    es = EmailService(db)
+    if not es.smtp_username or not es.smtp_password:
+        logger.info("SMTP no configurado, skip email new_referral_commission")
+        return
+
+    await es.send_new_referral_commission(
+        to_email=agent["email"],
+        referrer_business_name=(referrer.get("business_name") or referrer.get("name") or "—"),
+        referred_business_name=(referred.get("business_name") or referred.get("name") or "Cliente referido"),
+        amount_per_month_usd=COMMISSION_AMOUNT_USD,
+        active_count=credit.get("active_count", 0),
+        active_credit_capped_usd=credit.get("capped_amount_usd", 0),
+        plan_price_usd=credit.get("plan_price_usd", 0),
+        is_capped=bool(credit.get("is_capped")),
+    )
 
 
 async def calculate_active_credit_for_tenant(

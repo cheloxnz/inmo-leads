@@ -74,6 +74,9 @@ class EmailType(str, Enum):
     HOT_LEAD = "hot_lead"
     APPOINTMENT_REMINDER = "appointment_reminder"
     WARM_LEAD_REACTIVATION = "warm_lead_reactivation"
+    NEW_REFERRAL_COMMISSION = "new_referral_commission"
+    TRIAL_ENDING_SOON = "trial_ending_soon"
+    WEEKLY_DIGEST = "weekly_digest"
     TEST = "test"
 
 

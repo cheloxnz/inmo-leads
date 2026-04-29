@@ -114,12 +114,51 @@ async def _check_ai_unused(tenant: dict, db) -> dict | None:
     }
 
 
+# Trial considerations (14 días gratis sin tarjeta es la oferta del SaaS)
+TRIAL_DURATION_DAYS = 14
+TRIAL_WARN_THRESHOLD_DAYS = 3  # nudge cuando faltan <=3 días
+
+
+def _trial_days_left(tenant: dict) -> int | None:
+    """Devuelve días restantes de trial o None si tenant no está en trial."""
+    status = (tenant.get("subscription_status") or "").lower()
+    if status == "active":
+        return None
+    created = _parse_dt(tenant.get("created_at"))
+    if not created:
+        return None
+    elapsed = (datetime.now(timezone.utc) - created).days
+    left = TRIAL_DURATION_DAYS - elapsed
+    return max(0, left)
+
+
+async def _check_trial_ending_soon(tenant: dict, db) -> dict | None:
+    days_left = _trial_days_left(tenant)
+    if days_left is None or days_left > TRIAL_WARN_THRESHOLD_DAYS:
+        return None
+    if days_left == 0:
+        title = "Tu trial terminó — Activá tu plan para no perder el bot"
+        body = "Tu período de prueba gratuita finalizó. Suscribite ahora para mantener tus leads, configuración y bot activo."
+    else:
+        word = "día" if days_left == 1 else "días"
+        title = f"Tu trial termina en {days_left} {word}"
+        body = "Activá tu plan en 1 minuto para no perder lo que construiste. Tus leads, flujo y configuración quedan tal cual."
+    return {
+        "title": title,
+        "body": body,
+        "cta_text": "Suscribirme ahora",
+        "cta_url": "/config",
+        "severity": Severity.HIGH.value,
+    }
+
+
 # Lista de checks: (nudge_type, days_min, async_fn)
 _CHECKS = [
     ("whatsapp_unconfigured", 1, _check_whatsapp_unconfigured),
     ("no_leads_yet", 3, _check_no_leads_yet),
     ("default_branding", 5, _check_default_branding),
     ("ai_unused", 7, _check_ai_unused),
+    ("trial_ending_soon", 11, _check_trial_ending_soon),  # 14d - 3d = ≥11d
 ]
 
 
@@ -688,4 +727,41 @@ async def get_coach_effectiveness(
         },
         "timeseries": timeseries,
         "top_celebrations": top_celebrations,
+        "commission_summary": await _commission_summary_for_marketing(db, current_user.tenant_id),
     }
+
+
+async def _commission_summary_for_marketing(db, tenant_id):
+    """Mini-resumen de comisiones para el banner de /marketing."""
+    try:
+        from commission_service import calculate_active_credit_for_tenant
+        credit = await calculate_active_credit_for_tenant(db, tenant_id)
+
+        # Total histórico ganado
+        pipeline = [
+            {"$match": {"referrer_tenant_id": tenant_id}},
+            {"$group": {
+                "_id": None,
+                "total_credited": {"$sum": {"$ifNull": ["$total_credited_usd", 0]}},
+                "active": {"$sum": {"$cond": [{"$eq": ["$status", "active"]}, 1, 0]}},
+            }},
+        ]
+        agg = await db.commissions.aggregate(pipeline).to_list(length=1)
+        total_credited = (agg[0]["total_credited"] if agg else 0) or 0
+        return {
+            "active_count": credit.get("active_count", 0),
+            "capped_amount_usd": round(credit.get("capped_amount_usd", 0), 2),
+            "total_credited_usd": round(total_credited, 2),
+            "is_capped": bool(credit.get("is_capped")),
+            "plan_price_usd": round(credit.get("plan_price_usd", 0), 2),
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"commission_summary failed: {e}")
+        return {
+            "active_count": 0,
+            "capped_amount_usd": 0,
+            "total_credited_usd": 0,
+            "is_capped": False,
+            "plan_price_usd": 0,
+        }

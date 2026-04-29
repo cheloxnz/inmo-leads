@@ -13,8 +13,50 @@ const BACKEND = process.env.REACT_APP_BACKEND_URL;
 export default function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const refTenantId = searchParams.get('ref') || '';
-  const refCelebrationId = searchParams.get('ref_celebration_id') || '';
+  // Atribución persistente: si llega con ?ref=, lo guardamos en localStorage
+  // para no perder atribución si el usuario navega/recarga antes de completar signup.
+  const REF_STORAGE_KEY = 'inmobot_ref_attribution';
+  const REF_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
+
+  const queryRef = searchParams.get('ref') || '';
+  const queryRefCelebration = searchParams.get('ref_celebration_id') || '';
+
+  // Persistencia
+  useEffect(() => {
+    if (queryRef) {
+      try {
+        localStorage.setItem(REF_STORAGE_KEY, JSON.stringify({
+          ref: queryRef,
+          ref_celebration_id: queryRefCelebration || null,
+          utm_source: searchParams.get('utm_source') || null,
+          utm_medium: searchParams.get('utm_medium') || null,
+          utm_campaign: searchParams.get('utm_campaign') || null,
+          stored_at: Date.now(),
+        }));
+      } catch (e) { /* localStorage not available */ }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryRef, queryRefCelebration]);
+
+  // Resolver ref efectivo: query param > localStorage (no expirado)
+  const persistedRef = (() => {
+    if (queryRef) return { ref: queryRef, ref_celebration_id: queryRefCelebration };
+    try {
+      const raw = localStorage.getItem(REF_STORAGE_KEY);
+      if (!raw) return { ref: '', ref_celebration_id: '' };
+      const parsed = JSON.parse(raw);
+      if (!parsed.stored_at || Date.now() - parsed.stored_at > REF_TTL_MS) {
+        localStorage.removeItem(REF_STORAGE_KEY);
+        return { ref: '', ref_celebration_id: '' };
+      }
+      return { ref: parsed.ref || '', ref_celebration_id: parsed.ref_celebration_id || '' };
+    } catch (e) {
+      return { ref: '', ref_celebration_id: '' };
+    }
+  })();
+  const refTenantId = persistedRef.ref;
+  const refCelebrationId = persistedRef.ref_celebration_id;
+
   const [refBusiness, setRefBusiness] = useState('');
   const [step, setStep] = useState(1);
   const [data, setData] = useState({
@@ -80,6 +122,8 @@ export default function Signup() {
       // Guardar token para auto-login
       localStorage.setItem('token', res.data.access_token);
       localStorage.setItem('user', JSON.stringify(res.data.user));
+      // Limpiar atribución persistida tras conversión exitosa
+      try { localStorage.removeItem(REF_STORAGE_KEY); } catch (e) { /* noop */ }
       setStep(3);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error en el registro');

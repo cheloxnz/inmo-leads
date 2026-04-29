@@ -77,7 +77,7 @@ export default function ReferralProgramSection() {
 
   const tenantId = user?.tenant_id;
   const refLink = tenantId
-    ? `${window.location.origin}/signup?ref=${encodeURIComponent(tenantId)}`
+    ? `${window.location.origin}/signup?ref=${encodeURIComponent(tenantId)}&utm_source=referral&utm_medium=link&utm_campaign=tenant_share`
     : '';
   const credit = data.active_credit || {};
   const config = data.config || {};

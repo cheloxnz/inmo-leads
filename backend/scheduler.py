@@ -27,6 +27,8 @@ class ScheduledTasks:
         asyncio.create_task(self.bill_monthly_overage())
         asyncio.create_task(self.run_onboarding_coach())
         asyncio.create_task(self.run_commission_expiry())
+        asyncio.create_task(self.send_trial_ending_emails())
+        asyncio.create_task(self.send_weekly_digest_emails())
 
     async def run_commission_expiry(self):
         """Cada 24h, marca como EXPIRED las commissions que cumplieron 365 dias."""
@@ -40,6 +42,141 @@ class ScheduledTasks:
             except Exception as e:
                 logger.error(f"[Scheduler] commission expiry error: {e}")
             await asyncio.sleep(24 * 3600)
+
+    async def send_trial_ending_emails(self):
+        """Cada 24h, envía email a tenants con trial terminando en <=3 días.
+        Idempotente por (tenant_id, days_left bucket): no envía 2 veces el mismo aviso."""
+        await asyncio.sleep(240)
+        from routers.coach import _trial_days_left, TRIAL_WARN_THRESHOLD_DAYS
+        BASE_URL = (
+            __import__("os").environ.get("PUBLIC_BASE_URL")
+            or "https://inmobot-preview.preview.emergentagent.com"
+        )
+        while self.running:
+            try:
+                cursor = self.db.tenants.find(
+                    {"active": True},
+                    {"_id": 0, "tenant_id": 1, "business_name": 1, "name": 1,
+                     "subscription_status": 1, "created_at": 1},
+                )
+                async for t in cursor:
+                    days_left = _trial_days_left(t)
+                    if days_left is None or days_left > TRIAL_WARN_THRESHOLD_DAYS:
+                        continue
+                    sent_key = f"trial_ending_{days_left}d"
+                    already = await self.db.email_logs.find_one({
+                        "email_type": "trial_ending_soon",
+                        "subject": {"$regex": f"termina en {days_left}"},
+                        "recipient_emails": {"$exists": True},
+                        "lead_phone": sent_key,
+                    }, {"_id": 1})
+                    if already:
+                        continue
+                    agent = await self.db.agents.find_one(
+                        {"tenant_id": t["tenant_id"], "role": "admin", "active": True},
+                        {"_id": 0, "email": 1},
+                    )
+                    if not agent or not agent.get("email"):
+                        continue
+                    biz = t.get("business_name") or t.get("name") or t["tenant_id"]
+                    try:
+                        await self.email.send_trial_ending_soon(
+                            to_email=agent["email"],
+                            business_name=biz,
+                            days_left=days_left,
+                            upgrade_url=f"{BASE_URL}/config",
+                        )
+                        # marker de idempotencia: usar lead_phone como dedupe-key
+                        await self.db.email_logs.update_one(
+                            {"email_type": "trial_ending_soon",
+                             "recipient_emails": [agent["email"]],
+                             "subject": {"$regex": f"termina en {days_left}"}},
+                            {"$set": {"lead_phone": sent_key}},
+                        )
+                    except Exception as e:
+                        logger.warning(f"[Scheduler] trial email failed for {t['tenant_id']}: {e}")
+            except Exception as e:
+                logger.error(f"[Scheduler] trial ending task error: {e}")
+            await asyncio.sleep(24 * 3600)
+
+    async def send_weekly_digest_emails(self):
+        """Cada lunes a las 09:00 UTC envía un resumen semanal a cada admin tenant activo."""
+        await asyncio.sleep(300)
+        last_run_iso = None
+        while self.running:
+            try:
+                from datetime import datetime, timezone, timedelta
+                now = datetime.now(timezone.utc)
+                # Disparar lunes (weekday=0) entre 09:00-09:59 UTC, una vez por semana
+                run_now = (now.weekday() == 0 and now.hour == 9
+                           and last_run_iso != now.strftime("%G-W%V"))
+                # Modo manual / dev: respetar env DIGEST_FORCE=1
+                import os
+                if os.environ.get("DIGEST_FORCE") == "1":
+                    run_now = True
+                if run_now:
+                    sent = await self._send_digest_to_all_tenants()
+                    last_run_iso = now.strftime("%G-W%V")
+                    logger.info(f"[Scheduler] Weekly digest enviado a {sent} tenants")
+            except Exception as e:
+                logger.error(f"[Scheduler] weekly digest error: {e}")
+            await asyncio.sleep(3600)  # check cada hora
+
+    async def _send_digest_to_all_tenants(self) -> int:
+        """Envía digest a todos los tenants admin activos. Retorna cantidad enviada."""
+        from datetime import datetime, timezone, timedelta
+        from commission_service import calculate_active_credit_for_tenant
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        cutoff_iso = cutoff.isoformat()
+        sent = 0
+        cursor = self.db.tenants.find(
+            {"active": True, "subscription_status": {"$ne": "cancelled"}},
+            {"_id": 0, "tenant_id": 1, "business_name": 1, "name": 1},
+        )
+        async for t in cursor:
+            tid = t["tenant_id"]
+            agent = await self.db.agents.find_one(
+                {"tenant_id": tid, "role": "admin", "active": True},
+                {"_id": 0, "email": 1},
+            )
+            if not agent or not agent.get("email"):
+                continue
+            try:
+                leads_new = await self.db.leads.count_documents({
+                    "tenant_id": tid,
+                    "created_at": {"$gte": cutoff_iso},
+                })
+                leads_total = await self.db.leads.count_documents({"tenant_id": tid})
+                conversions = await self.db.leads.count_documents({
+                    "tenant_id": tid,
+                    "status": {"$in": ["hot", "appointment", "completed"]},
+                    "created_at": {"$gte": cutoff_iso},
+                })
+                ai_msgs = await self.db.usage_log.count_documents({
+                    "tenant_id": tid,
+                    "type": "ai_message",
+                    "created_at": {"$gte": cutoff_iso},
+                }) if "usage_log" in await self.db.list_collection_names() else 0
+                credit = await calculate_active_credit_for_tenant(self.db, tid)
+                stats = {
+                    "days": 7,
+                    "leads_new": leads_new,
+                    "leads_total": leads_total,
+                    "conversions": conversions,
+                    "ai_messages": ai_msgs,
+                    "referral_credit_capped_usd": credit.get("capped_amount_usd", 0),
+                    "referral_active_count": credit.get("active_count", 0),
+                }
+                biz = t.get("business_name") or t.get("name") or tid
+                await self.email.send_weekly_digest(
+                    to_email=agent["email"],
+                    business_name=biz,
+                    stats=stats,
+                )
+                sent += 1
+            except Exception as e:
+                logger.warning(f"[Scheduler] digest fail tenant={tid}: {e}")
+        return sent
 
     async def run_onboarding_coach(self):
         """Cada 6 horas, evalua todos los tenants y crea nudges del Coach."""

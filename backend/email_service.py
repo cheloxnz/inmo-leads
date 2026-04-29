@@ -326,6 +326,181 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             lead_phone=phone
         )
     
+    async def send_new_referral_commission(
+        self,
+        to_email: str,
+        referrer_business_name: str,
+        referred_business_name: str,
+        amount_per_month_usd: float,
+        active_count: int,
+        active_credit_capped_usd: float,
+        plan_price_usd: float,
+        is_capped: bool,
+    ) -> bool:
+        """Notifica al referrer que ganó una nueva comisión recurrente."""
+        if not to_email:
+            return False
+        subject = f"🎉 Conseguiste un nuevo referido — ${amount_per_month_usd:.0f}/mes ganados"
+        cap_note = (
+            f"<p style='margin-top:14px;color:#047857;'><strong>¡Tu suscripción es gratis!</strong> "
+            f"Llegaste al tope del plan (${plan_price_usd:.0f}/mes). El descuento se aplica al 100%.</p>"
+            if is_capped else ""
+        )
+        text_body = (
+            f"¡Hola {referrer_business_name}!\n\n"
+            f"Conseguiste un nuevo referido: {referred_business_name}.\n"
+            f"Te genera ${amount_per_month_usd:.0f}/mes de descuento durante 12 meses.\n\n"
+            f"Tu crédito activo este mes: -${active_credit_capped_usd:.0f} ({active_count} referidos activos).\n"
+            f"Se descontará automáticamente en tu próxima factura.\n\n"
+            f"Compartí tu link de referido para sumar más:\n"
+            f"https://inmobot-preview.preview.emergentagent.com/signup\n\n"
+            f"InmoBot AI"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; line-height:1.55; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:600px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#10b981 0%,#059669 100%); color:#fff; padding:32px 28px; text-align:center; }}
+  .header h1 {{ margin:0; font-size:22px; }}
+  .header .amount {{ font-size:42px; font-weight:800; margin-top:6px; letter-spacing:-0.02em; }}
+  .header .subtitle {{ opacity:0.92; font-size:14px; margin-top:6px; }}
+  .content {{ padding:28px; }}
+  .stats {{ display:flex; gap:12px; margin:18px 0; flex-wrap:wrap; }}
+  .stat {{ flex:1 1 140px; background:#ecfdf5; border:1px solid #6ee7b7; border-radius:10px; padding:14px; }}
+  .stat .lbl {{ font-size:11px; color:#047857; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; }}
+  .stat .val {{ font-size:24px; font-weight:700; color:#065f46; margin-top:4px; }}
+  .footer {{ padding:18px 28px; color:#6b7280; font-size:12px; text-align:center; border-top:1px solid #e5e7eb; }}
+</style></head>
+<body>
+  <div class='container'>
+    <div class='header'>
+      <h1>🎉 Conseguiste un nuevo referido</h1>
+      <div class='amount'>+${amount_per_month_usd:.0f}/mes</div>
+      <div class='subtitle'>durante los próximos 12 meses</div>
+    </div>
+    <div class='content'>
+      <p>¡Hola <strong>{referrer_business_name}</strong>!</p>
+      <p><strong>{referred_business_name}</strong> se sumó a InmoBot con tu link de referido y ya está pagando su suscripción 🚀</p>
+      <div class='stats'>
+        <div class='stat'><div class='lbl'>Crédito activo</div><div class='val'>-${active_credit_capped_usd:.0f}</div></div>
+        <div class='stat'><div class='lbl'>Referidos activos</div><div class='val'>{active_count}</div></div>
+      </div>
+      <p style='color:#6b7280; font-size:14px;'>El descuento se aplica automáticamente en tu próxima factura. No tenés que hacer nada.</p>
+      {cap_note}
+    </div>
+    <div class='footer'>
+      Querés ganar más? Compartí tu link de referido desde el panel de Facturación.<br>
+      InmoBot AI · Programa de referidos
+    </div>
+  </div>
+</body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.NEW_REFERRAL_COMMISSION,
+        )
+
+    async def send_trial_ending_soon(
+        self,
+        to_email: str,
+        business_name: str,
+        days_left: int,
+        upgrade_url: str,
+    ) -> bool:
+        """Aviso al admin cuando faltan pocos días al trial."""
+        if not to_email:
+            return False
+        subject = f"⏰ Tu trial de InmoBot termina en {days_left} {'día' if days_left==1 else 'días'}"
+        text_body = (
+            f"Hola {business_name},\n\n"
+            f"Tu período de prueba gratuita termina en {days_left} días.\n"
+            f"Suscribite ahora para no perder tu bot, leads y configuración:\n{upgrade_url}\n\n"
+            f"InmoBot AI"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><style>
+  body {{ font-family: -apple-system, Arial, sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:560px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%); color:#fff; padding:28px; text-align:center; }}
+  .content {{ padding:28px; line-height:1.55; }}
+  .cta {{ display:inline-block; padding:12px 22px; background:#6366f1; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; margin-top:14px; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'><h1 style='margin:0;font-size:22px;'>⏰ Tu trial termina pronto</h1></div>
+  <div class='content'>
+    <p>Hola <strong>{business_name}</strong>,</p>
+    <p>Tu período de prueba gratuita termina en <strong>{days_left} {'día' if days_left==1 else 'días'}</strong>.</p>
+    <p>No pierdas el bot que construiste, los leads que ya generaste ni tu configuración. Activá tu plan en 1 minuto:</p>
+    <p style='text-align:center;'><a class='cta' href='{upgrade_url}'>Suscribirme ahora</a></p>
+    <p style='color:#6b7280;font-size:13px;margin-top:24px;'>Si tenés dudas, respondé este mail y te ayudamos.</p>
+  </div>
+</div></body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.TRIAL_ENDING_SOON,
+        )
+
+    async def send_weekly_digest(
+        self,
+        to_email: str,
+        business_name: str,
+        stats: dict,
+    ) -> bool:
+        """Resumen semanal para retención.
+
+        stats: {leads_new, leads_total, conversions, ai_messages, days,
+                referral_credit_capped_usd, referral_active_count}
+        """
+        if not to_email:
+            return False
+        days = stats.get("days", 7)
+        subject = f"📊 Tu resumen semanal de InmoBot — {business_name}"
+        leads_new = stats.get("leads_new", 0)
+        leads_total = stats.get("leads_total", 0)
+        conversions = stats.get("conversions", 0)
+        ai_msgs = stats.get("ai_messages", 0)
+        savings = stats.get("referral_credit_capped_usd", 0)
+        ref_active = stats.get("referral_active_count", 0)
+        text_body = (
+            f"Resumen últimos {days} días para {business_name}:\n"
+            f"- Leads nuevos: {leads_new}\n"
+            f"- Conversiones: {conversions}\n"
+            f"- Mensajes IA: {ai_msgs}\n"
+            f"- Ahorro por referidos este mes: ${savings:.0f} ({ref_active} activos)\n"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; }}
+  .container {{ max-width:600px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%); color:#fff; padding:24px 28px; text-align:left; }}
+  .stats {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:18px 28px; }}
+  .stat {{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }}
+  .stat .lbl {{ font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; }}
+  .stat .val {{ font-size:22px; font-weight:700; color:#111827; margin-top:4px; }}
+  .footer {{ padding:18px 28px; color:#6b7280; font-size:12px; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'><h1 style='margin:0;font-size:20px;'>📊 Tu resumen semanal</h1>
+    <div style='opacity:0.9;font-size:13px;margin-top:4px;'>Últimos {days} días · {business_name}</div></div>
+  <div class='stats'>
+    <div class='stat'><div class='lbl'>Leads nuevos</div><div class='val'>{leads_new}</div></div>
+    <div class='stat'><div class='lbl'>Conversiones</div><div class='val'>{conversions}</div></div>
+    <div class='stat'><div class='lbl'>Mensajes IA</div><div class='val'>{ai_msgs}</div></div>
+    <div class='stat'><div class='lbl'>Total leads</div><div class='val'>{leads_total}</div></div>
+    <div class='stat' style='grid-column:1/-1; background:#ecfdf5; border-color:#6ee7b7;'>
+      <div class='lbl' style='color:#047857;'>Ahorro por referidos este mes</div>
+      <div class='val' style='color:#065f46;'>${savings:.0f} <span style='font-size:13px; color:#047857; font-weight:500;'>({ref_active} activos)</span></div>
+    </div>
+  </div>
+  <div class='footer'>Querés ver más? Iniciá sesión en tu dashboard de InmoBot.</div>
+</div></body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.WEEKLY_DIGEST,
+        )
+
     async def test_email(self) -> bool:
         """Envía email de prueba para verificar configuración"""
         if not self.notification_emails or not self.notification_emails[0]:
