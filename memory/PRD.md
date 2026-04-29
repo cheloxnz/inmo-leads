@@ -34,6 +34,39 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-29 (Sesión Actual - Iter23 - Stripe Coupon Codes + Login genérico)
+- **Stripe Coupon Codes para attribution nativa:**
+  - **`commission_service._generate_referral_code(tenant_id)`**: genera código legible `PREFIX-XXXXXX` con charset sin chars confusos (excluye 0/O/1/I; conserva L). Prefijo del tenant_id slugified (max 6 chars), sufijo random de 6 chars cripto-seguros.
+  - **`get_or_create_referral_code(db, tenant_id, create_in_stripe=True)`**: idempotente, retry x5 contra colisiones en mongo. Si STRIPE_API_KEY presente, crea lazy:
+    1. `Coupon` global `INMOBOT_REFERRAL_5_PERCENT_OFF_FIRST_MONTH` (5% off primer mes, duration=once) — beneficio que el referido ve al pagar.
+    2. `PromotionCode` mapeado al tenant via `metadata.referrer_tenant_id={tid}`.
+    Best-effort: si Stripe falla, igual devuelve el código local + `stripe_enabled=false`.
+  - **`find_referrer_by_promo_code`**: normaliza upper/strip, valida tenant active.
+- **Endpoints nuevos:**
+  - `GET /api/commissions/promo-code` (admin) → `{code, stripe_promotion_code_id, stripe_enabled}`.
+  - `POST /api/commissions/resolve-promo` (público, body `{code}`) → `{valid, ref_tenant_id?, business_name?}`. Validaciones: 400 si vacío o >40 chars.
+  - `GET /api/commissions/summary` ahora incluye `promo_code` en el response (1 request, no 2).
+- **Webhook Stripe attribution via cupón:**
+  - `PaymentService._attribute_via_promo_code(session, tenant_id)`:
+    1. Lee `session.total_details.breakdown.discounts[].discount.promotion_code` (Stripe lo expone tras checkout completado).
+    2. Hace `stripe.PromotionCode.retrieve(promo_id)` y lee `metadata.referrer_tenant_id` (path principal).
+    3. Fallback: busca el `code` string en nuestra DB via `find_referrer_by_promo_code`.
+    4. Si encuentra referrer → setea `tenant.referred_by` y `tenant.referred_via_promo_code`.
+    **No sobreescribe** si el tenant ya tiene `referred_by` (atribución congelada).
+  - Llamado al inicio de `_handle_checkout_completed` para que la atribución quede grabada antes de cualquier webhook posterior.
+- **Stripe Checkout Session ahora con `allow_promotion_codes=True`** — el campo "Add promotion code" aparece nativo en el form de pago.
+- **Index Mongo:** `tenants.referral_code` unique parcial (solo cuando `referral_code` es string), evita full scan en lookups públicos.
+- **UI `/config Programa de referidos`** — nueva tarjeta morada arriba del link:
+  - `data-testid="rp-promo-card"` con header "Tu código de cupón" + badge "Stripe activo" si Stripe está conectado.
+  - Código en monospace 1.5rem con border dashed morado, `user-select: all`.
+  - Botón copiar `data-testid="rp-promo-copy-btn"` con feedback `¡Copiado!`.
+  - Hint explicativo: "Tus referidos pueden ingresar este código directo al pagar en Stripe Checkout y reciben 5% off el primer mes. Vos seguís ganando $5/mes durante 12 meses por cada uno que active su plan. Funciona aunque pierdan el link."
+- **Login refresh genérico:**
+  - `/app/frontend/public/logo-generic.svg` (nuevo) — SVG inline 120x120 con chat bubble blanca, ojos morados, sonrisa, sparkle dorado, fondo gradient indigo→violet. Reemplaza el PNG hardcoded de "lead-manager".
+  - Texto: "Bot de WhatsApp con IA para tu negocio" (era "Sistema de Gestión de Leads Inmobiliarios").
+- **Tests:** Backend 23/23 iter23 PASS + 22/22 iter21+iter22 + 15/15 iter19 = **72/72 backend**. Frontend E2E 100% (testing_agent_v3_fork iteration_22.json — login text + SVG load + promo card + monospace + copy button + regression UTM/banner OK).
+- **Archivos:** `/app/backend/commission_service.py` (helpers + lazy Stripe), `/app/backend/routers/commissions.py` (2 endpoints + summary extension), `/app/backend/payment_service.py` (`_attribute_via_promo_code` + `allow_promotion_codes`), `/app/backend/server.py` (index parcial), `/app/frontend/public/logo-generic.svg` (nuevo), `/app/frontend/src/pages/Login.js` (logo + tagline), `/app/frontend/src/components/ReferralProgramSection.js` (tarjeta promo), `/app/frontend/src/App.css` (estilos `.rp-promo-*`), `/app/backend/tests/test_iter23_stripe_coupons.py` (nuevo).
+
 ### 2026-04-29 (Sesión Actual - Iter22 - Retención + Atribución sobre Comisiones)
 - **Email automático "Conseguiste un nuevo referido"** (`email_service.send_new_referral_commission`):
   - HTML branded (gradient verde) con headline "+$5/mes · 12 meses", grid de stats (crédito activo + referidos activos), nota especial cuando `is_capped` ("¡Tu suscripción es gratis!").
