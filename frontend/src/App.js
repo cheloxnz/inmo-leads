@@ -31,6 +31,7 @@ import WidgetAnalytics from './pages/WidgetAnalytics';
 import LandingEditor from './pages/LandingEditor';
 import Signup from './pages/Signup';
 import Broadcast from './pages/Broadcast';
+import MarketingEffectiveness from './pages/MarketingEffectiveness';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
 import '@/App.css';
@@ -219,6 +220,16 @@ function Navigation() {
             >
               <span className="icon">🎨</span>
               {!isCollapsed && <span>Landing</span>}
+            </Link>
+
+            <Link
+              to="/marketing"
+              className={`nav-link ${isActive('/marketing') ? 'active' : ''}`}
+              data-testid="nav-marketing"
+              title="Marketing Effectiveness"
+            >
+              <span className="icon">🏆</span>
+              {!isCollapsed && <span>Marketing</span>}
             </Link>
 
             <Link
@@ -469,6 +480,11 @@ function AppContent() {
           <Route path="/broadcast" element={
             <ProtectedRoute adminOnly>
               <Broadcast />
+            </ProtectedRoute>
+          } />
+          <Route path="/marketing" element={
+            <ProtectedRoute adminOnly>
+              <MarketingEffectiveness />
             </ProtectedRoute>
           } />
           <Route path="/auditoria" element={

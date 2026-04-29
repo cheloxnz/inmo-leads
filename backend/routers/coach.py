@@ -547,3 +547,141 @@ async def get_referral_stats(
         "tenant_signups_via_ref": stats.get("signups", 0),
         "conversion_rate": min(100.0, round((converted / leads_count) * 100, 1)) if leads_count else 0,
     }
+
+
+@router.get("/coach/effectiveness")
+async def get_coach_effectiveness(
+    days: int = 30,
+    current_user: User = Depends(require_admin),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Dashboard de Coach Effectiveness.
+    Devuelve funnel agregado + time series + top celebrations.
+
+    Query params:
+      days: ventana temporal (default 30, max 90)
+    """
+    days = max(1, min(int(days or 30), 90))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    tenant_id = current_user.tenant_id
+
+    # Funnel agregado (totales)
+    funnel_pipeline = [
+        {"$match": {"tenant_id": tenant_id}},
+        {"$group": {
+            "_id": None,
+            "shares_total": {"$sum": {"$ifNull": ["$shares.total", 0]}},
+            "shares_twitter": {"$sum": {"$ifNull": ["$shares.twitter", 0]}},
+            "shares_linkedin": {"$sum": {"$ifNull": ["$shares.linkedin", 0]}},
+            "shares_download": {"$sum": {"$ifNull": ["$shares.download", 0]}},
+            "preview_views": {"$sum": {"$ifNull": ["$shares.preview_views", 0]}},
+            "html_views": {"$sum": {"$ifNull": ["$shares.html_views", 0]}},
+        }},
+    ]
+    agg = await db.coach_celebrations.aggregate(funnel_pipeline).to_list(length=1)
+    share_data = agg[0] if agg else {}
+
+    leads_total = await db.referral_leads.count_documents({"ref_tenant_id": tenant_id})
+    leads_in_window = await db.referral_leads.count_documents({
+        "ref_tenant_id": tenant_id,
+        "created_at": {"$gte": since},
+    })
+    converted_total = await db.referral_leads.count_documents({
+        "ref_tenant_id": tenant_id,
+        "converted_tenant_id": {"$ne": None},
+    })
+    converted_in_window = await db.referral_leads.count_documents({
+        "ref_tenant_id": tenant_id,
+        "converted_tenant_id": {"$ne": None},
+        "converted_at": {"$gte": since},
+    })
+
+    # Time series: leads y conversions por dia
+    leads_ts_pipeline = [
+        {"$match": {"ref_tenant_id": tenant_id, "created_at": {"$gte": since}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$created_at"}},
+            "leads": {"$sum": 1},
+            "converted": {"$sum": {"$cond": [
+                {"$ne": ["$converted_tenant_id", None]}, 1, 0,
+            ]}},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    ts_docs = await db.referral_leads.aggregate(leads_ts_pipeline).to_list(length=days + 5)
+    timeseries = [
+        {"date": d["_id"], "leads": d.get("leads", 0), "converted": d.get("converted", 0)}
+        for d in ts_docs
+    ]
+
+    # Top celebrations por shares + leads
+    top_pipeline = [
+        {"$match": {"tenant_id": tenant_id}},
+        {"$project": {
+            "_id": 0,
+            "celebration_id": 1,
+            "celebration_type": 1,
+            "title": 1,
+            "shares_total": {"$ifNull": ["$shares.total", 0]},
+            "preview_views": {"$ifNull": ["$shares.preview_views", 0]},
+            "html_views": {"$ifNull": ["$shares.html_views", 0]},
+            "created_at": 1,
+        }},
+        {"$sort": {"shares_total": -1, "html_views": -1}},
+        {"$limit": 10},
+    ]
+    top_celebrations = await db.coach_celebrations.aggregate(top_pipeline).to_list(length=10)
+
+    # Para cada top, contar leads asociados (separate query, mas claro que $lookup)
+    for tc in top_celebrations:
+        cid = tc.get("celebration_id")
+        if cid:
+            tc["leads"] = await db.referral_leads.count_documents({
+                "ref_tenant_id": tenant_id,
+                "ref_celebration_id": cid,
+            })
+            tc["converted"] = await db.referral_leads.count_documents({
+                "ref_tenant_id": tenant_id,
+                "ref_celebration_id": cid,
+                "converted_tenant_id": {"$ne": None},
+            })
+        if isinstance(tc.get("created_at"), datetime):
+            tc["created_at"] = tc["created_at"].isoformat()
+
+    # Conversion rates en cada etapa del funnel
+    shares = share_data.get("shares_total", 0)
+    html_views = share_data.get("html_views", 0)
+    preview_views = share_data.get("preview_views", 0)
+
+    def _rate(num, denom):
+        if not denom:
+            return 0
+        return min(100.0, round((num / denom) * 100, 1))
+
+    return {
+        "window_days": days,
+        "funnel": {
+            "shares_explicit": shares,
+            "preview_views": preview_views,  # crawlers + visits a la imagen .png
+            "html_views": html_views,         # paginas HTML visitadas (visitor real)
+            "leads_captured": leads_total,
+            "signups_converted": converted_total,
+        },
+        "funnel_rates": {
+            "view_to_lead": _rate(leads_total, html_views),
+            "lead_to_signup": _rate(converted_total, leads_total),
+            "share_to_view": _rate(html_views, shares),
+            "overall_share_to_signup": _rate(converted_total, shares),
+        },
+        "by_platform": {
+            "twitter": share_data.get("shares_twitter", 0),
+            "linkedin": share_data.get("shares_linkedin", 0),
+            "download": share_data.get("shares_download", 0),
+        },
+        "in_window": {
+            "leads": leads_in_window,
+            "converted": converted_in_window,
+        },
+        "timeseries": timeseries,
+        "top_celebrations": top_celebrations,
+    }

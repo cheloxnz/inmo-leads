@@ -1,0 +1,41 @@
+{
+  "summary": "Iter20 (Coach Effectiveness dashboard) — Backend 11/12 PASS + Frontend E2E PASS. GET /api/coach/effectiveness valida estructura completa {window_days, funnel, funnel_rates, by_platform, in_window, timeseries, top_celebrations}. Funnel del demo tenant (90d): shares_explicit=6, html_views=4, leads_captured=14, signups_converted=3. Funnel_rates clampean a 100% (view_to_lead=100% real raw=350%, lead_to_signup=21.4%, share_to_view=66.7%, share_to_signup=50%). by_platform separa twitter/linkedin/download. in_window <= total. timeseries ordenada ASC YYYY-MM-DD. top_celebrations sorted desc por shares_total con campos celebration_id/type/title/shares_total/preview_views/html_views/leads/converted, created_at ISO string, max 10. Sin auth -> 401/403. Frontend /marketing renderiza marketing-effectiveness-page con 4 KPI cards (numeros reales del demo), funnel-visual con 4 barras decrecientes proporcionales, timeseries-chart (LineChart 2 series leads+converted), platform-breakdown (BarChart vertical), top-celebrations tabla. Window selector funciona: click window-7/30/90 cambia variant active y refetcha. Nav sidebar tiene nav-marketing con texto 'Marketing' y emoji trofeo entre Landing y Auditoria. Regression iter17+18+19+20 47/48 PASS.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/coach/effectiveness?days=0", "issue": "Spec dice clamp a 1, pero codigo retorna window_days=30. La expresion `int(days or 30)` short-circuita: 0 es falsy entonces se evalua a 30 antes del max(1,..). Fix: usar `int(days) if days is not None else 30` o `max(1, min(int(days if days is not None else 30), 90))`. Negativos y >90 se clampean correctamente."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/marketing - Funnel de Adquisicion", "issues": ["El label 'X% al siguiente paso' DENTRO del funnel visual es calculado en frontend SIN clamp a 100 (e.g. con demo data muestra '350.0% al siguiente paso' entre Vistas en redes=4 y Leads capturados=14). Inconsistente con los rates de la grilla inferior que SI estan clampeados a 100%. Considerar clampear stepRate en MarketingEffectiveness.js linea 145: `Math.min(100, ((next.value / d.value) * 100)).toFixed(1)`, o mostrar '>100%' explicitamente."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_marketing_effectiveness.py",
+    "/app/test_reports/pytest/iter20_results.xml",
+    "/app/test_reports/pytest/iter17_20_regression.xml"
+  ],
+  "action_items": [
+    "Fix coach.py:564 days=0 clamp: cambiar `max(1, min(int(days or 30), 90))` por `max(1, min(int(days) if days is not None else 30, 90))` para respetar la spec (days=0 -> 1).",
+    "(Opcional) Clamp del stepRate dentro del funnel-visual frontend para no mostrar 350% cuando hay leads_captured > html_views (caso demo)."
+  ],
+  "critical_code_review_comments": [
+    "coach.py:564 — `int(days or 30)` short-circuita en 0/None -> 30. Reemplazar por explicit None check para que days=0 clampee a 1 segun spec.",
+    "coach.py:644 — el conteo de leads/converted por celebracion hace 2 count_documents POR cada top celebration (max 20 queries en N+1). Para 10 celebrations es OK, pero si se sube el limite considerar single $lookup + $group. Demo (3 celebs) responde rapido.",
+    "coach.py:611 — `to_list(length=days+5)` para timeseries: si hay >35 fechas con leads en window=30 se trunca silenciosamente. Cambiar a `length=None` o `length=days*2` minimo. En la practica una entrada por dia maxima => OK.",
+    "MarketingEffectiveness.js:145 — stepRate del funnel visual NO clampeado mientras funnel_rates SI lo esta. Inconsistencia visual cuando el dato real excede 100%.",
+    "MarketingEffectiveness.js:43 — catch silencioso swallowea TODO error sin mostrar feedback al usuario; un error 500 deja la pagina vacia. Considerar toast de error o estado de error visible.",
+    "coach.py:565 — `days = max(1, min(int(days or 30), 90))` no maneja TypeError si llega cualquier string no-numerico. FastAPI ya valida int=Query default y devolveria 422 antes, asi que en la practica esta cubierto."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter20_marketing_effectiveness.py"],
+  "success_rate": {"backend": "92% (11/12, 1 spec deviation no critico)", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant=demo-inmobiliaria). Demo data al momento del test: shares_explicit=6, html_views=4, preview_views=0, leads_captured=14, signups_converted=3.",
+  "seed_data_creation": "Ningun seed nuevo. Usa data existente de iter19.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter20 done. Para regression: cd /app/backend && export $(grep -v '^#' /app/frontend/.env | xargs) && export $(grep -v '^#' .env | xargs) && pytest tests/test_iter17_*.py tests/test_iter18_*.py tests/test_iter19_*.py tests/test_iter20_*.py -q. El unico fail (test_days_clamped_to_min_1) es bug del backend, no del test. Si main agent fixea el `int(days or 30)`, el test debe pasar. Demo tenant tiene 14 leads / 4 html_views, ratio raw es 350% pero funnel_rates.view_to_lead clampea a 100 — el stepRate visual del frontend NO clampea (otro mini-bug). Idioma: ESPAÑOL siempre.",
+  "rca of the issue": "BUG: GET /api/coach/effectiveness?days=0 retorna window_days=30 en vez de 1.\nReproduccion: curl -H 'Authorization: Bearer <admin>' '<BASE>/api/coach/effectiveness?days=0' -> JSON.window_days==30.\nRoot cause: coach.py:564 `days = max(1, min(int(days or 30), 90))`. En Python `0 or 30 == 30` (0 es falsy), entonces int(0 or 30)=30, max(1, min(30,90))=30. La spec pedia clamp a 1.\nMitigacion: Reemplazar por `days = max(1, min(int(days) if days is not None else 30, 90))` o validar explicitamente `if days is None or days < 1: days = 1` antes del clamp."
+}
