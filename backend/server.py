@@ -1785,12 +1785,26 @@ app.include_router(coach_router, prefix="/api")
 app.include_router(public_share_router, prefix="/api")
 app.include_router(commissions_router, prefix="/api")
 
+# ---------------- Security hardening ----------------
+from security import setup_security_middleware, validate_cors_origins
+
+setup_security_middleware(app)
+
+# CORS — restringido a dominios explícitos en producción
+_cors_origins = validate_cors_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins if _cors_origins else ["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization", "Content-Type", "X-Requested-With",
+        "Accept", "Origin", "X-CSRF-Token",
+    ],
+    expose_headers=[
+        "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+        "Retry-After",
+    ],
 )
 
 
