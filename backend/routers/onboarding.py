@@ -314,6 +314,19 @@ async def auto_setup_tenant(
     except Exception:
         pass
 
+    # 11. Email de bienvenida (best-effort, NO bloquea onboarding si SMTP off)
+    try:
+        from email_service import EmailService
+        email_svc = EmailService(db=db)
+        await email_svc.send_welcome_tenant(
+            to_email=email,
+            business_name=business_name,
+            tenant_id=tenant_id,
+            admin_name=business_name,
+        )
+    except Exception as e:
+        logger.warning(f"Welcome email fallo para tenant={tenant_id}: {e}")
+
     return {
         "tenant_id": tenant_id,
         "template_id": detected,

@@ -77,6 +77,7 @@ class EmailType(str, Enum):
     NEW_REFERRAL_COMMISSION = "new_referral_commission"
     TRIAL_ENDING_SOON = "trial_ending_soon"
     WEEKLY_DIGEST = "weekly_digest"
+    WELCOME_TENANT = "welcome_tenant"
     TEST = "test"
 
 

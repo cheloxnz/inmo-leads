@@ -235,6 +235,7 @@ export default function DynamicLanding() {
             <a href="#servicios">Servicios</a>
             <a href="#como-funciona">Cómo funciona</a>
             <a href="#contacto">Contacto</a>
+            <a href="/changelog" data-testid="footer-changelog-link">Novedades</a>
           </div>
           <p className="immo-footer-copy">
             &copy; {new Date().getFullYear()} {businessName}. Powered by <strong>InmoBot</strong>.

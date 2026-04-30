@@ -501,6 +501,116 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             email_type=EmailType.WEEKLY_DIGEST,
         )
 
+    async def send_welcome_tenant(
+        self,
+        to_email: str,
+        business_name: str,
+        tenant_id: str,
+        admin_name: Optional[str] = None,
+    ) -> bool:
+        """Email de bienvenida cuando un nuevo tenant se registra.
+
+        Incluye CTA al dashboard, próximos pasos sugeridos (configurar WhatsApp,
+        editar landing) y datos de soporte. Best-effort: no rompe el onboarding
+        si SMTP no está configurado.
+        """
+        if not to_email:
+            return False
+        if not self.smtp_username or not self.smtp_password:
+            logger.info(
+                f"Welcome email skipped (SMTP no config) for tenant={tenant_id}"
+            )
+            return False
+
+        first_name = (admin_name or business_name or "").split()[0] or "Hola"
+        subject = f"🎉 Bienvenido a InmoBot, {business_name}"
+        dashboard_url = "https://app.inmobot.com/dashboard"
+        landing_url = f"https://app.inmobot.com/inicio/{tenant_id}"
+        text_body = (
+            f"Hola {first_name},\n\n"
+            f"Tu workspace de InmoBot ya está listo para {business_name}.\n\n"
+            f"Próximos pasos:\n"
+            f"1. Configurá tu cuenta de WhatsApp Business → /config\n"
+            f"2. Personalizá tu landing pública → {landing_url}\n"
+            f"3. Probá el bot enviando un mensaje a tu WhatsApp\n\n"
+            f"Tenés 14 días gratis. Cualquier cosa, contestá este email.\n\n"
+            f"— Equipo InmoBot"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:600px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#ec4899 100%); color:#fff; padding:32px 28px; text-align:left; }}
+  .header h1 {{ margin:0; font-size:24px; font-weight:700; }}
+  .header p {{ margin:6px 0 0 0; opacity:0.95; font-size:14px; }}
+  .body {{ padding:28px; }}
+  .greeting {{ font-size:16px; line-height:1.5; color:#111827; }}
+  .steps {{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px 20px; margin:20px 0; }}
+  .step {{ display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid #f3f4f6; }}
+  .step:last-child {{ border-bottom:none; }}
+  .step .num {{ width:28px; height:28px; flex-shrink:0; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; }}
+  .step .desc {{ flex:1; font-size:14px; color:#374151; line-height:1.4; }}
+  .step .desc strong {{ color:#111827; display:block; margin-bottom:2px; }}
+  .cta {{ display:inline-block; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff !important; padding:14px 28px; border-radius:10px; text-decoration:none; font-weight:600; font-size:15px; margin-top:8px; }}
+  .footer {{ padding:20px 28px; color:#6b7280; font-size:12px; border-top:1px solid #f3f4f6; }}
+  .trial-badge {{ background:#fef3c7; border:1px solid #fde68a; color:#92400e; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; display:inline-block; margin:14px 0; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'>
+    <h1>🎉 ¡Bienvenido a InmoBot!</h1>
+    <p>Tu bot de WhatsApp con IA para <strong>{business_name}</strong> está listo</p>
+  </div>
+  <div class='body'>
+    <div class='greeting'>Hola <strong>{first_name}</strong>,</div>
+    <p style='font-size:14px; line-height:1.6; color:#374151; margin:14px 0;'>
+      Acabás de crear tu workspace en InmoBot. En menos de 5 minutos podés tener
+      tu bot respondiendo mensajes de WhatsApp 24/7 con IA.
+    </p>
+    <div class='trial-badge'>✨ Tu prueba gratis de 14 días empieza ahora</div>
+    <div class='steps'>
+      <div class='step'>
+        <div class='num'>1</div>
+        <div class='desc'>
+          <strong>Conectá WhatsApp Business</strong>
+          Pegá tu Phone Number ID y Access Token desde Meta Business Suite.
+        </div>
+      </div>
+      <div class='step'>
+        <div class='num'>2</div>
+        <div class='desc'>
+          <strong>Personalizá tu landing pública</strong>
+          Logo, colores, copy generado con IA — todo desde el editor visual.
+          Tu landing está en <a href='{landing_url}' style='color:#6366f1;'>{landing_url}</a>.
+        </div>
+      </div>
+      <div class='step'>
+        <div class='num'>3</div>
+        <div class='desc'>
+          <strong>Probá el bot</strong>
+          Mandá un mensaje a tu número de WhatsApp y mirá cómo responde solo.
+        </div>
+      </div>
+    </div>
+    <div style='text-align:center;'>
+      <a href='{dashboard_url}' class='cta'>Ir al dashboard →</a>
+    </div>
+    <p style='font-size:13px; color:#6b7280; margin-top:24px; line-height:1.6;'>
+      ¿Necesitás una mano? Contestá este email y te respondemos en menos de 4 hs hábiles.
+      También podés revisar nuestra documentación en
+      <a href='https://app.inmobot.com/inicio' style='color:#6366f1;'>app.inmobot.com</a>.
+    </p>
+  </div>
+  <div class='footer'>
+    Recibís este email porque te registraste en InmoBot con {to_email}.<br>
+    InmoBot — Bot de WhatsApp con IA para tu negocio.
+  </div>
+</div></body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.WELCOME_TENANT,
+        )
+
     async def test_email(self) -> bool:
         """Envía email de prueba para verificar configuración"""
         if not self.notification_emails or not self.notification_emails[0]:

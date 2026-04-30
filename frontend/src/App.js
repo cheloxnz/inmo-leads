@@ -32,6 +32,7 @@ import LandingEditor from './pages/LandingEditor';
 import Signup from './pages/Signup';
 import Broadcast from './pages/Broadcast';
 import MarketingEffectiveness from './pages/MarketingEffectiveness';
+import Changelog from './pages/Changelog';
 import UpdateBanner from './components/UpdateBanner';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
 import '@/App.css';
@@ -381,7 +382,7 @@ function AppContent() {
   const location = useLocation();
   
   // Páginas públicas que no necesitan el layout del dashboard
-  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/login', '/signup', '/p/'];
+  const publicPages = ['/inicio', '/privacy', '/terms', '/data-deletion', '/changelog', '/login', '/signup', '/p/'];
   const isPublicPage = publicPages.some(page => location.pathname.startsWith(page));
 
   // Subdomain routing: si llega por {tenant}.platform.com y no esta en una ruta especifica,
@@ -411,6 +412,7 @@ function AppContent() {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
+            <Route path="/changelog" element={<Changelog />} />
             <Route path="*" element={<Navigate to="/inicio" replace />} />
           </Routes>
         </main>

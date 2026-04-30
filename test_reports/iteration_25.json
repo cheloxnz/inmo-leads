@@ -1,0 +1,31 @@
+{
+  "summary": "Iter27 (pasos 5-9 pre-launch checklist) testing completed. All 24 unit tests pass. Frontend pages /changelog, /privacy, /terms verified accessible without auth with correct testids and content. Footer link 'Novedades' on /inicio works and navigates to /changelog. bcrypt 4.0.1 pinned correctly with __about__ attribute present (no new warnings after pin); legacy warnings exist in old log files from before the pin was applied. Welcome email hook integrated in onboarding/auto-setup wrapped in try/except (best-effort). Locustfile is syntactically valid and contains required PublicVisitor + AuthenticatedTenant classes. Regression endpoints (/api/health, /api/health/ping with X-Request-ID, /api/leads, /api/auth/tenant/branding, /api/tenant/features-showcase) all return 200.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter27_welcome_bcrypt_locust.py",
+    "/app/backend/tests/test_iter26_structured_logging.py",
+    "/app/test_reports/pytest/iter27_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Old bcrypt warnings still in /var/log/supervisor/backend.err.log/out.log from before the pin (timestamps prior to last reload). After current bcrypt==4.0.1 pin, no new __about__ warnings on fresh logins — consider rotating or truncating logs in deploy to start clean.",
+    "Welcome email hook in /app/backend/routers/onboarding.py L317-329 uses business_name as admin_name fallback when no admin name is provided, which is acceptable but may produce slightly awkward greetings (e.g., 'Hola Acme SA'). Consider using request payload's admin contact name if available.",
+    "Locustfile has hardcoded path defaults (LOAD_TEST_EMAIL=demo@inmobot.com) — fine for preview but ensure prod runs override via env so demo creds aren't exercised against production."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@inmobot.com/Admin123! and demo@inmobot.com/Demo123! verified working (login returns access_token).",
+  "seed_data_creation": "None — used existing seeded admin and demo tenant.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Pasos 5-9 del checklist pre-lanzamiento verificados al 100%. Para correr tests backend con env: `cd /app/backend && export $(grep -v '^#' .env | grep -v 'SMTP_FROM_NAME' | xargs -d '\\n') && export REACT_APP_BACKEND_URL=https://inmobot-preview.preview.emergentagent.com && pytest tests/test_iter27_welcome_bcrypt_locust.py tests/test_iter26_structured_logging.py -v`. Sistema listo para deploy a producción salvo pasos 10-11 que requieren API keys reales del usuario.",
+  "rca of the issue": "N/A — no issues found"
+}
