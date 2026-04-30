@@ -130,6 +130,77 @@ async def public_founder_seats():
     }
 
 
+def _initials_from_name(name: str) -> str:
+    """Devuelve iniciales anonimizadas de un business_name (ej: 'Acme Corp' -> 'AC')."""
+    if not name:
+        return "XX"
+    words = [w for w in name.split() if w]
+    if not words:
+        return "XX"
+    if len(words) == 1:
+        return (words[0][:2] or "XX").upper()
+    return (words[0][0] + words[-1][0]).upper()
+
+
+def _time_ago_es(dt: datetime) -> str:
+    """Devuelve string relativo en español: 'hace 3 min', 'hace 2 hs', 'hace 1 día'."""
+    now = datetime.now(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta_s = max(0, int((now - dt).total_seconds()))
+    if delta_s < 60:
+        return "hace un momento"
+    if delta_s < 3600:
+        m = delta_s // 60
+        return f"hace {m} min"
+    if delta_s < 86400:
+        h = delta_s // 3600
+        return f"hace {h} {'h' if h == 1 else 'hs'}"
+    d = delta_s // 86400
+    return f"hace {d} día" + ("s" if d > 1 else "")
+
+
+@router.get("/public/founder-recent-signups")
+async def public_recent_signups(limit: int = 5):
+    """Firehose público (anonimizado) de charter members recientes.
+
+    Consumido por el widget "live" de la landing Shopify. Retorna solo iniciales
+    + tiempo relativo. No expone nombres reales, emails ni ubicación precisa.
+    Cacheado 60s.
+    """
+    limit = max(1, min(limit, 10))
+    cache_key = f"recent_signups_{limit}"
+    cached = ttl_cache_get(_CACHE_NS, cache_key)
+    if cached is not None:
+        return cached
+
+    cursor = _db.tenants.find(
+        {"is_founder": True},
+        {"_id": 0, "business_name": 1, "name": 1, "founder_joined_at": 1,
+         "created_at": 1, "tenant_id": 1},
+    ).sort("founder_joined_at", -1).limit(limit)
+
+    items = []
+    async for t in cursor:
+        joined_raw = t.get("founder_joined_at") or t.get("created_at")
+        if not joined_raw:
+            continue
+        try:
+            joined_dt = datetime.fromisoformat(str(joined_raw).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        name = t.get("business_name") or t.get("name") or ""
+        items.append({
+            "initials": _initials_from_name(name),
+            "time_ago": _time_ago_es(joined_dt),
+            "joined_at": joined_dt.isoformat(),
+        })
+
+    out = {"items": items, "count": len(items)}
+    ttl_cache_set(_CACHE_NS, cache_key, out, ttl=60.0)
+    return out
+
+
 # ============================================================
 # SuperAdmin config management
 # ============================================================
@@ -204,3 +275,86 @@ async def invalidate_founder_cache(current_user: User = Depends(get_current_user
     ttl_cache_invalidate(_CACHE_NS)
     state = await _build_public_state(force=True)
     return {"ok": True, "public_state": state}
+
+
+# ============================================================
+# Charter Members — listado + toggle manual
+# ============================================================
+
+@router.get("/superadmin/founders")
+async def list_charter_members(current_user: User = Depends(get_current_user)):
+    """Lista de charter members (tenants con is_founder=True).
+
+    Devuelve campos útiles para el panel: tenant_id, business_name, email admin,
+    founder_joined_at, plan, subscription_status. Ordenado desc por join date.
+    """
+    _require_superadmin(current_user)
+    cursor = _db.tenants.find(
+        {"is_founder": True},
+        {"_id": 0, "tenant_id": 1, "business_name": 1, "name": 1,
+         "founder_joined_at": 1, "created_at": 1, "subscription_plan": 1,
+         "subscription_status": 1, "active": 1},
+    ).sort("founder_joined_at", -1).limit(200)
+
+    items = []
+    async for t in cursor:
+        tid = t["tenant_id"]
+        agent = await _db.agents.find_one(
+            {"tenant_id": tid, "role": "admin", "active": True},
+            {"_id": 0, "email": 1},
+        )
+        items.append({
+            "tenant_id": tid,
+            "business_name": t.get("business_name") or t.get("name") or tid,
+            "admin_email": (agent or {}).get("email"),
+            "founder_joined_at": t.get("founder_joined_at") or t.get("created_at"),
+            "subscription_plan": t.get("subscription_plan"),
+            "subscription_status": t.get("subscription_status"),
+            "active": bool(t.get("active", True)),
+        })
+    return {"items": items, "count": len(items)}
+
+
+class ToggleFounderPayload(BaseModel):
+    is_founder: bool
+
+
+@router.post("/superadmin/tenants/{tenant_id}/toggle-founder")
+async def toggle_founder_status(
+    tenant_id: str,
+    payload: ToggleFounderPayload,
+    current_user: User = Depends(get_current_user),
+):
+    """Marca/desmarca manualmente un tenant como charter member.
+
+    Útil para clientes que vinieron por fuera del flujo de signup (ventas directas,
+    migraciones) o para corregir errores de atribución.
+    """
+    _require_superadmin(current_user)
+    tenant = await _db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    update_fields = {"is_founder": payload.is_founder}
+    if payload.is_founder and not tenant.get("founder_joined_at"):
+        update_fields["founder_joined_at"] = datetime.now(timezone.utc).isoformat()
+
+    await _db.tenants.update_one(
+        {"tenant_id": tenant_id}, {"$set": update_fields}
+    )
+
+    # Audit log
+    await _db.audit_log.insert_one({
+        "tenant_id": tenant_id,
+        "user_email": current_user.email,
+        "action": "founder_toggle",
+        "is_founder": payload.is_founder,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+    ttl_cache_invalidate(_CACHE_NS)
+    return {
+        "ok": True,
+        "tenant_id": tenant_id,
+        "is_founder": payload.is_founder,
+    }

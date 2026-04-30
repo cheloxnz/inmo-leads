@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Crown, Users, Lock, Unlock, RefreshCw, Check, AlertTriangle } from 'lucide-react';
+import { Crown, Users, Lock, Unlock, RefreshCw, Check, AlertTriangle, UserPlus, UserMinus } from 'lucide-react';
 
 export default function FounderSeatsPanel() {
   const [data, setData] = useState(null);
@@ -15,6 +15,9 @@ export default function FounderSeatsPanel() {
   const [error, setError] = useState('');
   const [draft, setDraft] = useState({ total: 50, boost: 8, closes_at: '2026-05-31', active: true });
   const [justSaved, setJustSaved] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -34,7 +37,20 @@ export default function FounderSeatsPanel() {
     }
   }, []);
 
+  const fetchMembers = useCallback(async () => {
+    setMembersLoading(true);
+    try {
+      const res = await axios.get(`${API}/superadmin/founders`);
+      setMembers(res.data.items || []);
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Error al cargar charter members');
+    } finally {
+      setMembersLoading(false);
+    }
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { if (showMembers) fetchMembers(); }, [showMembers, fetchMembers]);
 
   const save = async (overrides = {}) => {
     setSaving(true);
@@ -67,10 +83,22 @@ export default function FounderSeatsPanel() {
     try {
       await axios.post(`${API}/superadmin/founder-seats/invalidate-cache`);
       await fetchData();
+      if (showMembers) await fetchMembers();
     } catch (err) {
       setError(err?.response?.data?.detail || 'Error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleFounder = async (tenantId, newValue) => {
+    try {
+      await axios.post(`${API}/superadmin/tenants/${tenantId}/toggle-founder`, {
+        is_founder: newValue,
+      });
+      await Promise.all([fetchData(), fetchMembers()]);
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Error al actualizar charter member');
     }
   };
 
@@ -204,7 +232,106 @@ export default function FounderSeatsPanel() {
             <strong>Endpoint público</strong>: <code>GET /api/public/founder-seats</code> (no auth, cache 30s) consumido por la landing Shopify.
           </div>
         </details>
+
+        {/* Charter Members list */}
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+          <button
+            data-testid="fs-toggle-members"
+            onClick={() => setShowMembers(!showMembers)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 14, color: '#111' }}
+          >
+            <Crown size={16} style={{ color: '#f59e0b' }} />
+            Charter Members ({data?.real_founders_count ?? 0} reales) {showMembers ? '▾' : '▸'}
+          </button>
+          {showMembers && (
+            <div style={{ marginTop: 12 }} data-testid="fs-members-list">
+              {/* Marcar manualmente */}
+              <ManualMarkInput onMark={toggleFounder} />
+
+              {membersLoading && <div style={{ color: '#6b7280', fontSize: 13 }}>Cargando...</div>}
+              {!membersLoading && members.length === 0 && (
+                <div style={{ color: '#6b7280', fontSize: 13, background: '#f9fafb', padding: 12, borderRadius: 8 }}>
+                  Todavía no hay charter members reales. Los tenants que se registren mientras el plan esté abierto entrarán automáticamente.
+                </div>
+              )}
+              {!membersLoading && members.length > 0 && (
+                <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                  {members.map((m) => (
+                    <div
+                      key={m.tenant_id}
+                      data-testid={`fs-member-${m.tenant_id}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: '1px solid #f3f4f6', fontSize: 13 }}
+                    >
+                      <div style={{ width: 34, height: 34, borderRadius: 8, background: 'linear-gradient(135deg,#fbbf24,#f59e0b)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                        <Crown size={15} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.business_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>
+                          {m.admin_email || 'sin email'} · {m.subscription_plan || 'trial'} · {m.subscription_status}
+                        </div>
+                      </div>
+                      <button
+                        data-testid={`fs-remove-${m.tenant_id}`}
+                        onClick={() => {
+                          if (window.confirm(`¿Quitar "${m.business_name}" del plan fundador?`)) {
+                            toggleFounder(m.tenant_id, false);
+                          }
+                        }}
+                        style={{ background: 'transparent', border: '1px solid #fecaca', color: '#ef4444', padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                        title="Quitar estado de charter member"
+                      >
+                        <UserMinus size={12} style={{ display: 'inline', marginRight: 2 }} /> Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280' }}>
+                💡 Para agregar un cliente <strong>manualmente</strong> al plan fundador (ej. ventas directas sin signup), expandí su fila en la lista de clientes abajo y usá el botón "Marcar como fundador".
+              </div>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function ManualMarkInput({ onMark }) {
+  const [tenantId, setTenantId] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const submit = async () => {
+    const tid = tenantId.trim();
+    if (!tid) return;
+    setBusy(true);
+    try {
+      await onMark(tid, true);
+      setTenantId('');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={{ display: 'flex', gap: 8, background: '#fef3c7', border: '1px solid #fde68a', padding: '10px 12px', borderRadius: 8, marginBottom: 12 }}>
+      <Input
+        data-testid="fs-manual-mark-input"
+        placeholder="tenant_id (ej. clinica-maria-abc123)"
+        value={tenantId}
+        onChange={(e) => setTenantId(e.target.value)}
+        style={{ flex: 1, fontSize: 13 }}
+      />
+      <Button
+        data-testid="fs-manual-mark-btn"
+        onClick={submit}
+        disabled={busy || !tenantId.trim()}
+        size="sm"
+      >
+        <UserPlus size={14} style={{ marginRight: 4 }} />
+        Marcar como fundador
+      </Button>
+    </div>
   );
 }
