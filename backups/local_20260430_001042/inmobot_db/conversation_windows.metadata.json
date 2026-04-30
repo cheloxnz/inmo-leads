@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"f47396f750634c0e8f4b37d51fef9d6f","collectionName":"conversation_windows","type":"collection"}
