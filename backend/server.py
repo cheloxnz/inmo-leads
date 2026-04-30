@@ -9,7 +9,7 @@ import json
 import io
 from pathlib import Path
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 import asyncio
 
@@ -34,6 +34,10 @@ from resend_service import send_welcome_email
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Initialize structured logging FIRST (so Sentry init logs are JSON too)
+from logging_config import setup_logging, RequestLoggingMiddleware
+setup_logging()
 
 # Initialize Sentry as early as possible (after env vars loaded, before app)
 from sentry_config import init_sentry
@@ -126,32 +130,81 @@ async def lifespan(_app):
 app = FastAPI(title="Inmobiliaria WhatsApp Bot", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# basicConfig se reemplaza por setup_logging() (formato JSON estructurado).
+# Mantenemos la variable `logger` para compatibilidad con el resto del archivo.
 logger = logging.getLogger(__name__)
+
+# Tiempo de arranque para reportar uptime en /api/health
+APP_STARTED_AT = datetime.now(tz=timezone.utc)
+APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
 
 
 @api_router.get("/health")
-async def healthcheck():
+async def healthcheck(detailed: int = 0):
     """Health check endpoint — usado por load balancer / UptimeRobot.
-    Verifica conectividad con MongoDB. NO trackeado por Sentry."""
+
+    - **Default**: hace un `ping` a MongoDB y devuelve 200 si todo está OK,
+      503 si Mongo no responde. Shape estable: `{status, mongo, timestamp,
+      version, uptime_seconds}`.
+    - **`?detailed=1`**: agrega `mongo_latency_ms` (latencia del ping). Útil
+      para dashboards de observabilidad pero no recomendado para UptimeRobot
+      (mantenelo simple).
+
+    > **UptimeRobot tip:** monitorear esta URL cada 1 min con keyword=`ok`
+    > funciona perfecto. Si querés algo aún más liviano que NO toque la DB
+    > (para reducir carga en Atlas con free tier), usá `/api/health/ping`.
+    > NO está rate-limitado — los pings frecuentes son bienvenidos.
+    """
+    mongo_ok = False
+    mongo_latency_ms: float | None = None
     try:
+        t0 = datetime.now(tz=timezone.utc)
         await db.command("ping")
+        mongo_latency_ms = round(
+            (datetime.now(tz=timezone.utc) - t0).total_seconds() * 1000, 2
+        )
         mongo_ok = True
     except Exception as e:
-        logger.error(f"Healthcheck Mongo failed: {e}")
-        mongo_ok = False
+        logger.error(
+            f"Healthcheck Mongo failed: {e}",
+            extra={"event": "healthcheck_mongo_fail"},
+        )
+
+    uptime_seconds = int(
+        (datetime.now(tz=timezone.utc) - APP_STARTED_AT).total_seconds()
+    )
     status = "ok" if mongo_ok else "degraded"
+    body = {
+        "status": status,
+        "mongo": "ok" if mongo_ok else "fail",
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "version": APP_VERSION,
+        "uptime_seconds": uptime_seconds,
+    }
+    if detailed:
+        body["mongo_latency_ms"] = mongo_latency_ms
     return JSONResponse(
         status_code=200 if mongo_ok else 503,
-        content={
-            "status": status,
-            "mongo": "ok" if mongo_ok else "fail",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-        },
+        content=body,
     )
+
+
+@api_router.get("/health/ping")
+async def health_ping():
+    """Health check ultra-liviano — NO toca la base de datos.
+
+    Ideal para monitoreo externo (UptimeRobot, Pingdom, BetterStack) cada
+    30-60 segundos sin generar carga en MongoDB Atlas. Devuelve siempre 200
+    mientras el proceso de Python esté vivo.
+
+    Si querés validar también la DB, usá `/api/health` en una cadencia más
+    relajada (cada 5 min).
+    """
+    return {
+        "status": "ok",
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "version": APP_VERSION,
+    }
 
 
 @api_router.get("/sentry-debug")
@@ -1790,6 +1843,10 @@ from security import setup_security_middleware, validate_cors_origins
 
 setup_security_middleware(app)
 
+# Request ID + structured access logging (after security so rate-limited
+# responses also get a request_id).
+app.add_middleware(RequestLoggingMiddleware)
+
 # CORS — restringido a dominios explícitos en producción
 _cors_origins = validate_cors_origins()
 app.add_middleware(
@@ -1803,7 +1860,7 @@ app.add_middleware(
     ],
     expose_headers=[
         "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
-        "Retry-After",
+        "Retry-After", "X-Request-ID",
     ],
 )
 

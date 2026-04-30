@@ -34,6 +34,31 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-30 (Sesión Actual - Iter26 - Structured Logging JSON + Health Endpoints)
+- **Paso 4 del Checklist de Producción: UptimeRobot + Logs Estructurados** (DONE).
+- **Nuevo módulo `/app/backend/logging_config.py`:**
+  - `JsonFormatter`: serializa cada record como JSON (timestamp ISO8601 UTC, level, logger, service, message, module, line). Auto-incluye `exc` cuando hay excepción. Recoge cualquier `extra` que el dev pase a `logger.info("...", extra={"tenant_id": "x"})`. Fallback ultraseguro si JSON falla.
+  - `RequestLoggingMiddleware`: asigna `request_id` por request (uuid4 hex 12 chars) o respeta `X-Request-ID` del cliente (truncado a 64 chars). Lo expone en header de respuesta y lo propaga via `ContextVar` para que TODOS los logs de la request lo lleven. Emite log de acceso al final con `method/path/status/duration_ms/client_ip/user_agent`. Health endpoints loggean a DEBUG (no spamean con UptimeRobot).
+  - `setup_logging()`: aplica JsonFormatter al root + uvicorn loggers (uniformidad). Idempotente. Desactivable con `LOG_FORMAT=text`.
+  - `get_request_id()`: helper para acceder al request_id desde cualquier punto del codigo.
+- **`/api/health` mejorado:**
+  - Default: `{status, mongo, timestamp, version, uptime_seconds}` — shape estable.
+  - `?detailed=1` agrega `mongo_latency_ms` para dashboards de observabilidad.
+  - Manejo de errores con `extra={"event": "healthcheck_mongo_fail"}` para alertas en log analyzers.
+- **Nuevo `/api/health/ping`** — ultra-liviano, NO toca DB. Ideal para UptimeRobot cada 30-60s sin generar carga en MongoDB Atlas. Excluido del rate-limit.
+- **`server.py`:** removido `logging.basicConfig` (reemplazado por `setup_logging()` que corre antes de Sentry init para que TODO sea JSON desde el primer log). Agregadas constants `APP_STARTED_AT` y `APP_VERSION` (env-driven).
+- **`security.py`:** `RateLimitMiddleware` ahora skipea `/api/health/ping` además de `/api/health`.
+- **CORS:** expone `X-Request-ID` para que el frontend pueda leerlo y correlacionar con Sentry.
+- **`.env`:** agregadas `APP_VERSION=1.0.0`, `LOG_LEVEL=INFO`, `LOG_FORMAT=json`.
+- **Tests:** `test_iter26_structured_logging.py` 16/16 PASS:
+  - Health basic shape, detailed mode, ping lightweight, no rate-limit.
+  - X-Request-ID header presente, respetado cuando viene del cliente, truncado si gigante.
+  - JsonFormatter: campos básicos, extras, unjsonable→str, exc, request_id ContextVar, ausente cuando no seteado.
+  - setup_logging idempotente, modo `text` cuando LOG_FORMAT=text.
+  - **Total acumulado: 98/98** (iter21+22+23+24+25+26).
+- **UptimeRobot tip (en docstring del endpoint):** monitorear `/api/health/ping` cada 1 min con keyword=`ok`. Para DB+app health combinado, `/api/health` cada 5 min.
+- **Archivos:** `/app/backend/logging_config.py` (nuevo), `/app/backend/server.py` (setup_logging + APP_VERSION + health endpoints), `/app/backend/security.py` (skip /api/health/ping), `/app/backend/.env` (3 vars nuevas), `/app/backend/tests/test_iter26_structured_logging.py` (nuevo).
+
 ### 2026-04-29 (Sesión Actual - Iter25 - AI Lead Summary + Premium Features Showcase)
 - **AI Lead Summary** (primer feature real del catálogo, gated by `ai_lead_summary`):
   - **Servicio `/app/backend/lead_summary_service.py`** (nuevo):

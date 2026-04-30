@@ -65,7 +65,7 @@ def _client_ip(request):
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         path = request.url.path
-        if path in ("/api/health", "/health") or request.method == "OPTIONS":
+        if path in ("/api/health", "/api/health/ping", "/health") or request.method == "OPTIONS":
             return await call_next(request)
         ip = _client_ip(request)
         allowed, retry_after, max_req, window = _limiter.check(ip, path)
