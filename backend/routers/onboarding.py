@@ -163,6 +163,20 @@ async def auto_setup_tenant(
         "created_at": now_iso,
         "updated_at": now_iso,
     }
+
+    # Founder plan attribution: si quedan cupos + está activo, entra como fundador.
+    # Best-effort, no bloquea el onboarding si falla.
+    try:
+        from routers.founder import _build_public_state
+        founder_state = await _build_public_state(force=True)
+        if founder_state.get("is_open") and founder_state.get("left", 0) > 0:
+            tenant_doc["is_founder"] = True
+            tenant_doc["founder_joined_at"] = now_iso
+            # Invalidar cache para que el próximo request refleje el nuevo cupo
+            from cache_util import ttl_cache_invalidate
+            ttl_cache_invalidate("founder_seats")
+    except Exception as _fe:
+        logger.warning(f"Founder attribution skipped: {_fe}")
     # Referral attribution: persistir SOLO si el ref_tenant_id existe en la DB y NO es auto-referido
     referrer_ip = (request.client.host if request and request.client else None)
     fraud_reason = None
