@@ -34,6 +34,51 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-30 (Sesión Actual - Iter27 - Pasos 5-9 Pre-Lanzamiento)
+- **Paso 5 (P0) — bcrypt pin a 4.0.1** (DONE):
+  - `requirements.txt`: `bcrypt==4.0.1` (downgrade desde 4.1.3 que rompía `bcrypt.__about__.__version__` que `passlib` necesita).
+  - Resultado: NO más warnings ruidosos `(trapped) error reading bcrypt version` en logs de producción.
+- **Paso 6 (P1) — CHANGELOG público + página /changelog** (DONE):
+  - `/app/CHANGELOG.md` (nuevo) — texto markdown con releases mensuales (Abril/Marzo/Febrero/Enero 2026), tono customer-facing, agrupado por área (Observabilidad, IA, Marketing, Multi-tenant).
+  - `/app/frontend/src/pages/Changelog.js` (nuevo) — página React con timeline visual: badge morado "Changelog público", header gradient, items con icon+título+bullets, hover effect con elevación, responsive. Usa `lucide-react` icons (Sparkles, Shield, Bot, Mail, Megaphone, Wand2, Layers, Rocket).
+  - Ruta pública `/changelog` en `App.js` agregada al array `publicPages` y `<Routes>`.
+  - Footer del DynamicLanding (`/inicio` y `/inicio/:tenantId`): nuevo link "Novedades" → `/changelog` con `data-testid="footer-changelog-link"`.
+  - CSS `.changelog-*` (155 líneas) con tema oscuro, gradient indigo→violet, items con border y hover, mobile responsive (≤640px).
+- **Paso 7 (P1) — Email de bienvenida al crear tenant** (DONE):
+  - `EmailType.WELCOME_TENANT = "welcome_tenant"` (nuevo en `models.py`).
+  - `EmailService.send_welcome_tenant(to_email, business_name, tenant_id, admin_name)` en `email_service.py` (114 líneas):
+    - HTML branded con header gradient triple (indigo→violet→pink), badge ámbar "Tu prueba gratis de 14 días empieza ahora", 3 pasos numerados con CTAs, link al landing público y dashboard, footer con email del usuario.
+    - Best-effort: skip silencioso si SMTP no configurado o si `to_email` vacío. Log INFO cuando skipea.
+    - Plain-text fallback completo.
+  - Hook integrado en `routers/onboarding.py` step 11 tras `audit_log.insert_one`, envuelto en try/except → onboarding NUNCA rompe por fallo de email.
+- **Paso 8 (P2) — Términos y Privacy generic SaaS + Argentina** (DONE):
+  - `/app/frontend/src/pages/PrivacyPolicy.js` (rewritten 158 líneas):
+    - 11 secciones, mención explícita Ley 25.326 + GDPR aplicable, AAIP como autoridad, AFIP retención fiscal 5 años.
+    - Distinción clara entre tenant (responsable) e InmoBot (encargado del tratamiento).
+    - Sección 4: lista de subprocessors (OpenAI, Meta, Stripe, MongoDB Atlas, Sentry).
+    - Derechos ARCO con email de soporte y plazo de 10 días hábiles.
+    - `data-testid="privacy-page"`.
+  - `/app/frontend/src/pages/TermsOfService.js` (rewritten 153 líneas):
+    - 13 secciones con definiciones legales, trial 14 días, planes Stripe, uso aceptable (con prohibición explícita de violar TOS de WhatsApp), IP del Cliente conserva titularidad, descargo IA ("vos sos responsable de revisar respuestas automáticas"), SLA 99.5% objetivo, limitación responsabilidad cap=3 meses pagados, jurisdicción CABA.
+    - `data-testid="terms-page"`.
+- **Paso 9 (P2) — Locust stress test scaffold** (DONE):
+  - `/app/load_tests/locustfile.py` (nuevo, 161 líneas):
+    - 2 user classes: `PublicVisitor` (weight=5, simula UptimeRobot + crawlers + visitantes de landings) con tasks ponderados (ping=20, health=5, landing=3, changelog=2, catalog=1).
+    - `AuthenticatedTenant` (weight=1, login en `on_start`, ciclo dashboard) con branding=10, features=8, leads=5, metrics=3, commissions=2, coach=1.
+    - Listeners `test_start`/`test_stop` que imprimen targets SLO y stats finales.
+    - Configuración via env vars (`LOAD_TEST_EMAIL`, `LOAD_TEST_PASSWORD`).
+  - `/app/load_tests/README.md` (nuevo): instrucciones setup + targets SLO (p95<200ms ping, p95<800ms health, p95<1500ms login, 0 errores 5xx) + comandos web UI y headless CLI + roadmap futuro (subir a 500/1000 users, programar en CI).
+- **Tests:** `test_iter27_welcome_bcrypt_locust.py` 8/8 + `test_iter26_structured_logging.py` 16/16 = **24/24 PASS**:
+  - bcrypt versión pineada (major=4, minor=0).
+  - bcrypt tiene `__about__.__version__` (lo que `passlib` busca).
+  - send_welcome_tenant: skip silencioso sin SMTP, skip sin email, shape correcto cuando configurado, fallback de admin_name a business_name.
+  - EmailType.WELCOME_TENANT existe.
+  - Locustfile: existe, sintaxis válida, contiene clases requeridas, referencia `/api/health/ping`.
+- **Frontend E2E (testing_agent_v3_fork iteration_25.json) 100% PASS:** /changelog accesible sin auth con timeline correcto, /privacy y /terms con contenido Argentina, footer link "Novedades" funciona, regression endpoints OK.
+- **Total backend acumulado: 106/106** (iter21+22+23+24+25+26+27).
+- **Estado del checklist de producción:** 9/11 pasos completos (Sentry, Atlas, Hardening, Logs estructurados, bcrypt, Changelog, Welcome email, T&C+Privacy, Stress test). Solo restan **Paso 10** (insertar API keys de producción) y **Paso 11** (deploy + dominio) que dependen de información del usuario.
+- **Archivos:** `/app/CHANGELOG.md` (nuevo), `/app/frontend/src/pages/Changelog.js` (nuevo), `/app/frontend/src/pages/PrivacyPolicy.js` (rewritten), `/app/frontend/src/pages/TermsOfService.js` (rewritten), `/app/frontend/src/pages/DynamicLanding.js` (footer link), `/app/frontend/src/App.js` (ruta /changelog), `/app/frontend/src/App.css` (155 líneas changelog CSS), `/app/backend/email_service.py` (send_welcome_tenant), `/app/backend/models.py` (EmailType.WELCOME_TENANT), `/app/backend/routers/onboarding.py` (welcome hook), `/app/backend/requirements.txt` (bcrypt==4.0.1), `/app/load_tests/locustfile.py` (nuevo), `/app/load_tests/README.md` (nuevo), `/app/backend/tests/test_iter27_welcome_bcrypt_locust.py` (nuevo).
+
 ### 2026-04-30 (Sesión Actual - Iter26 - Structured Logging JSON + Health Endpoints)
 - **Paso 4 del Checklist de Producción: UptimeRobot + Logs Estructurados** (DONE).
 - **Nuevo módulo `/app/backend/logging_config.py`:**
