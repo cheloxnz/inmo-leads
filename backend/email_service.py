@@ -441,6 +441,100 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             email_type=EmailType.TRIAL_ENDING_SOON,
         )
 
+    async def send_trial_halfway(
+        self,
+        to_email: str,
+        business_name: str,
+        days_left: int,
+        upgrade_url: str,
+    ) -> bool:
+        """Check-in a mitad del trial (día 3 de 7). Más engagement que upsell."""
+        if not to_email:
+            return False
+        subject = f"👋 ¿Cómo va tu experiencia con InmoBot, {business_name}?"
+        text_body = (
+            f"Hola {business_name},\n\n"
+            f"Ya pasaste la mitad de tu trial. Te quedan {days_left} días.\n"
+            f"Si ya configuraste WhatsApp y tenés leads entrando, vas perfecto.\n"
+            f"Si aún no conectaste tu número, te recomendamos hacerlo hoy — "
+            f"podés empezar a recibir mensajes en 5 minutos.\n\n"
+            f"Activar tu plan: {upgrade_url}\n\n"
+            f"¿Dudas? Respondé este email.\n\n— Equipo InmoBot"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:560px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; padding:28px; text-align:center; }}
+  .content {{ padding:28px; line-height:1.6; color:#374151; font-size:14px; }}
+  .tip {{ background:#f9fafb; border-left:3px solid #8b5cf6; padding:12px 16px; margin:16px 0; border-radius:4px; }}
+  .cta {{ display:inline-block; padding:12px 22px; background:#6366f1; color:#fff !important; text-decoration:none; border-radius:8px; font-weight:600; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'><h1 style='margin:0;font-size:22px;'>Mitad de tu trial — ¿cómo va?</h1></div>
+  <div class='content'>
+    <p>Hola <strong>{business_name}</strong>,</p>
+    <p>Ya pasaste la mitad de tu período de prueba. Te quedan <strong>{days_left} días</strong>.</p>
+    <div class='tip'><strong>💡 Tip del día:</strong> Los clientes que cierran con InmoBot normalmente configuran su bot en las primeras 48 hs. Si aún no lo hiciste, te recomendamos hacerlo hoy.</div>
+    <p>Activar tu plan en 1 minuto para que no se te corte nada cuando termine el trial:</p>
+    <p style='text-align:center;margin:18px 0;'><a class='cta' href='{upgrade_url}'>Activar mi plan →</a></p>
+    <p style='color:#6b7280;font-size:13px;'>¿Alguna duda? Respondé este email y te ayudamos.</p>
+  </div>
+</div></body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.TRIAL_ENDING_SOON,
+        )
+
+    async def send_trial_expired(
+        self,
+        to_email: str,
+        business_name: str,
+        upgrade_url: str,
+    ) -> bool:
+        """Email de trial expirado — última oportunidad antes de perder datos."""
+        if not to_email:
+            return False
+        subject = f"🔒 Tu trial terminó — reactivá {business_name} antes de 30 días"
+        text_body = (
+            f"Hola {business_name},\n\n"
+            f"Tu trial gratuito terminó.\n"
+            f"Tus datos (leads, configuración, flujos) están guardados 30 días más.\n"
+            f"Si reactivás antes de ese plazo, todo vuelve a funcionar al instante.\n"
+            f"Pasados los 30 días se eliminan permanentemente.\n\n"
+            f"Reactivar: {upgrade_url}\n\n"
+            f"— Equipo InmoBot"
+        )
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:560px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06); }}
+  .header {{ background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; padding:28px; text-align:center; }}
+  .content {{ padding:28px; line-height:1.6; color:#374151; font-size:14px; }}
+  .warn {{ background:#fef2f2; border:1px solid #fee2e2; color:#991b1b; padding:14px 16px; border-radius:8px; margin:16px 0; font-size:13.5px; }}
+  .cta {{ display:inline-block; padding:14px 26px; background:#dc2626; color:#fff !important; text-decoration:none; border-radius:10px; font-weight:700; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'><h1 style='margin:0;font-size:22px;'>🔒 Tu trial terminó</h1></div>
+  <div class='content'>
+    <p>Hola <strong>{business_name}</strong>,</p>
+    <p>Tu período de prueba gratuito de 7 días finalizó. El bot está pausado y no procesa nuevos mensajes.</p>
+    <div class='warn'>
+      <strong>Importante:</strong> Tus datos (leads, configuración, flujos) quedan guardados <strong>30 días</strong>.
+      Después se eliminan permanentemente.
+    </div>
+    <p>Si reactivás antes de que se cumpla el plazo, <strong>todo vuelve a funcionar en segundos</strong> — no perdés nada.</p>
+    <p style='text-align:center;margin:20px 0;'><a class='cta' href='{upgrade_url}'>Reactivar mi cuenta →</a></p>
+    <p style='color:#6b7280;font-size:13px;'>Si pensás que esto es un error, respondé este email y lo revisamos.</p>
+  </div>
+</div></body></html>"""
+        return await self.send_email(
+            to_emails=[to_email], subject=subject,
+            html_body=html_body, text_body=text_body,
+            email_type=EmailType.TRIAL_ENDING_SOON,
+        )
+
     async def send_weekly_digest(
         self,
         to_email: str,
@@ -533,7 +627,7 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             f"1. Configurá tu cuenta de WhatsApp Business → /config\n"
             f"2. Personalizá tu landing pública → {landing_url}\n"
             f"3. Probá el bot enviando un mensaje a tu WhatsApp\n\n"
-            f"Tenés 14 días gratis. Cualquier cosa, contestá este email.\n\n"
+            f"Tenés 7 días gratis. Cualquier cosa, contestá este email.\n\n"
             f"— Equipo InmoBot"
         )
         html_body = f"""<!DOCTYPE html>
@@ -566,7 +660,7 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
       Acabás de crear tu workspace en InmoBot. En menos de 5 minutos podés tener
       tu bot respondiendo mensajes de WhatsApp 24/7 con IA.
     </p>
-    <div class='trial-badge'>✨ Tu prueba gratis de 14 días empieza ahora</div>
+    <div class='trial-badge'>✨ Tu prueba gratis de 7 días empieza ahora</div>
     <div class='steps'>
       <div class='step'>
         <div class='num'>1</div>

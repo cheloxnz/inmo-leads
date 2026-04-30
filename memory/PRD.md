@@ -34,6 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-04-30 (Iter28+29 - Founder Seats + Trial 7 días)
+- **Founder Seats System (Opción 2: graduated pricing)** (DONE):
+  - `GET /api/public/founder-seats` (público, cache 30s) — consumido por la landing Shopify.
+  - `GET|PUT /api/superadmin/founder-seats/config` — CRUD del doc `settings.founder_plan`.
+  - `POST /api/superadmin/founder-seats/invalidate-cache` — forzar recálculo inmediato.
+  - `taken = min(total, real_founders_count + boost)` — híbrido real + manual.
+  - Auto-attribution: cada tenant que se registra dentro de la ventana recibe `is_founder=True` en `onboarding/auto-setup`.
+  - Auto-close: `is_open=false` cuando `left==0` OR `active=false` OR `closes_at` expiró.
+  - UI superadmin: `FounderSeatsPanel` con switch activo/pausado, progress bar, inputs total/boost/closes_at, botones Guardar + Recalcular.
+  - Defaults: `{total:50, boost:8, closes_at:"2026-05-31", active:true}`.
+- **Trial 7 días + cadencia de emails** (DONE):
+  - `TRIAL_DURATION_DAYS`: 14 → **7**. Actualizado en onboarding, welcome email, public_share.
+  - Nueva cadencia: **halfway (día 4)** → **warn (3, 1, 0 días left)** → **expired (+1 a +30 días post-trial)**.
+  - `send_trial_halfway`: engagement con tip del día.
+  - `send_trial_expired`: urgencia roja + warning de eliminación post-30 días.
+  - Scheduler rewritten con idempotencia por `(tenant_id, bucket)`.
+- **Tests 40/40 new PASS** (iter28 14/14 + iter29 10/10 + iter26+27 regression 16/16).
+- **Archivos:** +`routers/founder.py`, +`components/FounderSeatsPanel.js`, +`tests/test_iter28_founder_seats.py`, +`tests/test_iter29_trial_7days.py`. Modificados: `server.py`, `routers/onboarding.py`, `routers/coach.py`, `scheduler.py`, `email_service.py`, `public_share.py`, `pages/SuperAdminPanel.js`.
+
 ### 2026-04-30 (Sesión Actual - Iter27 - Pasos 5-9 Pre-Lanzamiento)
 - **Paso 5 (P0) — bcrypt pin a 4.0.1** (DONE):
   - `requirements.txt`: `bcrypt==4.0.1` (downgrade desde 4.1.3 que rompía `bcrypt.__about__.__version__` que `passlib` necesita).

@@ -44,14 +44,19 @@ class ScheduledTasks:
             await asyncio.sleep(24 * 3600)
 
     async def send_trial_ending_emails(self):
-        """Cada 24h, envía email a tenants con trial terminando en <=3 días.
-        Idempotente por (tenant_id, days_left bucket): no envía 2 veces el mismo aviso."""
+        """Cada 24h, envía emails de trial según cadencia:
+        - días_left == 4: halfway check-in (solo 1 vez)
+        - días_left in {3, 1, 0}: warning clásico por bucket
+        - días_left < 0 (expirado, hasta -30): email de expirado (solo 1 vez)
+        Idempotente por (tenant_id, bucket): no envía 2 veces el mismo aviso."""
         await asyncio.sleep(240)
-        from routers.coach import _trial_days_left, TRIAL_WARN_THRESHOLD_DAYS
+        from routers.coach import _trial_days_left
         BASE_URL = (
             __import__("os").environ.get("PUBLIC_BASE_URL")
             or "https://inmobot-preview.preview.emergentagent.com"
         )
+        WARN_BUCKETS = {3, 1, 0}
+        HALFWAY_DAY = 4  # día 3 del trial (de 7) = 4 días left
         while self.running:
             try:
                 cursor = self.db.tenants.find(
@@ -61,40 +66,58 @@ class ScheduledTasks:
                 )
                 async for t in cursor:
                     days_left = _trial_days_left(t)
-                    if days_left is None or days_left > TRIAL_WARN_THRESHOLD_DAYS:
+                    if days_left is None:
                         continue
-                    sent_key = f"trial_ending_{days_left}d"
-                    already = await self.db.email_logs.find_one({
-                        "email_type": "trial_ending_soon",
-                        "subject": {"$regex": f"termina en {days_left}"},
-                        "recipient_emails": {"$exists": True},
-                        "lead_phone": sent_key,
-                    }, {"_id": 1})
+                    # Decide tipo de email
+                    if days_left == HALFWAY_DAY:
+                        bucket, send_fn_name = "halfway", "send_trial_halfway"
+                    elif days_left in WARN_BUCKETS:
+                        bucket, send_fn_name = f"warn_{days_left}d", "send_trial_ending_soon"
+                    elif -30 <= days_left < 0:
+                        bucket, send_fn_name = "expired", "send_trial_expired"
+                    else:
+                        continue
+
+                    # Idempotencia por (tenant, bucket)
+                    sent_key = f"trial_{bucket}_{t['tenant_id']}"
+                    already = await self.db.email_logs.find_one(
+                        {"lead_phone": sent_key}, {"_id": 1}
+                    )
                     if already:
                         continue
+
                     agent = await self.db.agents.find_one(
                         {"tenant_id": t["tenant_id"], "role": "admin", "active": True},
                         {"_id": 0, "email": 1},
                     )
                     if not agent or not agent.get("email"):
                         continue
+
                     biz = t.get("business_name") or t.get("name") or t["tenant_id"]
                     try:
-                        await self.email.send_trial_ending_soon(
+                        send_fn = getattr(self.email, send_fn_name)
+                        kwargs = dict(
                             to_email=agent["email"],
                             business_name=biz,
-                            days_left=days_left,
                             upgrade_url=f"{BASE_URL}/config",
                         )
-                        # marker de idempotencia: usar lead_phone como dedupe-key
-                        await self.db.email_logs.update_one(
-                            {"email_type": "trial_ending_soon",
-                             "recipient_emails": [agent["email"]],
-                             "subject": {"$regex": f"termina en {days_left}"}},
-                            {"$set": {"lead_phone": sent_key}},
-                        )
+                        # Solo halfway/warning llevan days_left
+                        if send_fn_name != "send_trial_expired":
+                            kwargs["days_left"] = max(0, days_left)
+                        await send_fn(**kwargs)
+                        # Registrar en email_logs con dedupe-key
+                        await self.db.email_logs.insert_one({
+                            "email_type": "trial_ending_soon",
+                            "recipient_emails": [agent["email"]],
+                            "tenant_id": t["tenant_id"],
+                            "lead_phone": sent_key,  # campo usado como dedupe-key
+                            "subject": f"trial_{bucket}",
+                            "sent_at": datetime.utcnow().isoformat(),
+                        })
                     except Exception as e:
-                        logger.warning(f"[Scheduler] trial email failed for {t['tenant_id']}: {e}")
+                        logger.warning(
+                            f"[Scheduler] trial email failed for {t['tenant_id']}: {e}"
+                        )
             except Exception as e:
                 logger.error(f"[Scheduler] trial ending task error: {e}")
             await asyncio.sleep(24 * 3600)

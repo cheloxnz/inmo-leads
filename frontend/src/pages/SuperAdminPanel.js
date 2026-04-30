@@ -10,6 +10,7 @@ import {
   Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag
 } from 'lucide-react';
 import TenantFeatureFlags from '../components/TenantFeatureFlags';
+import FounderSeatsPanel from '../components/FounderSeatsPanel';
 
 export default function SuperAdminPanel() {
   const { isSuperAdmin } = useAuth();
@@ -152,6 +153,11 @@ export default function SuperAdminPanel() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Founder Seats management */}
+      <div style={{ marginTop: 24, marginBottom: 24 }}>
+        <FounderSeatsPanel />
       </div>
 
       {/* Toolbar */}

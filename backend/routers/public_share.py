@@ -375,7 +375,7 @@ async def share_html_page(
     <div class="lead-box">
       <span class="ref-badge">✦ Te trajo {business}</span>
       <h2>¿Querés un bot así para tu negocio?</h2>
-      <p class="sub">Probalo gratis 14 días. Sin tarjeta. Setup en 5 minutos.</p>
+      <p class="sub">Probalo gratis 7 días. Sin tarjeta. Setup en 5 minutos.</p>
 
       <form class="lead-form" id="lf" onsubmit="return submitLead(event)">
         <input type="email" id="email" placeholder="tu@email.com" required autocomplete="email">

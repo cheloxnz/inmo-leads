@@ -114,8 +114,8 @@ async def _check_ai_unused(tenant: dict, db) -> dict | None:
     }
 
 
-# Trial considerations (14 días gratis sin tarjeta es la oferta del SaaS)
-TRIAL_DURATION_DAYS = 14
+# Trial considerations (7 días gratis sin tarjeta es la oferta del SaaS)
+TRIAL_DURATION_DAYS = 7
 TRIAL_WARN_THRESHOLD_DAYS = 3  # nudge cuando faltan <=3 días
 
 
@@ -158,7 +158,7 @@ _CHECKS = [
     ("no_leads_yet", 3, _check_no_leads_yet),
     ("default_branding", 5, _check_default_branding),
     ("ai_unused", 7, _check_ai_unused),
-    ("trial_ending_soon", 11, _check_trial_ending_soon),  # 14d - 3d = ≥11d
+    ("trial_ending_soon", 4, _check_trial_ending_soon),  # 7d - 3d = ≥4d
 ]
 
 
