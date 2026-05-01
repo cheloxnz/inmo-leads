@@ -217,3 +217,93 @@ async def update_tenant_feature_flag(
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
     return {"ok": True, "tenant_id": tenant_id, "feature": body.feature, "enabled": body.enabled}
+
+
+
+# ============================================================
+# Demanda Insatisfecha (Iter32) — productos pedidos pero agotados
+# ============================================================
+
+@router.get("/superadmin/unmet-demand")
+async def get_unmet_demand_global(
+    current_user: User = Depends(get_current_user),
+    limit: int = 20,
+):
+    """SuperAdmin: top productos con mayor demanda insatisfecha cross-tenant.
+
+    Score = leads_pending × log(1+price). Devuelve top N por demanda.
+    Útil para detectar qué productos reponer primero.
+    """
+    _require_superadmin(current_user)
+    import math
+
+    pipeline = [
+        {"$match": {"notified_at": None}},
+        {"$group": {
+            "_id": {"tenant_id": "$tenant_id", "product_id": "$product_id"},
+            "leads_count": {"$sum": 1},
+            "product_name": {"$first": "$product_name"},
+            "first_asked": {"$min": "$asked_at"},
+            "last_asked": {"$max": "$asked_at"},
+        }},
+        {"$sort": {"leads_count": -1}},
+        {"$limit": limit * 3},  # over-fetch para descartar productos ya repuestos
+    ]
+    rows = await _db.product_waitlist.aggregate(pipeline).to_list(limit * 3)
+
+    # Enriquecer con datos del producto + tenant + filtrar los ya repuestos
+    enriched = []
+    for r in rows:
+        tid = r["_id"]["tenant_id"]
+        pid = r["_id"]["product_id"]
+        prod = await _db.products.find_one(
+            {"tenant_id": tid, "product_id": pid}, {"_id": 0},
+        )
+        # Solo incluir productos que SIGUEN agotados o ya no existen
+        if prod:
+            stock = prod.get("stock_quantity")
+            still_out = (
+                prod.get("active") is False
+                or (stock is not None and stock <= 0)
+            )
+        else:
+            still_out = True
+        if not still_out:
+            continue
+
+        tenant = await _db.tenants.find_one(
+            {"tenant_id": tid}, {"_id": 0, "business_name": 1, "owner_email": 1},
+        )
+        price = (prod or {}).get("price", 0) or 0
+        urgency_score = round(r["leads_count"] * math.log(1 + max(price, 1)), 2)
+
+        enriched.append({
+            "tenant_id": tid,
+            "tenant_name": (tenant or {}).get("business_name", ""),
+            "tenant_email": (tenant or {}).get("owner_email", ""),
+            "product_id": pid,
+            "product_name": r.get("product_name") or (prod or {}).get("name", ""),
+            "category": (prod or {}).get("category", ""),
+            "price": price,
+            "currency": (prod or {}).get("currency", "USD"),
+            "leads_count": r["leads_count"],
+            "first_asked": r.get("first_asked"),
+            "last_asked": r.get("last_asked"),
+            "urgency_score": urgency_score,
+            "product_exists": prod is not None,
+        })
+        if len(enriched) >= limit:
+            break
+
+    # Ordenar por urgency_score
+    enriched.sort(key=lambda x: x["urgency_score"], reverse=True)
+
+    # Métricas agregadas
+    total_pending = await _db.product_waitlist.count_documents({"notified_at": None})
+    total_unique_products = len({(r["_id"]["tenant_id"], r["_id"]["product_id"]) for r in rows})
+
+    return {
+        "total_pending_leads": total_pending,
+        "total_unique_products": total_unique_products,
+        "top_products": enriched,
+    }

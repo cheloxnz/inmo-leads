@@ -333,29 +333,68 @@ async def substitute_preview(
 async def get_waitlist(current_user: User = Depends(require_admin)):
     """Admin: leads esperando que vuelvan productos agotados.
 
-    Retorna sólo las entradas pendientes de notificar (notified_at=None),
-    agrupadas por producto para mostrar en el panel.
+    Retorna entradas pendientes de notificar (notified_at=None), agrupadas
+    por producto y enriquecidas con datos del producto (precio, categoría,
+    stock actual) para el panel.
     """
     db = catalog_service.db
     items = await db.product_waitlist.find(
         {"tenant_id": current_user.tenant_id, "notified_at": None},
         {"_id": 0},
     ).sort("asked_at", -1).to_list(500)
-    # Agrupar por product_id
+    # Lookup productos en batch
+    pids = list({it.get("product_id", "") for it in items if it.get("product_id")})
+    products_map = {}
+    if pids:
+        prods = await db.products.find(
+            {"tenant_id": current_user.tenant_id, "product_id": {"$in": pids}},
+            {"_id": 0},
+        ).to_list(len(pids))
+        products_map = {p["product_id"]: p for p in prods}
+
     grouped: dict = {}
     for it in items:
         pid = it.get("product_id", "")
         if pid not in grouped:
+            prod = products_map.get(pid, {})
             grouped[pid] = {
                 "product_id": pid,
-                "product_name": it.get("product_name", ""),
+                "product_name": it.get("product_name", "") or prod.get("name", ""),
+                "category": prod.get("category", ""),
+                "price": prod.get("price", 0),
+                "currency": prod.get("currency", "USD"),
+                "stock_quantity": prod.get("stock_quantity"),
+                "is_out_of_stock": catalog_service.is_out_of_stock(prod) if prod else True,
+                "leads_count": 0,
                 "leads": [],
             }
         grouped[pid]["leads"].append({
             "lead_phone": it.get("lead_phone", ""),
             "asked_at": it.get("asked_at"),
         })
+        grouped[pid]["leads_count"] += 1
+
+    # Ordenar productos por demanda (más leads esperando primero)
+    by_product = sorted(grouped.values(), key=lambda g: g["leads_count"], reverse=True)
     return {
         "total_pending": len(items),
-        "by_product": list(grouped.values()),
+        "unique_products": len(by_product),
+        "by_product": by_product,
     }
+
+
+@router.post("/catalog/waitlist/notify/{product_id}")
+async def notify_waitlist_now(
+    product_id: str,
+    current_user: User = Depends(require_admin),
+):
+    """Admin: dispara manualmente el aviso back-in-stock para un producto.
+
+    Útil cuando el admin reactiva stock vía algún flujo externo y quiere
+    notificar inmediatamente sin tocar el stock_quantity.
+    """
+    notified = await catalog_service.notify_back_in_stock(
+        current_user.tenant_id, product_id,
+    )
+    return {"notified_leads": notified}
+

@@ -7,11 +7,12 @@ import { toast } from 'sonner';
 import {
   Plus, Trash2, Pencil, Package, Tag, DollarSign,
   X, Search, Filter, Sparkles, Globe, Copy,
-  PackageX, AlertTriangle, CheckCircle2, Wand2, Replace
+  PackageX, AlertTriangle, CheckCircle2, Wand2, Replace, Users
 } from 'lucide-react';
 import ProductForm from './catalog/ProductForm';
 import SubstitutesModal from './catalog/SubstitutesModal';
 import SubstitutePreviewModal from './catalog/SubstitutePreviewModal';
+import WaitlistModal from './catalog/WaitlistModal';
 
 // ---------------- Helpers ----------------
 const getAvailability = (p) => {
@@ -64,6 +65,7 @@ export default function CatalogPage() {
   const [publicLink, setPublicLink] = useState('');
   const [subsModalProduct, setSubsModalProduct] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -158,6 +160,14 @@ export default function CatalogPage() {
           <p>{products.length} productos</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <Button
+            variant="outline"
+            onClick={() => setWaitlistOpen(true)}
+            data-testid="btn-open-waitlist"
+            title="Lista de espera de leads"
+          >
+            <Users className="w-4 h-4 mr-1" /> Lista de espera
+          </Button>
           <Button
             variant="outline"
             onClick={() => setPreviewOpen(true)}
@@ -329,6 +339,10 @@ export default function CatalogPage() {
 
       {previewOpen && (
         <SubstitutePreviewModal onClose={() => setPreviewOpen(false)} />
+      )}
+
+      {waitlistOpen && (
+        <WaitlistModal onClose={() => setWaitlistOpen(false)} />
       )}
     </div>
   );

@@ -154,12 +154,16 @@ class CatalogService:
         Esta es la DETECCIÓN previa al flujo de sustitución: solo disparamos
         "está agotado pero tengo esta alternativa" si el cliente efectivamente
         mencionó un producto específico que ya no está disponible.
+
+        Tokens cortos (<3 chars) como "15", "S24", "X" se conservan ya que
+        muchos modelos de productos tienen números/letras significativas.
+        Se quita la puntuación al final de cada token ("pro?" → "pro").
         """
+        import string
         query = (query or "").strip().lower()
         if len(query) < 3:
             return None
 
-        # Traer TODOS (activos e inactivos) + los que tienen stock_quantity<=0
         all_products = await self.db.products.find(
             {"tenant_id": tenant_id},
             {"_id": 0},
@@ -169,7 +173,32 @@ class CatalogService:
         if not out_of_stock:
             return None
 
-        query_tokens = {t for t in query.split() if len(t) >= 3}
+        # Tokenizar quitando signos de puntuación al borde (pro? → pro, 15! → 15)
+        # Stopwords comunes que no aportan semántica del producto.
+        STOPWORDS = {
+            "tienen", "tienes", "tenes", "hay", "venden", "vende", "quiero",
+            "necesito", "busco", "que", "con", "del", "los", "las", "una",
+            "uno", "esta", "este", "para", "cuanto", "cuesta", "vale",
+            "precio", "info", "informacion", "sobre",
+        }
+
+        def tokenize(text: str) -> set:
+            tokens = set()
+            for raw in text.split():
+                t = raw.strip(string.punctuation)
+                if not t or t in STOPWORDS:
+                    continue
+                # Aceptamos tokens cortos si son alfanuméricos significativos:
+                # - len >= 3 (palabras normales)
+                # - len 2-3 con dígitos (S24, X9, M1, V8)
+                # - len 2 alfanumérico mixto (4K, 8K, P9)
+                if len(t) >= 3:
+                    tokens.add(t)
+                elif len(t) == 2 and any(ch.isdigit() for ch in t):
+                    tokens.add(t)
+            return tokens
+
+        query_tokens = tokenize(query)
         if not query_tokens:
             return None
 
@@ -179,8 +208,7 @@ class CatalogService:
             name = (p.get("name") or "").lower()
             if not name:
                 continue
-            # Score: tokens en común + bonus si el nombre completo está en la query
-            name_tokens = {t for t in name.split() if len(t) >= 3}
+            name_tokens = tokenize(name)
             if not name_tokens:
                 continue
             common = query_tokens & name_tokens

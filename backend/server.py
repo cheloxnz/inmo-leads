@@ -599,203 +599,11 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
 # ============================================
 
 
-@api_router.get("/config")
-async def get_config(current_user: User = Depends(get_current_user)):
-    """Obtiene configuración del bot (por tenant)"""
-    tf = tenant_filter(current_user)
-    config = await db.bot_config.find_one(tf, {"_id": 0})
-    
-    if not config:
-        config = BotConfig(tenant_id=current_user.tenant_id).model_dump()
-        config["updated_at"] = config["updated_at"].isoformat()
-        await db.bot_config.insert_one(config)
-    
-    return config
-
-
-@api_router.put("/config")
-async def update_config(config: BotConfig, current_user: User = Depends(require_admin)):
-    """Actualiza configuración del bot (por tenant)"""
-    config_dict = config.model_dump()
-    config_dict["tenant_id"] = current_user.tenant_id
-    config_dict["updated_at"] = datetime.utcnow().isoformat()
-    
-    await db.bot_config.update_one(
-        {"tenant_id": current_user.tenant_id},
-        {"$set": config_dict},
-        upsert=True
-    )
-    
-    return {"message": "Configuración actualizada"}
-
 
 # ============================================
-# WhatsApp Config per Tenant
+# /config/* y /flow/* y /usage/* -> routers/config.py + routers/usage.py
 # ============================================
 
-@api_router.get("/config/whatsapp")
-async def get_whatsapp_config(current_user: User = Depends(require_admin)):
-    """Admin: Obtiene config de WhatsApp del tenant"""
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant no encontrado")
-    return {
-        "whatsapp_phone_number_id": tenant.get("whatsapp_phone_number_id", ""),
-        "whatsapp_access_token": "***" + tenant.get("whatsapp_access_token", "")[-10:] if tenant.get("whatsapp_access_token") else "",
-        "whatsapp_business_account_id": tenant.get("whatsapp_business_account_id", ""),
-        "webhook_verify_token": tenant.get("webhook_verify_token", ""),
-        "webhook_url": f"{os.getenv('REACT_APP_BACKEND_URL', '')}/api/webhook",
-        "configured": bool(tenant.get("whatsapp_access_token") and tenant.get("whatsapp_phone_number_id"))
-    }
-
-@api_router.put("/config/whatsapp")
-async def update_whatsapp_config(
-    config: dict,
-    current_user: User = Depends(require_admin)
-):
-    """Admin: Actualiza config de WhatsApp del tenant"""
-    update_fields = {}
-    allowed = ["whatsapp_phone_number_id", "whatsapp_access_token", "whatsapp_business_account_id", "webhook_verify_token"]
-    for key in allowed:
-        if key in config:
-            update_fields[key] = config[key]
-    
-    if not update_fields:
-        raise HTTPException(status_code=400, detail="No hay campos para actualizar")
-
-    update_fields["updated_at"] = datetime.utcnow().isoformat()
-    
-    await db.tenants.update_one(
-        {"tenant_id": current_user.tenant_id},
-        {"$set": update_fields}
-    )
-    return {"message": "Configuracion de WhatsApp actualizada"}
-
-
-
-# ============================================
-# Usage / Limits Endpoints
-# ============================================
-
-@api_router.get("/usage")
-async def get_usage(current_user: User = Depends(get_current_user)):
-    """Obtiene resumen de uso del tenant actual"""
-    return await usage_service.get_usage_summary(current_user.tenant_id)
-
-
-@api_router.get("/config/ai")
-async def get_ai_config(current_user: User = Depends(require_admin)):
-    """Admin: Obtiene config de IA del tenant"""
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant no encontrado")
-    return {
-        "has_own_key": bool(tenant.get("openai_api_key")),
-        "key_preview": "***" + tenant.get("openai_api_key", "")[-8:] if tenant.get("openai_api_key") else "",
-        "max_ai_messages": tenant.get("max_ai_messages", 2000),
-        "model": "gpt-4o"
-    }
-
-
-@api_router.put("/config/ai")
-async def update_ai_config(body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Configura key propia de OpenAI (opcional)"""
-    update = {}
-    if "openai_api_key" in body:
-        update["openai_api_key"] = body["openai_api_key"]
-    
-    if not update:
-        raise HTTPException(status_code=400, detail="No hay campos para actualizar")
-
-    update["updated_at"] = datetime.utcnow().isoformat()
-    await db.tenants.update_one(
-        {"tenant_id": current_user.tenant_id},
-        {"$set": update}
-    )
-    return {"message": "Configuracion de IA actualizada"}
-
-
-@api_router.post("/usage/buy-pack")
-async def buy_ai_pack(body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Compra un bloque de mensajes IA extra via Stripe"""
-    pack_id = body.get("pack_id")
-    from usage_service import AI_MESSAGE_PACKS
-    
-    pack = AI_MESSAGE_PACKS.get(pack_id)
-    if not pack:
-        raise HTTPException(status_code=400, detail="Pack no valido")
-
-    if not payment_service.api_key:
-        raise HTTPException(status_code=400, detail="Stripe no configurado")
-
-    import stripe
-    try:
-        origin_url = body.get("origin_url", "")
-        success_url = f"{origin_url}/config?pack=success&pack_id={pack_id}"
-        cancel_url = f"{origin_url}/config?pack=cancelled"
-
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': pack["name"],
-                        'description': f'{pack["messages"]} conversaciones IA adicionales para tu plan',
-                    },
-                    'unit_amount': int(pack["price"] * 100),
-                },
-                'quantity': 1,
-            }],
-            mode='payment',
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata={
-                "type": "ai_pack",
-                "pack_id": pack_id,
-                "tenant_id": current_user.tenant_id,
-                "messages": str(pack["messages"])
-            }
-        )
-
-        # Save transaction
-        await db.payment_transactions.insert_one({
-            "session_id": session.id,
-            "tenant_id": current_user.tenant_id,
-            "type": "ai_pack",
-            "pack_id": pack_id,
-            "pack_name": pack["name"],
-            "amount": pack["price"],
-            "messages": pack["messages"],
-            "currency": "usd",
-            "payment_status": "pending",
-            "created_at": datetime.utcnow().isoformat()
-        })
-
-        return {"checkout_url": session.url, "session_id": session.id}
-    except Exception as e:
-        logger.error(f"Error comprando pack: {e}")
-        raise HTTPException(status_code=500, detail="Error creando sesion de pago")
-
-
-@api_router.post("/usage/confirm-pack")
-async def confirm_pack_purchase(body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Confirma compra de pack (llamado despues del redirect de Stripe)"""
-    pack_id = body.get("pack_id")
-    if not pack_id:
-        raise HTTPException(status_code=400, detail="pack_id requerido")
-
-    result = await usage_service.add_extra_messages(current_user.tenant_id, pack_id)
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
-
-    # Update transaction
-    await db.payment_transactions.update_one(
-        {"tenant_id": current_user.tenant_id, "pack_id": pack_id, "payment_status": "pending"},
-        {"$set": {"payment_status": "paid", "paid_at": datetime.utcnow().isoformat()}},
-    )
-
-    return result
 
 
 
@@ -807,85 +615,6 @@ async def confirm_pack_purchase(body: dict, current_user: User = Depends(require
 
 
 
-# ============================================
-# Custom Flow Builder (per tenant)
-# ============================================
-
-@api_router.get("/flow/config")
-async def get_flow_config(current_user: User = Depends(get_current_user)):
-    """Obtiene la config del flujo del tenant (custom o template base)"""
-    from flow_templates import get_template
-
-    # Get tenant info
-    tenant = await db.tenants.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-    template_id = tenant.get("template_id", "servicios") if tenant else "servicios"
-    base_template = get_template(template_id)
-
-    # Get custom overrides
-    config = await db.bot_config.find_one({"tenant_id": current_user.tenant_id}, {"_id": 0})
-
-    return {
-        "template_id": template_id,
-        "template_name": base_template.get("name", ""),
-        "is_customized": bool(config and config.get("custom_flow_steps")),
-        "welcome_message": (config or {}).get("custom_welcome_message") or base_template.get("welcome_message", ""),
-        "welcome_buttons": (config or {}).get("custom_welcome_buttons") or base_template.get("welcome_buttons", []),
-        "flow_steps": (config or {}).get("custom_flow_steps") or base_template.get("flow_steps", []),
-        "scoring": (config or {}).get("custom_scoring") or base_template.get("scoring", {}),
-        "appointment_message": (config or {}).get("custom_appointment_message") or base_template.get("appointment_message", ""),
-        "appointment_buttons": (config or {}).get("custom_appointment_buttons") or base_template.get("appointment_buttons", []),
-        "completion_message": (config or {}).get("custom_completion_message") or base_template.get("completion_message", ""),
-        "faq": (config or {}).get("custom_faq") or base_template.get("faq", {}),
-        "labels": (config or {}).get("custom_labels") or base_template.get("labels", {})
-    }
-
-
-@api_router.put("/flow/config")
-async def update_flow_config(body: dict, current_user: User = Depends(require_admin)):
-    """Admin: Guarda config custom del flujo"""
-    update = {"tenant_id": current_user.tenant_id}
-    
-    fields_map = {
-        "welcome_message": "custom_welcome_message",
-        "welcome_buttons": "custom_welcome_buttons",
-        "flow_steps": "custom_flow_steps",
-        "scoring": "custom_scoring",
-        "appointment_message": "custom_appointment_message",
-        "appointment_buttons": "custom_appointment_buttons",
-        "completion_message": "custom_completion_message",
-        "faq": "custom_faq",
-        "labels": "custom_labels"
-    }
-
-    for key, db_key in fields_map.items():
-        if key in body:
-            update[db_key] = body[key]
-
-    update["updated_at"] = datetime.utcnow().isoformat()
-
-    await db.bot_config.update_one(
-        {"tenant_id": current_user.tenant_id},
-        {"$set": update},
-        upsert=True
-    )
-    return {"message": "Flujo actualizado"}
-
-
-@api_router.post("/flow/reset")
-async def reset_flow_config(current_user: User = Depends(require_admin)):
-    """Admin: Resetea el flujo custom al template base"""
-    custom_fields = [
-        "custom_flow_steps", "custom_welcome_message", "custom_welcome_buttons",
-        "custom_scoring", "custom_appointment_message", "custom_appointment_buttons",
-        "custom_completion_message", "custom_faq", "custom_labels"
-    ]
-    unset = {f: "" for f in custom_fields}
-    
-    await db.bot_config.update_one(
-        {"tenant_id": current_user.tenant_id},
-        {"$unset": unset}
-    )
-    return {"message": "Flujo reseteado al template base"}
 
 
 
@@ -1558,6 +1287,8 @@ async def clear_update_notification(
 # Incluir routers
 from routers.catalog import router as catalog_router
 from routers.leads import router as leads_router
+from routers.config import router as config_router
+from routers.usage import router as usage_router
 from routers.billing import router as billing_router
 from routers.metrics import router as metrics_router
 from routers.widget import router as widget_router
@@ -1576,6 +1307,8 @@ app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(catalog_router, prefix="/api")
 app.include_router(leads_router, prefix="/api")
+app.include_router(config_router, prefix="/api")
+app.include_router(usage_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
 app.include_router(widget_router, prefix="/api")

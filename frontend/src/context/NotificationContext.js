@@ -117,9 +117,10 @@ export function NotificationProvider({ children }) {
     };
 
     ws.onmessage = (event) => {
+      // El servidor manda 'pong' como texto plano para keep-alive: ignorar.
+      if (event.data === 'pong' || event.data === 'ping') return;
       try {
         const data = JSON.parse(event.data);
-        // Solo procesar notificaciones si sigue autenticado
         if (isAuthenticated) {
           handleNotification(data);
         }

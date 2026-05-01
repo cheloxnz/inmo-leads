@@ -34,6 +34,27 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter32b - Unmet Demand Dashboard + UX polish)
+- **Dashboard "Demanda Insatisfecha" SuperAdmin** (NEW):
+  - `GET /api/superadmin/unmet-demand?limit=20`: agregación cross-tenant de productos con leads esperando, **score = leads × log(1+precio)**, filtra los que ya fueron repuestos. Enriquece con tenant_name, owner_email, categoría, precio, urgency_score.
+  - Componente `UnmetDemandPanel.js` con tabla TOP-N, ícono fuego (🔥) en los top 3, refresh button, stats agregadas (`total_pending_leads`, `total_unique_products`).
+  - Integrado en `SuperAdminPanel.js` debajo del Founder Seats.
+- **UI Lista de Espera (per tenant)**: 
+  - `WaitlistModal.js` enlazado desde botón "Lista de espera" en `CatalogPage`. Muestra leads agrupados por producto, cuántos esperan, fecha de pregunta, badge AGOTADO/Stock visible.
+  - Botón "Avisar ahora" por producto → llama `POST /api/catalog/waitlist/notify/{product_id}` (deshabilitado mientras el producto siga agotado).
+  - Endpoint `/catalog/waitlist` ahora **enrichece** con `price`, `category`, `currency`, `stock_quantity`, `is_out_of_stock`, `leads_count`. Ordenado por demanda desc.
+- **Fuzzy detection mejorada** (`catalog_service.find_out_of_stock_match`):
+  - Acepta tokens cortos significativos: ≥3 chars, o len 2-3 con dígitos (S24, X9, M1, 4K, 8K).
+  - Quita puntuación al borde (`pro?` → `pro`, `15!` → `15`).
+  - Stopwords españolas (`tienen`, `quiero`, `busco`, `cuanto`, etc) descartadas.
+  - Resultado: queries naturales como "tienen Samsung S24?" o "quiero iphone pro!" ahora matchean.
+- **Refactor `server.py` continuado**: 
+  - Movidos 9 endpoints `/config/*`, `/flow/*`, `/usage/*` a `routers/config.py` + `routers/usage.py`.
+  - `server.py` pasó de 1619 → **1352 líneas** (-267 más; -517 totales en 2 iteraciones).
+- **Fix WebSocket**: `NotificationContext.js` ahora ignora mensajes `pong`/`ping` del keep-alive en lugar de loguear error de JSON.parse.
+- **Tests**: `test_iter32b_unmet_demand.py` con **6 tests PASS** (fuzzy short tokens, fuzzy con puntuación, waitlist enriched, notify-now, unmet-demand structure y filtrado de repuestos, /config alive). Total acumulado: **31/31 pass** (16 iter31 + 9 iter32 + 6 iter32b).
+- **Archivos**: +`routers/config.py`, +`routers/usage.py`, +`pages/catalog/WaitlistModal.js`, +`components/UnmetDemandPanel.js`, +`tests/test_iter32b_unmet_demand.py`. Modificados: `routers/superadmin.py` (+90 líneas: unmet-demand endpoint), `routers/catalog.py` (+50 líneas: waitlist enriched + notify-now), `catalog_service.py` (find_out_of_stock_match rewrite ~50 líneas), `CatalogPage.js`, `SuperAdminPanel.js`, `NotificationContext.js`, `App.css` (+220 estilos).
+
 ### 2026-05-01 (Iter32 - Back-in-Stock Notifications + Refactors)
 - **Back-in-Stock Waitlist (NEW FEATURE)**:
   - Nueva colección `product_waitlist`: `{tenant_id, lead_phone, product_id, product_name, asked_at, notified_at, created_at}`. Upsert por `(tenant_id, lead_phone, product_id)` → idempotente.
