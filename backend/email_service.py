@@ -61,7 +61,7 @@ class EmailService:
     
     async def _log_email(self, email_type: EmailType, recipients: List[str], subject: str, success: bool, error: Optional[str], lead_phone: Optional[str]):
         """Registra envío de email en base de datos"""
-        if not self.db:
+        if self.db is None:
             return
         
         try:
