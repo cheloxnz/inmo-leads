@@ -82,10 +82,21 @@ class CatalogService:
         return [r["_id"] for r in results if r["_id"]]
 
     async def update_product(self, tenant_id: str, product_id: str, update_data: dict) -> bool:
-        """Actualiza un producto por ID (con validación tenant)"""
+        """Actualiza un producto por ID (con validación tenant).
+
+        Si el payload incluye `stock_quantity`, sincroniza `active` igual que
+        `set_stock` para evitar la inconsistencia de tener active=true con
+        stock=0 o active=false con stock>0.
+        """
         update_data.pop("tenant_id", None)
         update_data.pop("_id", None)
         update_data.pop("product_id", None)
+        if "stock_quantity" in update_data:
+            stock = update_data["stock_quantity"]
+            if stock is not None and stock <= 0:
+                update_data["active"] = False
+            elif stock is not None and stock > 0:
+                update_data["active"] = True
         result = await self.db.products.update_one(
             {"tenant_id": tenant_id, "product_id": product_id},
             {"$set": update_data}

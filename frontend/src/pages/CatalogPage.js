@@ -361,12 +361,6 @@ function ProductForm({ product, onSaved, onCancel }) {
       };
       if (product) {
         await axios.put(`${API}/catalog/${product.product_id}`, data);
-        // Si el usuario tocó el stock, usar el endpoint dedicado para que sincronice active
-        if (product.stock_quantity !== data.stock_quantity) {
-          await axios.patch(`${API}/catalog/products/${product.product_id}/stock`, {
-            stock_quantity: data.stock_quantity,
-          });
-        }
         toast.success('Producto actualizado');
       } else {
         await axios.post(`${API}/catalog`, data);

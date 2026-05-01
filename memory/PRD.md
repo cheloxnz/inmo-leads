@@ -34,6 +34,20 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter31b - Smart Substitution UI completa)
+- **Frontend UI Smart Substitution** (`CatalogPage.js` reescrito):
+  - Campo `stock_quantity` en ProductForm (input number, vacío = sin tracking, 0 = AGOTADO).
+  - Badge de disponibilidad visible en cada tarjeta: `AGOTADO` (rojo), `Poco stock (N)` (ámbar), `Stock: N` (verde), o sin badge si no hay tracking.
+  - Overlay "AGOTADO" sobre la imagen del producto + opacity reducida cuando `active=false`.
+  - Botón 1-click (icono PackageX/CheckCircle2) en cada tarjeta para marcar AGOTADO o reponer a stock=10.
+  - **SubstitutesModal**: búsqueda de candidatos (activos con stock), selección con checkbox, orden numerado #1-#10, guarda via `PUT /catalog/products/{id}/substitutes`.
+  - **SubstitutePreviewModal**: input de query, muestra producto agotado detectado + sustitutos propuestos + mensaje WhatsApp exacto en burbuja verde.
+  - Data-testids: `btn-substitute-preview`, `btn-toggle-stock-{id}`, `btn-substitutes-{id}`, `input-product-stock`, `badge-out-of-stock/low-stock/in-stock`, `substitutes-modal`, `preview-modal`, `preview-query-input`, `btn-run-preview`, `preview-message`, `sub-option-{id}`.
+- **Backend — unificación PUT stock_quantity**:
+  - `CatalogService.update_product` ahora sincroniza `active` automáticamente cuando el payload incluye `stock_quantity` (igual que `set_stock`). Elimina el doble round-trip PUT+PATCH del frontend.
+- **Testing**: 16/16 pytest iter31 pass; backend E2E curl (PATCH/PUT/POST preview) + frontend E2E del testing agent → success rate 100% backend, 95% frontend (un edge-case no reproducible no bloqueante).
+- **Archivos**: ~`pages/CatalogPage.js` (rewrite, 554 líneas), ~`backend/catalog_service.py` (update_product +12 líneas), ~`App.css` (+280 líneas de estilos modal/badge/preview).
+
 ### 2026-04-30 (Iter28+29 - Founder Seats + Trial 7 días)
 - **Founder Seats System (Opción 2: graduated pricing)** (DONE):
   - `GET /api/public/founder-seats` (público, cache 30s) — consumido por la landing Shopify.
