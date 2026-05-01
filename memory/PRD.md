@@ -34,6 +34,23 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter32d - Upsell Automático Pro→Enterprise)
+- **Upsell Service** (`upsell_service.py`):
+  - `calculate_unmet_demand_for_tenant(db, tenant_id)`: calcula leads en waitlist + `value_usd` (suma de price × leads_count) + top-5 productos. Solo cuenta productos QUE SIGUEN agotados.
+  - `check_and_send_upsells(db, email_service)`: recorre tenants `subscription_plan="pro"` activos. Dispara email si cruza `UPSELL_THRESHOLD_LEADS` (default 50) **O** `UPSELL_THRESHOLD_VALUE_USD` (default 1500). Cooldown idempotente de 30 días vía colección `upsell_events`. Override con `UPSELL_FORCE=1`.
+  - **Skip a tenants ya Enterprise** (no se autospamean).
+- **Email template** (`send_upsell_unmet_demand`):
+  - Subject: "📊 [Negocio]: detectamos $X en demanda no atendida esta semana".
+  - HTML con header rojo→naranja, 2 stat cards (leads + USD), tabla top-5 productos con precio + valor, pitch de Enterprise con bullet points (reportes diarios, alertas WhatsApp, 10K conversaciones IA, API, OpenAI key propia), price tag $249/mes, CTA "respondé este email".
+  - Plain text fallback completo.
+  - `EmailType.UPSELL_UNMET_DEMAND` agregado al enum.
+- **Scheduler**: `run_upsell_checks` corre cada 24h tras 6 min de warmup.
+- **Endpoints SuperAdmin**:
+  - `POST /api/superadmin/upsell/run`: dispara corrida manual (útil testing, respeta cooldown).
+  - `GET /api/superadmin/upsell/history?limit=50`: histórico de envíos.
+- **Tests**: `test_iter32d_upsell.py` con **3 tests PASS** (threshold + idempotencia/cooldown 30 días, skip si baja demanda, skip si ya Enterprise). Total acumulado: **37/37 PASS** (16 iter31 + 9 iter32 + 6 iter32b + 3 iter32c + 3 iter32d).
+- **Archivos**: +`upsell_service.py` (185 líneas), +`tests/test_iter32d_upsell.py`, ~`email_service.py` (+150 líneas: send_upsell_unmet_demand), ~`scheduler.py` (+18: run_upsell_checks task), ~`models.py` (+1: EmailType.UPSELL_UNMET_DEMAND), ~`routers/superadmin.py` (+40: 2 endpoints upsell).
+
 ### 2026-05-01 (Iter32c - Snooze Demanda + Weekly Digest enriched)
 - **Snooze de productos en Demanda Insatisfecha**:
   - Nueva colección `unmet_demand_snooze`: `{tenant_id, product_id, snoozed_until, snoozed_by, snoozed_at, days}`.

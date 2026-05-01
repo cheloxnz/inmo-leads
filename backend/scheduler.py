@@ -29,6 +29,7 @@ class ScheduledTasks:
         asyncio.create_task(self.run_commission_expiry())
         asyncio.create_task(self.send_trial_ending_emails())
         asyncio.create_task(self.send_weekly_digest_emails())
+        asyncio.create_task(self.run_upsell_checks())
 
     async def run_commission_expiry(self):
         """Cada 24h, marca como EXPIRED las commissions que cumplieron 365 dias."""
@@ -240,6 +241,23 @@ class ScheduledTasks:
             except Exception as e:
                 logger.warning(f"[Scheduler] digest fail tenant={tid}: {e}")
         return sent
+
+    async def run_upsell_checks(self):
+        """Cada 24h, evalúa tenants Pro con alta demanda insatisfecha y dispara
+        emails de upsell automático. Idempotente con cooldown de 30 días."""
+        await asyncio.sleep(360)  # warmup
+        from upsell_service import check_and_send_upsells
+        while self.running:
+            try:
+                result = await check_and_send_upsells(self.db, self.email)
+                if result.get("sent", 0) > 0 or result.get("evaluated", 0) > 0:
+                    logger.info(
+                        f"[Scheduler] Upsell run: evaluated={result['evaluated']} "
+                        f"sent={result['sent']} skipped_cooldown={result['skipped_cooldown']}"
+                    )
+            except Exception as e:
+                logger.error(f"[Scheduler] upsell run error: {e}")
+            await asyncio.sleep(24 * 3600)
 
     async def run_onboarding_coach(self):
         """Cada 6 horas, evalua todos los tenants y crea nudges del Coach."""

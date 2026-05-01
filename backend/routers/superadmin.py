@@ -377,3 +377,37 @@ async def unsnooze_unmet_demand_item(
         {"tenant_id": tenant_id, "product_id": product_id},
     )
     return {"ok": True, "removed": result.deleted_count}
+
+
+# ============================================================
+# Upsell automático (Iter32d)
+# ============================================================
+
+@router.post("/superadmin/upsell/run")
+async def run_upsell_now(
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: dispara una corrida del upsell automático ahora.
+
+    Útil para testear sin esperar el cron diario. Respeta cooldown salvo que
+    `UPSELL_FORCE=1` esté en .env.
+    """
+    _require_superadmin(current_user)
+    from upsell_service import check_and_send_upsells
+    from email_service import EmailService
+    email_svc = EmailService(_db)
+    result = await check_and_send_upsells(_db, email_svc)
+    return result
+
+
+@router.get("/superadmin/upsell/history")
+async def get_upsell_history(
+    current_user: User = Depends(get_current_user),
+    limit: int = 50,
+):
+    """SuperAdmin: histórico de upsells enviados."""
+    _require_superadmin(current_user)
+    items = await _db.upsell_events.find(
+        {}, {"_id": 0},
+    ).sort("sent_at", -1).limit(limit).to_list(limit)
+    return {"items": items, "total": len(items)}

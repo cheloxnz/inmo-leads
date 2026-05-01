@@ -790,3 +790,158 @@ InmoBot AI - Sistema de Calificación Automática
             text_body=text_body,
             email_type=EmailType.TEST
         )
+
+
+
+    async def send_upsell_unmet_demand(
+        self,
+        to_email: str,
+        business_name: str,
+        demand: dict,
+    ) -> bool:
+        """Email de upsell automático cuando un tenant Pro tiene mucha demanda
+        insatisfecha → invita a upgrade a Enterprise.
+
+        demand: {leads_count, value_usd, top_products: [{name, leads_count, price}]}
+        """
+        if not to_email:
+            return False
+        leads_count = demand.get("leads_count", 0)
+        value_usd = demand.get("value_usd", 0)
+        top = demand.get("top_products", []) or []
+
+        subject = (
+            f"📊 {business_name}: detectamos ${value_usd:,.0f} en demanda no atendida esta semana"
+        )
+
+        rows_html = ""
+        rows_text = ""
+        for i, p in enumerate(top[:5], 1):
+            value = p["leads_count"] * (p.get("price") or 0)
+            rows_html += (
+                f"<tr>"
+                f"<td style='padding:10px;font-weight:700;color:#dc2626;width:30px;'>#{i}</td>"
+                f"<td style='padding:10px;'><strong>{p['name']}</strong></td>"
+                f"<td style='padding:10px;text-align:right;color:#374151;'>"
+                f"{p['leads_count']} leads</td>"
+                f"<td style='padding:10px;text-align:right;color:#dc2626;font-weight:700;'>"
+                f"${value:,.0f}</td>"
+                f"</tr>"
+            )
+            rows_text += (
+                f"  {i}. {p['name']} — {p['leads_count']} leads × ${p.get('price', 0)} = ${value:,.0f}\n"
+            )
+
+        text_body = (
+            f"Hola,\n\n"
+            f"Tu InmoBot detectó algo importante esta semana en {business_name}:\n\n"
+            f"➤ {leads_count} clientes preguntaron por productos AGOTADOS\n"
+            f"➤ Eso representa ${value_usd:,.0f} USD en demanda real que pasó por tu WhatsApp\n\n"
+            f"Top productos pedidos pero sin stock:\n"
+            f"{rows_text}\n"
+            f"InmoBot ya está guardando esos leads en una lista de espera y les avisará "
+            f"automáticamente cuando repongas. Pero hay algo más:\n\n"
+            f"Tu plan actual (Pro) no incluye reportes diarios ni alertas por WhatsApp "
+            f"de demanda insatisfecha. El plan Enterprise sí.\n\n"
+            f"Plan Enterprise:\n"
+            f"  • Reportes diarios automáticos\n"
+            f"  • Alertas WhatsApp cuando un producto cruza un umbral de demanda\n"
+            f"  • 10,000 conversaciones IA/mes (vs 2,000)\n"
+            f"  • 50 usuarios (vs 10)\n"
+            f"  • API completa + Soporte 24/7\n"
+            f"  • Tu propia OpenAI key (opcional)\n\n"
+            f"$249/mes — paga sólo lo que vale 1 venta cerrada con esos {leads_count} leads.\n\n"
+            f"¿Querés probarlo? Respondé este email y te activamos el upgrade hoy mismo.\n\n"
+            f"— Equipo InmoBot"
+        )
+
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:620px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08); }}
+  .header {{ background:linear-gradient(135deg,#dc2626 0%,#f97316 100%); color:#fff; padding:28px; text-align:left; }}
+  .header h1 {{ margin:0; font-size:22px; font-weight:700; }}
+  .header p {{ margin:8px 0 0 0; opacity:0.95; font-size:13px; }}
+  .body {{ padding:24px 28px; }}
+  .alert-box {{ background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:18px 20px; margin:0 0 18px; }}
+  .alert-num {{ font-size:32px; font-weight:800; color:#dc2626; line-height:1; }}
+  .alert-lbl {{ font-size:13px; color:#7f1d1d; margin-top:4px; font-weight:500; }}
+  .grid {{ display:flex; gap:12px; margin:14px 0; }}
+  .grid-cell {{ flex:1; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:14px; }}
+  table {{ width:100%; border-collapse:collapse; font-size:13px; margin:14px 0; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }}
+  table th {{ background:#f9fafb; text-align:left; padding:10px; font-size:11px; text-transform:uppercase; color:#6b7280; letter-spacing:0.05em; font-weight:600; border-bottom:1px solid #e5e7eb; }}
+  table th.r {{ text-align:right; }}
+  table tr {{ border-bottom:1px solid #f3f4f6; }}
+  table tr:last-child {{ border-bottom:none; }}
+  .pitch {{ background:#eef2ff; border:1px solid #c7d2fe; border-radius:10px; padding:18px 20px; margin:18px 0; }}
+  .pitch h3 {{ margin:0 0 10px; font-size:16px; color:#3730a3; }}
+  .pitch ul {{ margin:8px 0 0; padding-left:20px; font-size:13px; color:#4338ca; line-height:1.7; }}
+  .price {{ font-size:24px; font-weight:800; color:#1e1b4b; margin:14px 0 4px; }}
+  .price-sub {{ font-size:12px; color:#6b7280; }}
+  .cta {{ display:inline-block; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff !important; padding:14px 28px; border-radius:10px; text-decoration:none; font-weight:600; font-size:15px; margin-top:14px; }}
+  .footer {{ padding:18px 28px; color:#6b7280; font-size:12px; border-top:1px solid #f3f4f6; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'>
+    <h1>📊 Detectamos ${value_usd:,.0f} en demanda no atendida</h1>
+    <p>Reporte automático de InmoBot · {business_name}</p>
+  </div>
+  <div class='body'>
+    <p style='font-size:14px; line-height:1.6; color:#374151; margin:0 0 14px;'>
+      Esta semana, <strong>{leads_count} clientes</strong> te preguntaron por
+      productos que estaban agotados. Eso es plata real que pasó por tu WhatsApp:
+    </p>
+    <div class='grid'>
+      <div class='grid-cell'>
+        <div class='alert-num'>{leads_count}</div>
+        <div class='alert-lbl'>leads esperando</div>
+      </div>
+      <div class='grid-cell'>
+        <div class='alert-num'>${value_usd:,.0f}</div>
+        <div class='alert-lbl'>USD en demanda</div>
+      </div>
+    </div>
+
+    <h3 style='font-size:14px; color:#111827; margin:18px 0 8px;'>Top productos pedidos sin stock</h3>
+    <table>
+      <thead><tr><th></th><th>Producto</th><th class='r'>Pedidos</th><th class='r'>Valor</th></tr></thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+
+    <p style='font-size:13px; line-height:1.6; color:#374151;'>
+      Buena noticia: InmoBot ya guardó esos leads en una lista de espera y les
+      avisará automáticamente cuando repongas stock. Pero estás dejando pasar
+      una oportunidad mayor 👇
+    </p>
+
+    <div class='pitch'>
+      <h3>🚀 Plan Enterprise: pensado para volumen como el tuyo</h3>
+      <ul>
+        <li><strong>Reportes diarios</strong> de demanda insatisfecha</li>
+        <li><strong>Alertas WhatsApp</strong> al admin cuando un producto cruza un umbral</li>
+        <li><strong>10,000 conversaciones IA/mes</strong> (vs 2,000 en Pro)</li>
+        <li><strong>50 usuarios + API completa + Soporte 24/7</strong></li>
+        <li>Tu propia OpenAI key (opcional, sin markup)</li>
+      </ul>
+      <div class='price'>$249 USD / mes</div>
+      <div class='price-sub'>Lo recuperás con 1 venta cerrada de los {leads_count} leads que ya tenés en lista.</div>
+    </div>
+
+    <p style='font-size:13px; line-height:1.6; color:#374151;'>
+      ¿Querés probarlo? <strong>Respondé este email</strong> y te activamos el
+      upgrade hoy mismo (sin cambios de plataforma, todo continúa funcionando).
+    </p>
+  </div>
+  <div class='footer'>
+    Email automático generado a partir de tus datos reales en InmoBot.
+    Si no querés recibir estos avisos, contestá "no thanks" y los pausamos.
+  </div>
+</div></body></html>"""
+
+        return await self.send_email(
+            to_emails=[to_email],
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            email_type=EmailType.UPSELL_UNMET_DEMAND,
+        )

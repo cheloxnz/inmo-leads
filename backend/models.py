@@ -78,6 +78,7 @@ class EmailType(str, Enum):
     TRIAL_ENDING_SOON = "trial_ending_soon"
     WEEKLY_DIGEST = "weekly_digest"
     WELCOME_TENANT = "welcome_tenant"
+    UPSELL_UNMET_DEMAND = "upsell_unmet_demand"
     TEST = "test"
 
 
