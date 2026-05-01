@@ -7812,6 +7812,22 @@ body {
   font-style: italic;
 }
 
+.unmet-snooze-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.unmet-snooze-btn:hover:not(:disabled) {
+  border-color: #f97316;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.08);
+}
+.unmet-snooze-btn:disabled { opacity: 0.5; cursor: wait; }
+
 .catalog-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

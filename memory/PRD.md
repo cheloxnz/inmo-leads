@@ -34,6 +34,21 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter32c - Snooze Demanda + Weekly Digest enriched)
+- **Snooze de productos en Demanda Insatisfecha**:
+  - Nueva colección `unmet_demand_snooze`: `{tenant_id, product_id, snoozed_until, snoozed_by, snoozed_at, days}`.
+  - `POST /api/superadmin/unmet-demand/snooze` (body: `tenant_id, product_id, days 1-365`) silencia el item del top hasta `snoozed_until`. Upsert para re-snooze.
+  - `DELETE /api/superadmin/unmet-demand/snooze` re-activa.
+  - `GET /api/superadmin/unmet-demand` filtra automáticamente snoozes vigentes y devuelve `snoozed_count` para el dashboard.
+  - UI: nueva columna "Acciones" con botón 🔕 en cada fila (prompt para días). Stat `snoozed_count` aparece en header cuando > 0.
+- **Weekly Digest semanal enriquecido con Demanda Insatisfecha**:
+  - `_send_digest_to_all_tenants` agrega `stats.unmet_top` (top-3 productos del tenant agotados con leads esperando) — solo incluye los que SIGUEN agotados.
+  - Email HTML: nueva sección naranja "🔥 Demanda Insatisfecha" con tabla #N · producto · "X esperando", debajo de las stats normales.
+  - Plain text fallback también incluye los top-3.
+  - Schedule existente: lunes 09:00 UTC. Override con `DIGEST_FORCE=1` para testing manual.
+- **Tests**: `test_iter32c_snooze_digest.py` con **3 tests PASS** (snooze hide+unsnooze, validación de input, digest captura unmet_top correctamente). Total acumulado: **34/34 PASS**.
+- **Archivos**: ~`routers/superadmin.py` (+90 líneas: snooze endpoints + filtro), ~`scheduler.py` (+40: unmet_top en digest), ~`email_service.py` (+30: sección HTML demanda), ~`UnmetDemandPanel.js` (+45: handleSnooze + columna Acciones), ~`App.css` (+18: estilos snooze button), +`tests/test_iter32c_snooze_digest.py`.
+
 ### 2026-05-01 (Iter32b - Unmet Demand Dashboard + UX polish)
 - **Dashboard "Demanda Insatisfecha" SuperAdmin** (NEW):
   - `GET /api/superadmin/unmet-demand?limit=20`: agregación cross-tenant de productos con leads esperando, **score = leads × log(1+precio)**, filtra los que ya fueron repuestos. Enriquece con tenant_name, owner_email, categoría, precio, urgency_score.

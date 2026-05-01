@@ -556,6 +556,7 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
         ai_msgs = stats.get("ai_messages", 0)
         savings = stats.get("referral_credit_capped_usd", 0)
         ref_active = stats.get("referral_active_count", 0)
+        unmet_top = stats.get("unmet_top", []) or []
         text_body = (
             f"Resumen últimos {days} días para {business_name}:\n"
             f"- Leads nuevos: {leads_new}\n"
@@ -563,6 +564,35 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             f"- Mensajes IA: {ai_msgs}\n"
             f"- Ahorro por referidos este mes: ${savings:.0f} ({ref_active} activos)\n"
         )
+        if unmet_top:
+            text_body += "\nProductos más pedidos pero AGOTADOS (reponé estos para activar avisos automáticos):\n"
+            for i, u in enumerate(unmet_top, 1):
+                text_body += f"  {i}. {u['name']} — {u['leads_count']} lead(s) esperando\n"
+
+        # Sección HTML opcional para top productos
+        unmet_html = ""
+        if unmet_top:
+            rows_html = ""
+            for i, u in enumerate(unmet_top, 1):
+                rows_html += (
+                    f"<tr>"
+                    f"<td style='padding:8px 10px;font-weight:700;color:#dc2626;width:24px;'>#{i}</td>"
+                    f"<td style='padding:8px 10px;'><strong>{u['name']}</strong></td>"
+                    f"<td style='padding:8px 10px;text-align:right;color:#6366f1;font-weight:700;'>"
+                    f"{u['leads_count']} esperando</td>"
+                    f"</tr>"
+                )
+            unmet_html = (
+                "<div style='padding:0 28px 18px;'>"
+                "<div style='background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:14px 16px;'>"
+                "<div style='font-size:11px;color:#c2410c;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;'>"
+                "🔥 Demanda Insatisfecha</div>"
+                "<div style='font-size:13px;color:#7c2d12;margin:4px 0 12px;'>"
+                "Estos productos están agotados pero leads los siguen pidiendo. "
+                "Reponé el stock y InmoBot avisará automáticamente a los leads que esperaban.</div>"
+                f"<table style='width:100%;border-collapse:collapse;font-size:13px;'>{rows_html}</table>"
+                "</div></div>"
+            )
         html_body = f"""<!DOCTYPE html>
 <html><head><style>
   body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; }}
@@ -587,6 +617,7 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
       <div class='val' style='color:#065f46;'>${savings:.0f} <span style='font-size:13px; color:#047857; font-weight:500;'>({ref_active} activos)</span></div>
     </div>
   </div>
+  {unmet_html}
   <div class='footer'>Querés ver más? Iniciá sesión en tu dashboard de InmoBot.</div>
 </div></body></html>"""
         return await self.send_email(

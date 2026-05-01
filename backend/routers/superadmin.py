@@ -236,6 +236,16 @@ async def get_unmet_demand_global(
     """
     _require_superadmin(current_user)
     import math
+    from datetime import datetime, timezone
+
+    # Cargar snoozes activos (no expirados)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    snoozed_keys = set()
+    snoozes = await _db.unmet_demand_snooze.find(
+        {"snoozed_until": {"$gt": now_iso}},
+        {"_id": 0},
+    ).to_list(500)
+    snoozed_keys = {(s["tenant_id"], s["product_id"]) for s in snoozes}
 
     pipeline = [
         {"$match": {"notified_at": None}},
@@ -247,19 +257,20 @@ async def get_unmet_demand_global(
             "last_asked": {"$max": "$asked_at"},
         }},
         {"$sort": {"leads_count": -1}},
-        {"$limit": limit * 3},  # over-fetch para descartar productos ya repuestos
+        {"$limit": limit * 3},  # over-fetch para descartar productos ya repuestos/snoozed
     ]
     rows = await _db.product_waitlist.aggregate(pipeline).to_list(limit * 3)
 
-    # Enriquecer con datos del producto + tenant + filtrar los ya repuestos
+    # Enriquecer con datos del producto + tenant + filtrar los ya repuestos/snoozed
     enriched = []
     for r in rows:
         tid = r["_id"]["tenant_id"]
         pid = r["_id"]["product_id"]
+        if (tid, pid) in snoozed_keys:
+            continue
         prod = await _db.products.find_one(
             {"tenant_id": tid, "product_id": pid}, {"_id": 0},
         )
-        # Solo incluir productos que SIGUEN agotados o ya no existen
         if prod:
             stock = prod.get("stock_quantity")
             still_out = (
@@ -295,15 +306,74 @@ async def get_unmet_demand_global(
         if len(enriched) >= limit:
             break
 
-    # Ordenar por urgency_score
     enriched.sort(key=lambda x: x["urgency_score"], reverse=True)
 
-    # Métricas agregadas
     total_pending = await _db.product_waitlist.count_documents({"notified_at": None})
     total_unique_products = len({(r["_id"]["tenant_id"], r["_id"]["product_id"]) for r in rows})
 
     return {
         "total_pending_leads": total_pending,
         "total_unique_products": total_unique_products,
+        "snoozed_count": len(snoozed_keys),
         "top_products": enriched,
     }
+
+
+@router.post("/superadmin/unmet-demand/snooze")
+async def snooze_unmet_demand_item(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: silencia un producto del top de demanda insatisfecha.
+
+    Body: `{"tenant_id": "...", "product_id": "...", "days": 7}`.
+    El item desaparece del listado hasta que `snoozed_until` expira.
+    """
+    _require_superadmin(current_user)
+    from datetime import datetime, timezone, timedelta
+
+    tenant_id = body.get("tenant_id")
+    product_id = body.get("product_id")
+    days = int(body.get("days", 7))
+    if not tenant_id or not product_id:
+        raise HTTPException(status_code=400, detail="tenant_id y product_id requeridos")
+    if days < 1 or days > 365:
+        raise HTTPException(status_code=400, detail="days debe estar entre 1 y 365")
+
+    snoozed_until = datetime.now(timezone.utc) + timedelta(days=days)
+    await _db.unmet_demand_snooze.update_one(
+        {"tenant_id": tenant_id, "product_id": product_id},
+        {
+            "$set": {
+                "snoozed_until": snoozed_until.isoformat(),
+                "snoozed_by": current_user.email,
+                "snoozed_at": datetime.now(timezone.utc).isoformat(),
+                "days": days,
+            },
+        },
+        upsert=True,
+    )
+    return {
+        "ok": True,
+        "tenant_id": tenant_id,
+        "product_id": product_id,
+        "snoozed_until": snoozed_until.isoformat(),
+        "days": days,
+    }
+
+
+@router.delete("/superadmin/unmet-demand/snooze")
+async def unsnooze_unmet_demand_item(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: re-activa un producto que estaba silenciado."""
+    _require_superadmin(current_user)
+    tenant_id = body.get("tenant_id")
+    product_id = body.get("product_id")
+    if not tenant_id or not product_id:
+        raise HTTPException(status_code=400, detail="tenant_id y product_id requeridos")
+    result = await _db.unmet_demand_snooze.delete_one(
+        {"tenant_id": tenant_id, "product_id": product_id},
+    )
+    return {"ok": True, "removed": result.deleted_count}

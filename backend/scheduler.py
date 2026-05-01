@@ -181,6 +181,45 @@ class ScheduledTasks:
                     "created_at": {"$gte": cutoff_iso},
                 }) if "usage_log" in await self.db.list_collection_names() else 0
                 credit = await calculate_active_credit_for_tenant(self.db, tid)
+
+                # Top-3 productos con demanda insatisfecha (Iter32b)
+                unmet_top = []
+                try:
+                    pipeline = [
+                        {"$match": {"tenant_id": tid, "notified_at": None}},
+                        {"$group": {
+                            "_id": "$product_id",
+                            "leads_count": {"$sum": 1},
+                            "product_name": {"$first": "$product_name"},
+                        }},
+                        {"$sort": {"leads_count": -1}},
+                        {"$limit": 5},
+                    ]
+                    rows = await self.db.product_waitlist.aggregate(pipeline).to_list(5)
+                    for r in rows:
+                        prod = await self.db.products.find_one(
+                            {"tenant_id": tid, "product_id": r["_id"]}, {"_id": 0},
+                        )
+                        # Solo incluir si sigue agotado
+                        if prod:
+                            stock = prod.get("stock_quantity")
+                            still_out = (
+                                prod.get("active") is False
+                                or (stock is not None and stock <= 0)
+                            )
+                        else:
+                            still_out = True
+                        if still_out:
+                            unmet_top.append({
+                                "name": r.get("product_name") or (prod or {}).get("name", ""),
+                                "leads_count": r["leads_count"],
+                                "price": (prod or {}).get("price", 0),
+                            })
+                        if len(unmet_top) >= 3:
+                            break
+                except Exception as e:
+                    logger.warning(f"[digest] unmet demand fail tenant={tid}: {e}")
+
                 stats = {
                     "days": 7,
                     "leads_new": leads_new,
@@ -189,6 +228,7 @@ class ScheduledTasks:
                     "ai_messages": ai_msgs,
                     "referral_credit_capped_usd": credit.get("capped_amount_usd", 0),
                     "referral_active_count": credit.get("active_count", 0),
+                    "unmet_top": unmet_top,
                 }
                 biz = t.get("business_name") or t.get("name") or tid
                 await self.email.send_weekly_digest(

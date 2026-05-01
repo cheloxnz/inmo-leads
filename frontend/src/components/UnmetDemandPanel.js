@@ -3,11 +3,13 @@ import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, RefreshCw, Flame, Package, Users, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { TrendingUp, RefreshCw, Flame, Package, Users, Loader2, BellOff } from 'lucide-react';
 
 export default function UnmetDemandPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [snoozingKey, setSnoozingKey] = useState(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -22,6 +24,32 @@ export default function UnmetDemandPanel() {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  const handleSnooze = async (tenant_id, product_id, product_name) => {
+    const days = window.prompt(
+      `Silenciar "${product_name}" del top de demanda. ¿Cuántos días? (1-365)`,
+      '7'
+    );
+    if (!days) return;
+    const n = parseInt(days, 10);
+    if (Number.isNaN(n) || n < 1 || n > 365) {
+      toast.error('Días debe ser entre 1 y 365');
+      return;
+    }
+    const key = `${tenant_id}-${product_id}`;
+    setSnoozingKey(key);
+    try {
+      await axios.post(`${API}/superadmin/unmet-demand/snooze`, {
+        tenant_id, product_id, days: n,
+      });
+      toast.success(`Silenciado por ${n} día(s)`);
+      fetch();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Error silenciando');
+    } finally {
+      setSnoozingKey(null);
+    }
+  };
 
   return (
     <Card className="unmet-demand-panel" data-testid="unmet-demand-panel">
@@ -71,6 +99,13 @@ export default function UnmetDemandPanel() {
                 <span className="unmet-stat-num">{data.total_unique_products}</span>
                 <span>productos únicos</span>
               </div>
+              {data.snoozed_count > 0 && (
+                <div className="unmet-stat" title="Productos silenciados, no aparecen en el top">
+                  <BellOff className="w-4 h-4" />
+                  <span className="unmet-stat-num">{data.snoozed_count}</span>
+                  <span>silenciados</span>
+                </div>
+              )}
             </div>
 
             <div className="unmet-table-wrap">
@@ -83,11 +118,14 @@ export default function UnmetDemandPanel() {
                     <th className="num">Precio</th>
                     <th className="num">Leads</th>
                     <th className="num">Score</th>
+                    <th className="num">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.top_products.map((p, idx) => (
-                    <tr key={`${p.tenant_id}-${p.product_id}`} data-testid={`unmet-row-${idx}`}>
+                  {data.top_products.map((p, idx) => {
+                    const key = `${p.tenant_id}-${p.product_id}`;
+                    return (
+                    <tr key={key} data-testid={`unmet-row-${idx}`}>
                       <td className="unmet-product-cell">
                         {idx < 3 && <Flame className="w-3 h-3 unmet-fire" />}
                         <span>
@@ -107,8 +145,22 @@ export default function UnmetDemandPanel() {
                       <td className="num">{p.price > 0 ? `$${p.price} ${p.currency}` : '—'}</td>
                       <td className="num"><strong>{p.leads_count}</strong></td>
                       <td className="num unmet-score">{p.urgency_score}</td>
+                      <td className="num">
+                        <button
+                          className="unmet-snooze-btn"
+                          title="Silenciar del top por X días"
+                          disabled={snoozingKey === key}
+                          onClick={() => handleSnooze(p.tenant_id, p.product_id, p.product_name)}
+                          data-testid={`btn-snooze-${idx}`}
+                        >
+                          {snoozingKey === key
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <BellOff className="w-3 h-3" />}
+                        </button>
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
