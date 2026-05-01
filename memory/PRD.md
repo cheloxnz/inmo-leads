@@ -34,6 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter32e - Upsell History + Conversion Tracking)
+- **Conversion tracking** (`upsell_service.py`):
+  - `mark_upsell_conversions(db, lookback_days=90)`: scanea eventos delivered y marca `converted=true` si el tenant upgradeó a Enterprise DESPUÉS de `sent_at` (comparando `subscription_updated_at`). Idempotente (no re-procesa ya marcados).
+  - `get_upsell_stats(db, days=90)`: `{total_sent, delivered, converted, conversion_rate%, converted_value_usd}`.
+  - `payment_service` ahora setea `subscription_updated_at` al activar suscripción para permitir el tracking.
+- **Scheduler**: `run_upsell_checks` también llama `mark_upsell_conversions` cada 24h.
+- **Endpoint `/superadmin/upsell/history`** enriquecido:
+  - Ejecuta mark al vuelo (cheap).
+  - Enriquece cada item con `tenant_name` + `current_plan`.
+  - Incluye `stats` con tasa de conversión.
+- **Frontend `UpsellHistoryPanel.js`**:
+  - Card dedicada en SuperAdminPanel debajo de Demanda Insatisfecha.
+  - 5 stat cards: Enviados / Entregados / Convertidos (verde) / Tasa conv.% (verde) / Demanda convertida USD (ámbar).
+  - Botón "Ejecutar ahora" (corrida manual, muestra toast con `evaluated/sent/skipped/conversions_marked`).
+  - Tabla con 7 columnas (fecha, tenant, email, leads, demanda USD, estado entregado/falló, conversión).
+  - Badge verde gradient para convertidos con plan target; "Pendiente" para no convertidos; "ya Enterprise" si upgradeó antes.
+- **Tests**: `test_iter32e_upsell_conversion.py` con **4 tests PASS** (flip converted=true tras upgrade posterior, skip si upgrade fue antes, endpoint history retorna stats, stats shape correcta). Regression iter32d: 3/3 PASS. Total acumulado: **41/41 PASS**.
+- **Archivos**: ~`upsell_service.py` (+70 líneas: mark_conversions + get_stats), ~`scheduler.py` (+3: hook conversions), ~`routers/superadmin.py` (+25: history enriquecido), ~`payment_service.py` (+1: subscription_updated_at), ~`SuperAdminPanel.js`, +`UpsellHistoryPanel.js` (210 líneas), ~`App.css` (+85: estilos upsell panel), +`tests/test_iter32e_upsell_conversion.py`.
+
 ### 2026-05-01 (Iter32d - Upsell Automático Pro→Enterprise)
 - **Upsell Service** (`upsell_service.py`):
   - `calculate_unmet_demand_for_tenant(db, tenant_id)`: calcula leads en waitlist + `value_usd` (suma de price × leads_count) + top-5 productos. Solo cuenta productos QUE SIGUEN agotados.

@@ -244,16 +244,20 @@ class ScheduledTasks:
 
     async def run_upsell_checks(self):
         """Cada 24h, evalúa tenants Pro con alta demanda insatisfecha y dispara
-        emails de upsell automático. Idempotente con cooldown de 30 días."""
+        emails de upsell automático. Idempotente con cooldown de 30 días.
+        También marca conversiones (tenant que upgradeó a Enterprise post-upsell).
+        """
         await asyncio.sleep(360)  # warmup
-        from upsell_service import check_and_send_upsells
+        from upsell_service import check_and_send_upsells, mark_upsell_conversions
         while self.running:
             try:
                 result = await check_and_send_upsells(self.db, self.email)
-                if result.get("sent", 0) > 0 or result.get("evaluated", 0) > 0:
+                conv = await mark_upsell_conversions(self.db)
+                if result.get("sent", 0) > 0 or result.get("evaluated", 0) > 0 or conv > 0:
                     logger.info(
                         f"[Scheduler] Upsell run: evaluated={result['evaluated']} "
-                        f"sent={result['sent']} skipped_cooldown={result['skipped_cooldown']}"
+                        f"sent={result['sent']} skipped_cooldown={result['skipped_cooldown']} "
+                        f"conversions_marked={conv}"
                     )
             except Exception as e:
                 logger.error(f"[Scheduler] upsell run error: {e}")

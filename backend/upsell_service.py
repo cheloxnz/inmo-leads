@@ -192,3 +192,81 @@ async def check_and_send_upsells(
         "sent": sent,
         "skipped_cooldown": skipped_cooldown,
     }
+
+
+async def mark_upsell_conversions(
+    db: AsyncIOMotorDatabase,
+    lookback_days: int = 90,
+) -> int:
+    """Marca eventos de upsell como `converted=true` si el tenant upgradeó
+    a Enterprise DESPUÉS de recibir el upsell.
+
+    Idempotente: solo procesa eventos con `converted` no seteado o en `false`.
+    Retorna cantidad de eventos actualizados a converted.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    cutoff_iso = cutoff.isoformat()
+
+    cursor = db.upsell_events.find(
+        {
+            "sent_at": {"$gte": cutoff_iso},
+            "delivered": True,
+            "$or": [{"converted": {"$exists": False}}, {"converted": False}],
+        },
+        {"_id": 0},
+    )
+    updated = 0
+    async for evt in cursor:
+        tid = evt["tenant_id"]
+        tenant = await db.tenants.find_one(
+            {"tenant_id": tid},
+            {"_id": 0, "subscription_plan": 1, "subscription_updated_at": 1, "subscription_started_at": 1},
+        )
+        if not tenant:
+            continue
+        if tenant.get("subscription_plan") != TARGET_PLAN:
+            continue
+        # Conversión cuenta solo si el upgrade fue DESPUÉS del envío
+        plan_change_at = (
+            tenant.get("subscription_updated_at")
+            or tenant.get("subscription_started_at")
+        )
+        if plan_change_at and plan_change_at < evt["sent_at"]:
+            continue
+        await db.upsell_events.update_one(
+            {
+                "tenant_id": tid,
+                "sent_at": evt["sent_at"],
+            },
+            {
+                "$set": {
+                    "converted": True,
+                    "converted_at": plan_change_at or datetime.now(timezone.utc).isoformat(),
+                    "conversion_plan": TARGET_PLAN,
+                },
+            },
+        )
+        updated += 1
+    return updated
+
+
+async def get_upsell_stats(db: AsyncIOMotorDatabase, days: int = 90) -> Dict:
+    """Stats agregadas del upsell para dashboard."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_iso = cutoff.isoformat()
+    match = {"sent_at": {"$gte": cutoff_iso}}
+    total = await db.upsell_events.count_documents(match)
+    delivered = await db.upsell_events.count_documents({**match, "delivered": True})
+    converted = await db.upsell_events.count_documents({**match, "converted": True})
+    total_value = 0.0
+    async for e in db.upsell_events.find(match, {"_id": 0, "value_usd": 1, "converted": 1}):
+        if e.get("converted"):
+            total_value += float(e.get("value_usd", 0) or 0)
+    return {
+        "days": days,
+        "total_sent": total,
+        "delivered": delivered,
+        "converted": converted,
+        "conversion_rate": round((converted / delivered * 100) if delivered else 0.0, 2),
+        "converted_value_usd": round(total_value, 2),
+    }

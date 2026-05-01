@@ -390,13 +390,15 @@ async def run_upsell_now(
     """SuperAdmin: dispara una corrida del upsell automático ahora.
 
     Útil para testear sin esperar el cron diario. Respeta cooldown salvo que
-    `UPSELL_FORCE=1` esté en .env.
+    `UPSELL_FORCE=1` esté en .env. También marca conversiones pendientes.
     """
     _require_superadmin(current_user)
-    from upsell_service import check_and_send_upsells
+    from upsell_service import check_and_send_upsells, mark_upsell_conversions
     from email_service import EmailService
     email_svc = EmailService(_db)
     result = await check_and_send_upsells(_db, email_svc)
+    conversions_marked = await mark_upsell_conversions(_db)
+    result["conversions_marked"] = conversions_marked
     return result
 
 
@@ -404,10 +406,24 @@ async def run_upsell_now(
 async def get_upsell_history(
     current_user: User = Depends(get_current_user),
     limit: int = 50,
+    days: int = 90,
 ):
-    """SuperAdmin: histórico de upsells enviados."""
+    """SuperAdmin: histórico de upsells con enriquecimiento por tenant + stats."""
     _require_superadmin(current_user)
+    from upsell_service import get_upsell_stats, mark_upsell_conversions
+    # Marcar conversiones frescas al vuelo (cheap op)
+    await mark_upsell_conversions(_db)
+
     items = await _db.upsell_events.find(
         {}, {"_id": 0},
     ).sort("sent_at", -1).limit(limit).to_list(limit)
-    return {"items": items, "total": len(items)}
+    # Enriquecer con nombre de tenant + plan actual
+    for it in items:
+        tenant = await _db.tenants.find_one(
+            {"tenant_id": it.get("tenant_id")},
+            {"_id": 0, "business_name": 1, "subscription_plan": 1},
+        )
+        it["tenant_name"] = (tenant or {}).get("business_name", "")
+        it["current_plan"] = (tenant or {}).get("subscription_plan", "")
+    stats = await get_upsell_stats(_db, days=days)
+    return {"items": items, "total": len(items), "stats": stats}

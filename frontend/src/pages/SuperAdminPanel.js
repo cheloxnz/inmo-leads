@@ -12,6 +12,7 @@ import {
 import TenantFeatureFlags from '../components/TenantFeatureFlags';
 import FounderSeatsPanel from '../components/FounderSeatsPanel';
 import UnmetDemandPanel from '../components/UnmetDemandPanel';
+import UpsellHistoryPanel from '../components/UpsellHistoryPanel';
 
 export default function SuperAdminPanel() {
   const { isSuperAdmin } = useAuth();
@@ -164,6 +165,11 @@ export default function SuperAdminPanel() {
       {/* Demanda Insatisfecha cross-tenant */}
       <div style={{ marginBottom: 24 }}>
         <UnmetDemandPanel />
+      </div>
+
+      {/* Upsell History + Conversion tracking */}
+      <div style={{ marginBottom: 24 }}>
+        <UpsellHistoryPanel />
       </div>
 
       {/* Toolbar */}

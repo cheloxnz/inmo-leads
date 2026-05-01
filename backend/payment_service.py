@@ -278,16 +278,18 @@ class PaymentService:
 
         if tenant_id and subscription_id:
             plan = SUBSCRIPTION_PLANS.get(plan_id) or SUBSCRIPTION_PLANS.get("pro")
+            now_iso = datetime.utcnow().isoformat()
             await self.db.tenants.update_one(
                 {"tenant_id": tenant_id},
                 {"$set": {
                     "subscription_status": "active",
                     "subscription_plan": plan_id,
+                    "subscription_updated_at": now_iso,
                     "stripe_subscription_id": subscription_id,
                     "stripe_customer_id": session.customer,
                     "max_leads": plan.get("max_leads", 500),
                     "max_agents": plan.get("max_agents", 3),
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": now_iso
                 }}
             )
             logger.info(f"Suscripcion activada: tenant={tenant_id} plan={plan_id}")
