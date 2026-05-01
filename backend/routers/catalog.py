@@ -35,10 +35,22 @@ async def create_product(body: dict, current_user: User = Depends(require_admin)
 @router.put("/catalog/{product_id}")
 async def update_product(product_id: str, body: dict, current_user: User = Depends(require_admin)):
     """Admin: Actualiza un producto por product_id"""
+    # Detectar si el producto estaba agotado ANTES del update para disparar
+    # notificación back-in-stock si el stock sube de 0 a >0.
+    was_out = False
+    if "stock_quantity" in body:
+        before = await catalog_service.get_product_by_id(current_user.tenant_id, product_id)
+        was_out = bool(before and catalog_service.is_out_of_stock(before))
     success = await catalog_service.update_product(current_user.tenant_id, product_id, body)
     if not success:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return {"message": "Producto actualizado"}
+    notified = 0
+    if was_out:
+        try:
+            notified = await catalog_service.notify_back_in_stock(current_user.tenant_id, product_id)
+        except Exception:
+            notified = 0
+    return {"message": "Producto actualizado", "notified_leads": notified}
 
 
 @router.delete("/catalog/{product_id}")
@@ -224,16 +236,26 @@ async def set_product_stock(
     stock = body["stock_quantity"]
     if stock is not None and not isinstance(stock, int):
         raise HTTPException(status_code=400, detail="stock_quantity debe ser int o null")
+    # Detectar transición agotado → disponible para disparar notificaciones
+    before = await catalog_service.get_product_by_id(current_user.tenant_id, product_id)
+    was_out = bool(before and catalog_service.is_out_of_stock(before))
     ok = await catalog_service.set_stock(current_user.tenant_id, product_id, stock)
     if not ok:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     product = await catalog_service.get_product_by_id(current_user.tenant_id, product_id)
+    notified = 0
+    if was_out and not catalog_service.is_out_of_stock(product):
+        try:
+            notified = await catalog_service.notify_back_in_stock(current_user.tenant_id, product_id)
+        except Exception:
+            notified = 0
     return {
         "ok": True,
         "product_id": product_id,
         "stock_quantity": product.get("stock_quantity"),
         "active": product.get("active"),
         "availability_status": catalog_service.get_availability_status(product),
+        "notified_leads": notified,
     }
 
 
@@ -267,7 +289,7 @@ async def set_product_substitutes(
 @router.post("/catalog/substitute-preview")
 async def substitute_preview(
     body: dict,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """Preview del flujo de sustitución desde el panel admin.
 
@@ -303,4 +325,37 @@ async def substitute_preview(
         "out_of_stock_product": out_of_stock,
         "substitutes": substitutes,
         "message": message,
+    }
+
+
+
+@router.get("/catalog/waitlist")
+async def get_waitlist(current_user: User = Depends(require_admin)):
+    """Admin: leads esperando que vuelvan productos agotados.
+
+    Retorna sólo las entradas pendientes de notificar (notified_at=None),
+    agrupadas por producto para mostrar en el panel.
+    """
+    db = catalog_service.db
+    items = await db.product_waitlist.find(
+        {"tenant_id": current_user.tenant_id, "notified_at": None},
+        {"_id": 0},
+    ).sort("asked_at", -1).to_list(500)
+    # Agrupar por product_id
+    grouped: dict = {}
+    for it in items:
+        pid = it.get("product_id", "")
+        if pid not in grouped:
+            grouped[pid] = {
+                "product_id": pid,
+                "product_name": it.get("product_name", ""),
+                "leads": [],
+            }
+        grouped[pid]["leads"].append({
+            "lead_phone": it.get("lead_phone", ""),
+            "asked_at": it.get("asked_at"),
+        })
+    return {
+        "total_pending": len(items),
+        "by_product": list(grouped.values()),
     }

@@ -423,6 +423,16 @@ class GenericFlowEngine:
                         await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
                     )
                     await wa.send_message(lead.phone, msg)
+                    # Registrar en waitlist para avisar cuando reponga stock
+                    try:
+                        await catalog.add_to_waitlist(
+                            tenant_id,
+                            lead.phone,
+                            agotado.get("product_id", ""),
+                            agotado.get("name", ""),
+                        )
+                    except Exception as e:
+                        logger.warning(f"[waitlist] add failed: {e}")
                     # Marcamos en el log para analytics
                     await db.substitute_events.insert_one({
                         "tenant_id": tenant_id,

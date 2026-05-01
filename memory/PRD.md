@@ -34,6 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-01 (Iter32 - Back-in-Stock Notifications + Refactors)
+- **Back-in-Stock Waitlist (NEW FEATURE)**:
+  - Nueva colección `product_waitlist`: `{tenant_id, lead_phone, product_id, product_name, asked_at, notified_at, created_at}`. Upsert por `(tenant_id, lead_phone, product_id)` → idempotente.
+  - `CatalogService.add_to_waitlist()` enganchado en `generic_flow.py` cuando se detecta consulta sobre producto agotado (post Smart Substitution). El lead queda registrado para aviso automático.
+  - `CatalogService.notify_back_in_stock(tenant_id, product_id)`: envía WhatsApp "*X* volvió a estar disponible" a todos los leads pendientes; marca `notified_at`; valida que el producto NO esté agotado al momento de notificar; best-effort por lead (no falla si uno truena).
+  - Hooks en `PATCH /catalog/products/{id}/stock` y `PUT /catalog/{id}` detectan transición agotado→disponible y disparan `notify_back_in_stock` automáticamente. Response incluye `notified_leads: int`.
+  - `GET /api/catalog/waitlist` (admin): retorna leads pendientes agrupados por producto para UI.
+  - Frontend: el botón 1-click de reponer stock muestra toast "Avisamos a N lead(s) que lo esperaban" cuando notificó.
+- **Refactor `server.py`** (parcial conservador):
+  - Movidos endpoints de `/leads/*` y `/tags` a `routers/leads.py` (262 líneas, 11 endpoints). `server.py` pasó de 1869 → **1619 líneas** (-250).
+- **Refactor `CatalogPage.js`**: split en 4 archivos:
+  - `pages/CatalogPage.js` (335 líneas, antes 639).
+  - `pages/catalog/ProductForm.js` (109 líneas).
+  - `pages/catalog/SubstitutesModal.js` (106 líneas).
+  - `pages/catalog/SubstitutePreviewModal.js` (104 líneas).
+- **Security tweak**: `POST /api/catalog/substitute-preview` ahora exige `require_admin` (antes `get_current_user`).
+- **Tests**: `tests/test_iter32_back_in_stock.py` con **9 tests PASS** (regression iter31 16/16 → total 25/25 ✅). Cubren: refactor de leads vivo, kanban shape, stats shape, preview admin-only, waitlist endpoint, transición agotado→stock vía PATCH y vía PUT, skip cuando sigue agotado, idempotencia upsert.
+- **Archivos**: +`routers/leads.py`, +`pages/catalog/{ProductForm,SubstitutesModal,SubstitutePreviewModal}.js`, +`tests/test_iter32_back_in_stock.py`. Modificados: `catalog_service.py` (+135 líneas: waitlist methods), `routers/catalog.py` (+50 líneas: hooks + waitlist GET), `generic_flow.py` (+10: hook waitlist), `server.py` (-250 líneas), `CatalogPage.js` (-304 líneas).
+
 ### 2026-05-01 (Iter31b - Smart Substitution UI completa)
 - **Frontend UI Smart Substitution** (`CatalogPage.js` reescrito):
   - Campo `stock_quantity` en ProductForm (input number, vacío = sin tracking, 0 = AGOTADO).

@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { API } from '../App';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Pencil, Package, Tag, DollarSign,
-  Send, X, Search, Filter, Sparkles, Globe, Copy,
+  X, Search, Filter, Sparkles, Globe, Copy,
   PackageX, AlertTriangle, CheckCircle2, Wand2, Replace
 } from 'lucide-react';
+import ProductForm from './catalog/ProductForm';
+import SubstitutesModal from './catalog/SubstitutesModal';
+import SubstitutePreviewModal from './catalog/SubstitutePreviewModal';
 
 // ---------------- Helpers ----------------
 const getAvailability = (p) => {
@@ -43,10 +46,9 @@ const AvailabilityBadge = ({ product }) => {
       </span>
     );
   }
-  return null; // no_tracking: no mostramos badge
+  return null;
 };
 
-// ---------------- Main Page ----------------
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -124,15 +126,19 @@ export default function CatalogPage() {
     }
   };
 
-  // 1-click toggle: marcar como AGOTADO o reponer
   const handleToggleStock = async (product) => {
     const isOut = getAvailability(product) === 'out_of_stock';
-    const newStock = isOut ? 10 : 0; // reponer a 10 o marcar agotado
+    const newStock = isOut ? 10 : 0;
     try {
-      await axios.patch(`${API}/catalog/products/${product.product_id}/stock`, {
+      const res = await axios.patch(`${API}/catalog/products/${product.product_id}/stock`, {
         stock_quantity: newStock,
       });
-      toast.success(isOut ? 'Producto repuesto (stock: 10)' : 'Marcado como AGOTADO');
+      const notified = res.data?.notified_leads || 0;
+      if (isOut && notified > 0) {
+        toast.success(`Producto repuesto (stock: 10). Avisamos a ${notified} lead(s) que lo esperaban.`);
+      } else {
+        toast.success(isOut ? 'Producto repuesto (stock: 10)' : 'Marcado como AGOTADO');
+      }
       fetchProducts();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Error actualizando stock');
@@ -166,7 +172,6 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* Public link + AI preview */}
       {products.length > 0 && (
         <div className="catalog-pro-panel" data-testid="catalog-pro-panel">
           <div className="catalog-pro-row">
@@ -210,7 +215,6 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="catalog-toolbar">
         <div className="catalog-search">
           <Search className="w-4 h-4" />
@@ -225,7 +229,6 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* Product Form */}
       {showForm && (
         <ProductForm
           product={editingProduct}
@@ -234,7 +237,6 @@ export default function CatalogPage() {
         />
       )}
 
-      {/* Product Grid */}
       <div className="catalog-grid">
         {loading ? (
           <div className="catalog-empty">Cargando...</div>
@@ -316,7 +318,6 @@ export default function CatalogPage() {
         )}
       </div>
 
-      {/* Substitutes Modal */}
       {subsModalProduct && (
         <SubstitutesModal
           product={subsModalProduct}
@@ -326,314 +327,9 @@ export default function CatalogPage() {
         />
       )}
 
-      {/* Substitute Preview Modal */}
       {previewOpen && (
         <SubstitutePreviewModal onClose={() => setPreviewOpen(false)} />
       )}
-    </div>
-  );
-}
-
-// ---------------- Product Form ----------------
-function ProductForm({ product, onSaved, onCancel }) {
-  const [form, setForm] = useState({
-    name: product?.name || '',
-    description: product?.description || '',
-    price: product?.price || '',
-    currency: product?.currency || 'USD',
-    category: product?.category || '',
-    image_url: product?.image_url || '',
-    stock_quantity: product?.stock_quantity ?? '',
-  });
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) { toast.error('Nombre es requerido'); return; }
-    setSaving(true);
-    try {
-      const stockRaw = form.stock_quantity;
-      const stockParsed = stockRaw === '' || stockRaw === null ? null : parseInt(stockRaw, 10);
-      const data = {
-        ...form,
-        price: parseFloat(form.price) || 0,
-        stock_quantity: Number.isNaN(stockParsed) ? null : stockParsed,
-      };
-      if (product) {
-        await axios.put(`${API}/catalog/${product.product_id}`, data);
-        toast.success('Producto actualizado');
-      } else {
-        await axios.post(`${API}/catalog`, data);
-        toast.success('Producto creado');
-      }
-      onSaved();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error guardando producto');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card className="catalog-form" data-testid="product-form">
-      <CardHeader>
-        <CardTitle className="text-sm">{product ? 'Editar Producto' : 'Nuevo Producto'}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit}>
-          <div className="catalog-form-grid">
-            <div className="catalog-form-field">
-              <label>Nombre *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required data-testid="input-product-name" />
-            </div>
-            <div className="catalog-form-field">
-              <label>Categoria</label>
-              <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="Ej: Departamentos, Servicios..." data-testid="input-product-category" />
-            </div>
-            <div className="catalog-form-field">
-              <label>Precio</label>
-              <input type="number" step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} data-testid="input-product-price" />
-            </div>
-            <div className="catalog-form-field">
-              <label>Moneda</label>
-              <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>
-                <option value="USD">USD</option>
-                <option value="ARS">ARS</option>
-                <option value="MXN">MXN</option>
-                <option value="COP">COP</option>
-                <option value="EUR">EUR</option>
-              </select>
-            </div>
-            <div className="catalog-form-field">
-              <label>
-                Stock disponible
-                <span className="catalog-form-hint"> (vacío = sin tracking; 0 = AGOTADO)</span>
-              </label>
-              <input
-                type="number"
-                step="1"
-                min="0"
-                value={form.stock_quantity}
-                onChange={e => setForm({ ...form, stock_quantity: e.target.value })}
-                placeholder="Ej: 10 (o vacío)"
-                data-testid="input-product-stock"
-              />
-            </div>
-            <div className="catalog-form-field full">
-              <label>Descripcion</label>
-              <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} data-testid="input-product-desc" />
-            </div>
-            <div className="catalog-form-field full">
-              <label>URL de imagen (opcional)</label>
-              <input value={form.image_url} onChange={e => setForm({ ...form, image_url: e.target.value })} placeholder="https://..." />
-            </div>
-          </div>
-          <div className="catalog-form-actions">
-            <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-            <Button type="submit" disabled={saving} data-testid="btn-save-product">{saving ? 'Guardando...' : 'Guardar'}</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ---------------- Substitutes Modal ----------------
-function SubstitutesModal({ product, allProducts, onSaved, onClose }) {
-  const [selected, setSelected] = useState(product.substitute_product_ids || []);
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const candidates = allProducts.filter(p =>
-    p.product_id !== product.product_id &&
-    (p.active !== false) &&
-    (p.stock_quantity == null || p.stock_quantity > 0) &&
-    (!search || p.name.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const toggle = (pid) => {
-    setSelected(prev =>
-      prev.includes(pid) ? prev.filter(x => x !== pid) : [...prev, pid].slice(0, 10)
-    );
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await axios.put(`${API}/catalog/products/${product.product_id}/substitutes`, {
-        substitute_product_ids: selected,
-      });
-      toast.success(`${selected.length} sustituto(s) guardado(s)`);
-      onSaved();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error guardando sustitutos');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="catalog-modal-backdrop" data-testid="substitutes-modal">
-      <div className="catalog-modal">
-        <div className="catalog-modal-head">
-          <div>
-            <h3><Replace className="w-5 h-5" /> Sustitutos para "{product.name}"</h3>
-            <p className="catalog-modal-sub">
-              Cuando este producto esté agotado, el bot ofrecerá primero estos sustitutos (en orden de prioridad).
-              Si no configurás ninguno, la IA elegirá automáticamente por categoría + precio.
-            </p>
-          </div>
-          <button onClick={onClose} className="catalog-modal-close"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="catalog-modal-body">
-          <div className="catalog-search" style={{ marginBottom: '0.75rem' }}>
-            <Search className="w-4 h-4" />
-            <input
-              placeholder="Buscar producto para agregar..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              data-testid="substitutes-search"
-            />
-          </div>
-          <div className="catalog-subs-list">
-            {candidates.length === 0 ? (
-              <p className="catalog-empty-sm">No hay productos disponibles para usar como sustitutos.</p>
-            ) : candidates.map(c => {
-              const idx = selected.indexOf(c.product_id);
-              const checked = idx >= 0;
-              return (
-                <label
-                  key={c.product_id}
-                  className={`catalog-sub-row ${checked ? 'catalog-sub-row-checked' : ''}`}
-                  data-testid={`sub-option-${c.product_id}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(c.product_id)}
-                  />
-                  <div className="catalog-sub-info">
-                    <strong>{c.name}</strong>
-                    <span>
-                      {c.price > 0 ? `$${c.price} ${c.currency || ''}` : ''}
-                      {c.category ? ` · ${c.category}` : ''}
-                    </span>
-                  </div>
-                  {checked && <span className="catalog-sub-order">#{idx + 1}</span>}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-        <div className="catalog-modal-foot">
-          <span className="catalog-modal-count">{selected.length}/10 seleccionados</span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="btn-save-substitutes">
-              {saving ? 'Guardando...' : 'Guardar sustitutos'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------- Substitute Preview Modal ----------------
-function SubstitutePreviewModal({ onClose }) {
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-
-  const handleTest = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setLoading(true);
-    setResult(null);
-    try {
-      const res = await axios.post(`${API}/catalog/substitute-preview`, { query: query.trim() });
-      setResult(res.data);
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error en preview');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="catalog-modal-backdrop" data-testid="preview-modal">
-      <div className="catalog-modal">
-        <div className="catalog-modal-head">
-          <div>
-            <h3><Wand2 className="w-5 h-5" /> Probar sustitución IA</h3>
-            <p className="catalog-modal-sub">
-              Simulá lo que un cliente preguntaría por WhatsApp sobre un producto agotado. Te mostramos qué responderá el bot.
-            </p>
-          </div>
-          <button onClick={onClose} className="catalog-modal-close"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="catalog-modal-body">
-          <form onSubmit={handleTest} className="catalog-preview-form">
-            <input
-              placeholder='Ej: "tienen el iPhone 15?" o "quiero el producto X"'
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              data-testid="preview-query-input"
-              autoFocus
-            />
-            <Button type="submit" disabled={loading} data-testid="btn-run-preview">
-              <Send className="w-4 h-4 mr-1" />
-              {loading ? 'Probando...' : 'Probar'}
-            </Button>
-          </form>
-
-          {result && (
-            <div className="catalog-preview-result" data-testid="preview-result">
-              {!result.out_of_stock_product ? (
-                <div className="catalog-preview-empty">
-                  <p><strong>No se detectó match con ningún producto agotado.</strong></p>
-                  <p className="catalog-preview-sub">
-                    {result.reason || 'Asegurate de que existe un producto agotado (stock=0) con un nombre similar a la query.'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="catalog-preview-block">
-                    <span className="catalog-preview-label">Producto agotado detectado:</span>
-                    <strong className="catalog-preview-out">
-                      <PackageX className="w-4 h-4" /> {result.out_of_stock_product.name}
-                    </strong>
-                  </div>
-                  <div className="catalog-preview-block">
-                    <span className="catalog-preview-label">
-                      Sustitutos propuestos ({result.substitutes.length}):
-                    </span>
-                    {result.substitutes.length === 0 ? (
-                      <em className="catalog-preview-sub">Sin sustitutos disponibles en este momento.</em>
-                    ) : (
-                      <ul className="catalog-preview-subs">
-                        {result.substitutes.map((s, i) => (
-                          <li key={s.product_id}>
-                            <strong>#{i + 1} {s.name}</strong>
-                            {s.price > 0 && <span> · ${s.price} {s.currency}</span>}
-                            {s.category && <span> · {s.category}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="catalog-preview-block">
-                    <span className="catalog-preview-label">Mensaje WhatsApp:</span>
-                    <div className="catalog-preview-message" data-testid="preview-message">
-                      {result.message || '(sin mensaje)'}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

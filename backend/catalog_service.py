@@ -329,6 +329,114 @@ class CatalogService:
         )
         return result.matched_count > 0
 
+    # ============================================================
+    # Back-in-stock waitlist (Iter32)
+    # ============================================================
+
+    async def add_to_waitlist(
+        self,
+        tenant_id: str,
+        lead_phone: str,
+        product_id: str,
+        product_name: str = "",
+    ) -> None:
+        """Registra interés de un lead en un producto agotado.
+
+        Upsert por (tenant_id, lead_phone, product_id) para evitar duplicados
+        si el lead pregunta varias veces. Si ya existe y está notified, se
+        resetea notified_at para que vuelva a recibir aviso cuando reponga.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        await self.db.product_waitlist.update_one(
+            {"tenant_id": tenant_id, "lead_phone": lead_phone, "product_id": product_id},
+            {
+                "$set": {
+                    "product_name": product_name,
+                    "asked_at": now,
+                    "notified_at": None,
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+
+    async def notify_back_in_stock(
+        self,
+        tenant_id: str,
+        product_id: str,
+    ) -> int:
+        """Envía WhatsApp a todos los leads que esperaban este producto.
+
+        Solo notifica entradas con notified_at=None. Retorna cantidad de
+        mensajes enviados. Best-effort: si falla el envío a uno, continúa
+        con los siguientes.
+        """
+        # Validar que el producto está realmente disponible
+        product = await self.get_product_by_id(tenant_id, product_id)
+        if not product or self.is_out_of_stock(product):
+            return 0
+
+        waiters = await self.db.product_waitlist.find(
+            {
+                "tenant_id": tenant_id,
+                "product_id": product_id,
+                "notified_at": None,
+            },
+            {"_id": 0},
+        ).to_list(1000)
+        if not waiters:
+            return 0
+
+        # WhatsApp service del tenant
+        try:
+            from whatsapp_service import create_wa_service_for_tenant
+            tenant = await self.db.tenants.find_one(
+                {"tenant_id": tenant_id}, {"_id": 0},
+            )
+            if not tenant:
+                return 0
+            wa = create_wa_service_for_tenant(tenant)
+        except Exception as e:
+            logger.warning(f"[back_in_stock] wa_service init failed: {e}")
+            return 0
+
+        price_str = (
+            f" (${product['price']} {product.get('currency', 'USD')})"
+            if product.get("price") else ""
+        )
+        name = product.get("name", "ese producto")
+        message = (
+            f"¡Buenas noticias! 🎉\n\n"
+            f"*{name}*{price_str} volvió a estar disponible. "
+            f"Me pediste que te avisara, así que acá estoy 👇\n\n"
+            f"¿Querés reservarlo ahora o que te pase más info?"
+        )
+
+        sent = 0
+        now = datetime.now(timezone.utc).isoformat()
+        for w in waiters:
+            try:
+                await wa.send_message(w["lead_phone"], message)
+                await self.db.product_waitlist.update_one(
+                    {
+                        "tenant_id": tenant_id,
+                        "lead_phone": w["lead_phone"],
+                        "product_id": product_id,
+                    },
+                    {"$set": {"notified_at": now}},
+                )
+                sent += 1
+            except Exception as e:
+                logger.warning(
+                    f"[back_in_stock] send failed tenant={tenant_id} "
+                    f"lead={w['lead_phone']} product={product_id}: {e}"
+                )
+        logger.info(
+            f"[back_in_stock] tenant={tenant_id} product={product_id} "
+            f"notified {sent}/{len(waiters)} leads"
+        )
+        return sent
+
     def build_substitute_message(
         self,
         out_of_stock_product: dict,
