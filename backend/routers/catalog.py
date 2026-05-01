@@ -202,3 +202,105 @@ async def recommend_for_tenant(body: dict, current_user: User = Depends(get_curr
         "recommendations": recommended,
         "ai_enabled": llm.enabled
     }
+
+
+# ============================================================
+# Smart Substitution endpoints (Iter31)
+# ============================================================
+
+@router.patch("/catalog/products/{product_id}/stock")
+async def set_product_stock(
+    product_id: str,
+    body: dict,
+    current_user: User = Depends(require_admin),
+):
+    """Admin: actualiza stock_quantity de un producto.
+
+    Body: `{"stock_quantity": 5}` | `{"stock_quantity": 0}` (agotado) | `{"stock_quantity": null}` (sin tracking).
+    Cuando stock<=0, se marca también como inactive para que no aparezca en listados.
+    """
+    if "stock_quantity" not in body:
+        raise HTTPException(status_code=400, detail="stock_quantity es requerido")
+    stock = body["stock_quantity"]
+    if stock is not None and not isinstance(stock, int):
+        raise HTTPException(status_code=400, detail="stock_quantity debe ser int o null")
+    ok = await catalog_service.set_stock(current_user.tenant_id, product_id, stock)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    product = await catalog_service.get_product_by_id(current_user.tenant_id, product_id)
+    return {
+        "ok": True,
+        "product_id": product_id,
+        "stock_quantity": product.get("stock_quantity"),
+        "active": product.get("active"),
+        "availability_status": catalog_service.get_availability_status(product),
+    }
+
+
+@router.put("/catalog/products/{product_id}/substitutes")
+async def set_product_substitutes(
+    product_id: str,
+    body: dict,
+    current_user: User = Depends(require_admin),
+):
+    """Admin: configura sustitutos manuales para un producto.
+
+    Body: `{"substitute_product_ids": ["pid-1", "pid-2", "pid-3"]}`.
+    Lista vacía = sin sustitutos manuales (se usan los automáticos).
+    """
+    subs = body.get("substitute_product_ids", [])
+    if not isinstance(subs, list):
+        raise HTTPException(status_code=400, detail="substitute_product_ids debe ser array")
+    if len(subs) > 10:
+        raise HTTPException(status_code=400, detail="max 10 sustitutos")
+    ok = await catalog_service.set_substitutes(current_user.tenant_id, product_id, subs)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Producto no encontrado o algún sustituto no existe")
+    product = await catalog_service.get_product_by_id(current_user.tenant_id, product_id)
+    return {
+        "ok": True,
+        "product_id": product_id,
+        "substitute_product_ids": product.get("substitute_product_ids", []),
+    }
+
+
+@router.post("/catalog/substitute-preview")
+async def substitute_preview(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Preview del flujo de sustitución desde el panel admin.
+
+    Body: `{"query": "tienen el iPhone 15?"}` o `{"product_id": "pid-xxx"}`.
+    Retorna el producto agotado detectado + la lista de sustitutos que le
+    mostraría el bot + el mensaje exacto que se enviaría por WhatsApp.
+    """
+    tenant_id = current_user.tenant_id
+    query = (body or {}).get("query", "").strip()
+    product_id = (body or {}).get("product_id")
+
+    out_of_stock = None
+    if product_id:
+        p = await catalog_service.get_product_by_id(tenant_id, product_id)
+        if p and catalog_service.is_out_of_stock(p):
+            out_of_stock = p
+    elif query:
+        out_of_stock = await catalog_service.find_out_of_stock_match(tenant_id, query)
+
+    if not out_of_stock:
+        return {
+            "out_of_stock_product": None,
+            "substitutes": [],
+            "message": None,
+            "reason": "no se detectó match con producto agotado",
+        }
+
+    substitutes = await catalog_service.find_substitute(
+        tenant_id, out_of_stock, max_results=3,
+    )
+    message = catalog_service.build_substitute_message(out_of_stock, substitutes)
+    return {
+        "out_of_stock_product": out_of_stock,
+        "substitutes": substitutes,
+        "message": message,
+    }

@@ -27,6 +27,13 @@ class CatalogService:
             "category": product.get("category", ""),
             "image_url": product.get("image_url", ""),
             "active": True,
+            # Smart Substitution fields (Iter31):
+            # - stock_quantity: None = sin tracking de stock (solo active flag);
+            #   0 = agotado; >0 = unidades disponibles.
+            # - substitute_product_ids: lista manual ordenada de sustitutos
+            #   preferidos (override de la lógica automática).
+            "stock_quantity": product.get("stock_quantity"),
+            "substitute_product_ids": list(product.get("substitute_product_ids") or []),
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await self.db.products.insert_one(doc)
@@ -92,6 +99,260 @@ class CatalogService:
             {"$set": {"active": False}}
         )
         return result.matched_count > 0
+
+    # ============================================================
+    # Smart Substitution (Iter31)
+    # ============================================================
+
+    def is_out_of_stock(self, product: dict) -> bool:
+        """Un producto está agotado si está inactivo O si stock_quantity==0."""
+        if not product:
+            return True
+        if product.get("active") is False:
+            return True
+        stock = product.get("stock_quantity")
+        if stock is not None and stock <= 0:
+            return True
+        return False
+
+    def get_availability_status(self, product: dict) -> str:
+        """
+        Retorna 'available' | 'out_of_stock' | 'low_stock' | 'no_tracking'.
+        Útil para la UI y para decidir copy del bot.
+        """
+        if self.is_out_of_stock(product):
+            return "out_of_stock"
+        stock = product.get("stock_quantity")
+        if stock is None:
+            return "no_tracking"
+        if stock <= 3:
+            return "low_stock"
+        return "available"
+
+    async def find_out_of_stock_match(
+        self,
+        tenant_id: str,
+        query: str,
+        min_similarity: float = 0.45,
+    ) -> Optional[dict]:
+        """Busca si la query del cliente hace match con un producto AGOTADO.
+
+        Usa matching fuzzy (sustring + tokens en común) sobre nombre. Retorna
+        el producto agotado con mejor score, o None si no hay match claro.
+
+        Esta es la DETECCIÓN previa al flujo de sustitución: solo disparamos
+        "está agotado pero tengo esta alternativa" si el cliente efectivamente
+        mencionó un producto específico que ya no está disponible.
+        """
+        query = (query or "").strip().lower()
+        if len(query) < 3:
+            return None
+
+        # Traer TODOS (activos e inactivos) + los que tienen stock_quantity<=0
+        all_products = await self.db.products.find(
+            {"tenant_id": tenant_id},
+            {"_id": 0},
+        ).to_list(500)
+
+        out_of_stock = [p for p in all_products if self.is_out_of_stock(p)]
+        if not out_of_stock:
+            return None
+
+        query_tokens = {t for t in query.split() if len(t) >= 3}
+        if not query_tokens:
+            return None
+
+        best = None
+        best_score = 0.0
+        for p in out_of_stock:
+            name = (p.get("name") or "").lower()
+            if not name:
+                continue
+            # Score: tokens en común + bonus si el nombre completo está en la query
+            name_tokens = {t for t in name.split() if len(t) >= 3}
+            if not name_tokens:
+                continue
+            common = query_tokens & name_tokens
+            token_score = len(common) / max(len(name_tokens), 1)
+            substring_bonus = 0.3 if name in query or query in name else 0.0
+            score = token_score + substring_bonus
+            if score > best_score:
+                best_score = score
+                best = p
+
+        if best and best_score >= min_similarity:
+            return best
+        return None
+
+    async def find_substitute(
+        self,
+        tenant_id: str,
+        out_of_stock_product: dict,
+        max_results: int = 3,
+    ) -> List[dict]:
+        """Encuentra sustitutos para un producto agotado, en cascada:
+
+        1. **Manual**: `substitute_product_ids` configurado por el admin.
+        2. **Categoría + precio similar** (±30%): misma categoría, activo, stock>0.
+        3. **GPT fallback**: recomendación semántica sobre todo el catálogo activo
+           usando el nombre + descripción del agotado como query.
+
+        Retorna lista de productos (puede estar vacía si no hay nada en stock).
+        """
+        if not out_of_stock_product:
+            return []
+        results: List[dict] = []
+        seen_ids = set()
+
+        # 1. Manual substitutes
+        manual_ids = out_of_stock_product.get("substitute_product_ids") or []
+        if manual_ids:
+            manual_subs = await self.db.products.find(
+                {"tenant_id": tenant_id, "product_id": {"$in": manual_ids}, "active": True},
+                {"_id": 0},
+            ).to_list(max_results * 2)
+            # Preservar orden manual + filtrar agotados
+            ordered = sorted(
+                [s for s in manual_subs if not self.is_out_of_stock(s)],
+                key=lambda s: manual_ids.index(s["product_id"]) if s.get("product_id") in manual_ids else 99,
+            )
+            for s in ordered[:max_results]:
+                if s["product_id"] not in seen_ids:
+                    results.append(s)
+                    seen_ids.add(s["product_id"])
+
+        if len(results) >= max_results:
+            return results
+
+        # 2. Same category + similar price
+        category = out_of_stock_product.get("category")
+        base_price = out_of_stock_product.get("price") or 0
+        if category:
+            candidates = await self.db.products.find(
+                {"tenant_id": tenant_id, "category": category, "active": True,
+                 "product_id": {"$ne": out_of_stock_product.get("product_id"), "$nin": list(seen_ids)}},
+                {"_id": 0},
+            ).to_list(50)
+            # Filtrar agotados por stock_quantity
+            in_stock = [c for c in candidates if not self.is_out_of_stock(c)]
+            if base_price > 0:
+                # Ordenar por proximidad de precio (±30% es ideal)
+                in_stock.sort(key=lambda c: abs((c.get("price") or 0) - base_price))
+            for c in in_stock[:max_results - len(results)]:
+                if c["product_id"] not in seen_ids:
+                    results.append(c)
+                    seen_ids.add(c["product_id"])
+
+        if len(results) >= max_results:
+            return results
+
+        # 3. GPT fallback: usa nombre + desc del agotado como query sobre todo el catálogo
+        try:
+            from llm_provider import create_llm_for_tenant
+            tenant = await self.db.tenants.find_one(
+                {"tenant_id": tenant_id}, {"_id": 0},
+            )
+            all_active = await self.get_products(tenant_id, active_only=True)
+            in_stock_active = [
+                p for p in all_active
+                if not self.is_out_of_stock(p) and p["product_id"] not in seen_ids
+                and p["product_id"] != out_of_stock_product.get("product_id")
+            ]
+            if in_stock_active and tenant:
+                llm = create_llm_for_tenant(tenant)
+                query = (
+                    f"{out_of_stock_product.get('name', '')} "
+                    f"{out_of_stock_product.get('description', '')}"
+                ).strip()
+                rec_ids = await llm.recommend_products(
+                    query, in_stock_active, max_results=max_results - len(results),
+                )
+                for pid in rec_ids:
+                    match = next((p for p in in_stock_active if p["product_id"] == pid), None)
+                    if match and match["product_id"] not in seen_ids:
+                        results.append(match)
+                        seen_ids.add(match["product_id"])
+                        if len(results) >= max_results:
+                            break
+        except Exception as e:
+            logger.warning(f"[find_substitute] GPT fallback failed for tenant={tenant_id}: {e}")
+
+        return results
+
+    async def set_substitutes(
+        self,
+        tenant_id: str,
+        product_id: str,
+        substitute_ids: List[str],
+    ) -> bool:
+        """Configura sustitutos manuales para un producto. Valida que todos existan."""
+        if substitute_ids:
+            count = await self.db.products.count_documents(
+                {"tenant_id": tenant_id, "product_id": {"$in": substitute_ids}}
+            )
+            if count != len(substitute_ids):
+                return False
+        result = await self.db.products.update_one(
+            {"tenant_id": tenant_id, "product_id": product_id},
+            {"$set": {"substitute_product_ids": list(substitute_ids or [])}},
+        )
+        return result.matched_count > 0
+
+    async def set_stock(
+        self,
+        tenant_id: str,
+        product_id: str,
+        stock_quantity: Optional[int],
+    ) -> bool:
+        """Actualiza stock_quantity. None = sin tracking; 0 = agotado; >0 = disponible."""
+        update = {"stock_quantity": stock_quantity}
+        # Si marcamos como agotado, también desactivamos para que no aparezca en listados
+        # (se puede re-activar al setear stock>0)
+        if stock_quantity is not None and stock_quantity <= 0:
+            update["active"] = False
+        elif stock_quantity is not None and stock_quantity > 0:
+            update["active"] = True
+        result = await self.db.products.update_one(
+            {"tenant_id": tenant_id, "product_id": product_id},
+            {"$set": update},
+        )
+        return result.matched_count > 0
+
+    def build_substitute_message(
+        self,
+        out_of_stock_product: dict,
+        substitutes: List[dict],
+    ) -> str:
+        """Genera el mensaje de WhatsApp con copy del bonus 'disponibilidad'."""
+        name = out_of_stock_product.get("name", "ese producto")
+        if not substitutes:
+            return (
+                f"Justo *{name}* está agotado por ahora 😕. "
+                f"¿Querés que te avise cuando vuelva a estar disponible?"
+            )
+        if len(substitutes) == 1:
+            alt = substitutes[0]
+            price = (
+                f" (${alt['price']} {alt.get('currency', 'USD')})"
+                if alt.get("price") else ""
+            )
+            return (
+                f"Justo *{name}* está agotado, pero tengo una buena noticia 👇\n\n"
+                f"*{alt['name']}*{price} tiene características muy parecidas y "
+                f"está disponible ahora. ¿Te cuento las diferencias?"
+            )
+        lines = [
+            f"Justo *{name}* está agotado, pero tengo alternativas que te pueden "
+            f"interesar 👇\n",
+        ]
+        for i, alt in enumerate(substitutes[:3], 1):
+            price = (
+                f" — ${alt['price']} {alt.get('currency', 'USD')}"
+                if alt.get("price") else ""
+            )
+            lines.append(f"*{i}. {alt['name']}*{price}")
+        lines.append("\n¿Cuál te interesa? Te cuento más en 30 segundos.")
+        return "\n".join(lines)
 
     def build_product_list_message(self, products: List[dict], header: str = "Nuestros productos") -> dict:
         """

@@ -3,9 +3,10 @@ InmoBot SaaS - Motor de flujo genérico basado en templates
 Procesa mensajes según el template del tenant.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flow_templates import get_template
 from scoring import calculate_score
+from whatsapp_service import create_wa_service_for_tenant
 import re
 
 logger = logging.getLogger(__name__)
@@ -403,6 +404,42 @@ class GenericFlowEngine:
         from catalog_service import CatalogService
 
         catalog = CatalogService(db)
+
+        # Smart Substitution (Iter31): si el cliente menciona específicamente un
+        # producto agotado, responder con sustituto en lugar del catálogo completo.
+        last_msg = ""
+        if lead.conversation_history:
+            for m in reversed(lead.conversation_history):
+                if m.get("from") == "customer":
+                    last_msg = m.get("text", "")
+                    break
+        if last_msg:
+            try:
+                agotado = await catalog.find_out_of_stock_match(tenant_id, last_msg)
+                if agotado:
+                    subs = await catalog.find_substitute(tenant_id, agotado, max_results=3)
+                    msg = catalog.build_substitute_message(agotado, subs)
+                    wa = create_wa_service_for_tenant(
+                        await db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
+                    )
+                    await wa.send_message(lead.phone, msg)
+                    # Marcamos en el log para analytics
+                    await db.substitute_events.insert_one({
+                        "tenant_id": tenant_id,
+                        "lead_phone": lead.phone,
+                        "asked_for_product_id": agotado.get("product_id"),
+                        "asked_for_name": agotado.get("name"),
+                        "substitutes_offered": [s.get("product_id") for s in subs],
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    })
+                    logger.info(
+                        f"[substitute] tenant={tenant_id} lead={lead.phone} "
+                        f"agotado='{agotado.get('name')}' subs={len(subs)}"
+                    )
+                    return True
+            except Exception as e:
+                logger.warning(f"[substitute] check failed: {e}")
+
         products = await catalog.get_products(tenant_id)
 
         if not products:
