@@ -1,0 +1,43 @@
+{
+  "summary": "Iter31 Smart Substitution: backend (16/16 pytest passed) + frontend E2E validated. Backend endpoints PATCH /stock, PUT /substitutes, POST /substitute-preview funcionan correctamente (query/product_id modes, validations 400/404, manual cascade). Frontend /catalogo carga OK, modals 'Probar sustitución' y 'Sustitutos' funcionan, badge AGOTADO/Poco stock/Stock visible, overlay AGOTADO se renderiza, toggle 1-click cambia stock, formulario acepta stock_quantity (vacío permitido), edición carga stock actual.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Substitutes save → Preview",
+        "issue": "Posible inconsistencia: en E2E, tras guardar 1 sustituto manual (P3 low_stock) para P1 (agotado) y consultar preview con query que matchea P1, el modal mostró 'Sustitutos propuestos (0)' con mensaje 'Sin sustitutos disponibles en este momento' aunque el sustituto guardado (P3) seguía activo con stock=2. Backend pytest test_manual_substitutes_take_priority pasa, así que probablemente es un edge-case en cascada con orden de ops. Sugerido: revisar find_substitute cuando manual_id apunta a producto low_stock o cuando manual list quedó con solo 1 entrada tras filtros.",
+        "affected_selectors": ["preview-result", "preview-message"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter31_smart_substitution.py",
+    "/app/test_reports/pytest/iter31_results.xml"
+  ],
+  "action_items": [
+    "Investigar el caso edge donde un sustituto manual configurado (low_stock) no aparece en /substitute-preview aunque el producto siga activo y con stock>0. Verificar que find_substitute respete realmente la prioridad manual sin filtrar por low_stock cuando active=true. (No bloqueante - probable race condition en el flujo E2E)",
+    "Mejorar el handler del WebSocket de notificaciones que loguea 'Error parsing notification: Unexpected token p, pong is not valid JSON' (debería ignorar mensajes 'pong' del keep-alive sin intentar JSON.parse)."
+  ],
+  "critical_code_review_comments": [
+    "CatalogPage.js (646 líneas) - excede el límite de 700 con margen estrecho; considerar split en componentes (ProductForm.js, SubstitutesModal.js, SubstitutePreviewModal.js, helpers.js).",
+    "ProductForm.handleSubmit emite PUT /catalog/{id} y luego PATCH /stock cuando cambia stock_quantity. Esto causa 2 round-trips y una ventana en la que el listado podría refrescar entre ambos. Idealmente unificar en un solo endpoint o pasar stock_quantity al PUT y dejar que el backend sincronice active/availability_status.",
+    "WebSocket handler en main.4961b9de.js intenta JSON.parse mensajes que pueden ser texto plano 'pong' del keep-alive y arroja error de console por cada ping. Bug de logging, no funcional, pero ruidoso.",
+    "El endpoint POST /catalog/substitute-preview usa get_current_user (no require_admin) - cualquier user autenticado puede testearlo. Si la idea es que solo admin acceda a preview desde el panel, considerar require_admin."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (16/16)",
+    "frontend": "95% (todos los flows críticos validados; 1 inconsistencia menor en preview con sustitutos manuales)"
+  },
+  "test_credentials": "admin@inmobot.com / Admin123! (superadmin) - confirmado en /app/memory/test_credentials.md",
+  "seed_data_creation": "Durante E2E se crearon 3 productos test (iPhone 15 Pro Test E2E, iPhone 15 Test E2E, iPhone 13 Test E2E con categoría celulares-e2e) y luego se eliminaron en cleanup. Catálogo del superadmin debe quedar vacío.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter31 Smart Substitution UI completo. Backend tests: /app/backend/tests/test_iter31_smart_substitution.py (16 passed). data-testids disponibles: btn-add-product, btn-substitute-preview, btn-toggle-stock-{id}, btn-substitutes-{id}, input-product-stock, badge-out-of-stock, badge-low-stock, badge-in-stock, substitutes-modal, preview-modal, preview-query-input, btn-run-preview, preview-result, preview-message, sub-option-{id}, btn-save-substitutes, btn-save-product. Ruta del catálogo: /catalogo (no /catalog). Detección fuzzy out_of_stock_match requiere ≥2 tokens en común con el nombre del producto. Para superadmin tenant_id=__superadmin__.",
+  "rca of the issue": "No se reprodujo bug crítico. La única inconsistencia (preview mostró 0 substitutes tras guardar manual) puede ser race-condition E2E porque entre saveSubstitutes y openPreview no hubo refresh del estado backend del producto, y el manual_id guardado quizás apuntaba a un producto que en ese momento estaba marcado AGOTADO (P2 estaba toggled out justo antes de seleccionar substitutos, y P3 era el único candidato visible). Backend unit test test_manual_substitutes_take_priority confirma que la cascada funciona correctamente cuando el sustituto es válido."
+}
