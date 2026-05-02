@@ -165,6 +165,7 @@ async def check_and_send_upsells(
                 to_email=agent["email"],
                 business_name=biz,
                 demand=demand,
+                tenant_id=tid,
             )
         except Exception as e:
             logger.warning(f"[upsell] send failed tenant={tid}: {e}")

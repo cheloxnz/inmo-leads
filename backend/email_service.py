@@ -180,7 +180,7 @@ Score: {score}/12
                 {appointment_str}hs
             </div>"""
         
-        html_body += f"""
+        html_body += """
             <div class="footer">
                 <p>Este es un lead caliente que requiere atención inmediata.</p>
                 <p><strong>InmoBot AI</strong> - Sistema de Calificación Automática</p>
@@ -798,6 +798,7 @@ InmoBot AI - Sistema de Calificación Automática
         to_email: str,
         business_name: str,
         demand: dict,
+        tenant_id: str = "",
     ) -> bool:
         """Email de upsell automático cuando un tenant Pro tiene mucha demanda
         insatisfecha → invita a upgrade a Enterprise.
@@ -809,6 +810,15 @@ InmoBot AI - Sistema de Calificación Automática
         leads_count = demand.get("leads_count", 0)
         value_usd = demand.get("value_usd", 0)
         top = demand.get("top_products", []) or []
+
+        # UTM-tagged CTAs (P1 quick win)
+        app_url = os.environ.get("APP_URL", "https://app.inmobot.com").rstrip("/")
+        utm_base = (
+            "utm_source=upsell&utm_medium=email&utm_campaign=unmet_demand"
+            + (f"&utm_content={tenant_id}" if tenant_id else "")
+        )
+        upgrade_url = f"{app_url}/billing?{utm_base}"
+        dashboard_url = f"{app_url}/dashboard?{utm_base}"
 
         subject = (
             f"📊 {business_name}: detectamos ${value_usd:,.0f} en demanda no atendida esta semana"
@@ -851,7 +861,9 @@ InmoBot AI - Sistema de Calificación Automática
             f"  • API completa + Soporte 24/7\n"
             f"  • Tu propia OpenAI key (opcional)\n\n"
             f"$249/mes — paga sólo lo que vale 1 venta cerrada con esos {leads_count} leads.\n\n"
-            f"¿Querés probarlo? Respondé este email y te activamos el upgrade hoy mismo.\n\n"
+            f"→ Ver detalles y upgrade: {upgrade_url}\n"
+            f"→ Ir al dashboard: {dashboard_url}\n\n"
+            f"¿Preferís que te activemos el upgrade nosotros? Respondé este email y listo.\n\n"
             f"— Equipo InmoBot"
         )
 
@@ -928,9 +940,19 @@ InmoBot AI - Sistema de Calificación Automática
     </div>
 
     <p style='font-size:13px; line-height:1.6; color:#374151;'>
-      ¿Querés probarlo? <strong>Respondé este email</strong> y te activamos el
-      upgrade hoy mismo (sin cambios de plataforma, todo continúa funcionando).
+      ¿Querés probarlo? Hacé upgrade en 1 click o <strong>respondé este email</strong> y te
+      lo activamos hoy mismo (sin cambios de plataforma, todo continúa funcionando).
     </p>
+    <div style='text-align:center; margin:24px 0 8px;'>
+      <a href='{upgrade_url}' class='cta' data-testid='upsell-cta-upgrade'>
+        🚀 Hacer upgrade a Enterprise
+      </a>
+    </div>
+    <div style='text-align:center; margin-bottom:8px;'>
+      <a href='{dashboard_url}' style='color:#6366f1; font-size:13px; text-decoration:underline;'>
+        Ver demanda insatisfecha en mi dashboard →
+      </a>
+    </div>
   </div>
   <div class='footer'>
     Email automático generado a partir de tus datos reales en InmoBot.
@@ -944,6 +966,110 @@ InmoBot AI - Sistema de Calificación Automática
             html_body=html_body,
             text_body=text_body,
             email_type=EmailType.UPSELL_UNMET_DEMAND,
+        )
+
+
+    async def send_waitlist_threshold_alert(
+        self,
+        to_email: str,
+        tenant_id: str,
+        business_name: str,
+        plan: str,
+        product_name: str,
+        product_id: str,
+        leads_count: int,
+        threshold: int,
+    ) -> bool:
+        """Alerta al SUPERADMIN cuando un tenant cruza el threshold de waitlist
+        en un producto específico → señal temprana para outreach comercial.
+        """
+        if not to_email:
+            return False
+
+        app_url = os.environ.get("APP_URL", "https://app.inmobot.com").rstrip("/")
+        utm = (
+            "utm_source=admin_alert&utm_medium=email&utm_campaign=waitlist_threshold"
+            f"&utm_content={tenant_id}"
+        )
+        tenant_url = f"{app_url}/superadmin?tenant={tenant_id}&{utm}"
+
+        subject = (
+            f"🔔 [InmoBot] {business_name} cruzó {leads_count} leads en espera "
+            f"por '{product_name}'"
+        )
+
+        text_body = (
+            f"Alerta de oportunidad comercial\n\n"
+            f"Tenant: {business_name} ({tenant_id})\n"
+            f"Plan actual: {plan or 'desconocido'}\n"
+            f"Producto: {product_name}\n"
+            f"Leads esperando: {leads_count} (threshold {threshold})\n\n"
+            f"Acción sugerida:\n"
+            f"  1. Revisá el detalle en el panel SuperAdmin: {tenant_url}\n"
+            f"  2. Contactá al tenant si es plan Pro o menor (upsell a Enterprise)\n"
+            f"  3. Si es Enterprise, verificá si necesita asistencia para reponer stock\n"
+        )
+
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:560px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08); }}
+  .header {{ background:linear-gradient(135deg,#f59e0b 0%,#dc2626 100%); color:#fff; padding:24px; }}
+  .header h1 {{ margin:0; font-size:18px; font-weight:700; }}
+  .body {{ padding:22px 26px; font-size:14px; line-height:1.6; color:#374151; }}
+  .stat-row {{ display:flex; gap:12px; margin:16px 0; }}
+  .stat-cell {{ flex:1; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:14px; text-align:center; }}
+  .stat-num {{ font-size:28px; font-weight:800; color:#c2410c; line-height:1; }}
+  .stat-lbl {{ font-size:11px; color:#7c2d12; margin-top:4px; text-transform:uppercase; letter-spacing:0.05em; }}
+  .info {{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin:12px 0; font-size:13px; }}
+  .info strong {{ color:#111827; }}
+  .cta {{ display:inline-block; background:#4f46e5; color:#fff !important; padding:12px 24px; border-radius:10px; text-decoration:none; font-weight:600; font-size:14px; margin-top:14px; }}
+  .footer {{ padding:16px 26px; color:#6b7280; font-size:11px; border-top:1px solid #f3f4f6; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'>
+    <h1>🔔 Waitlist threshold cruzado</h1>
+  </div>
+  <div class='body'>
+    <p>Un tenant acumuló demanda insatisfecha suficiente como para considerar outreach comercial.</p>
+
+    <div class='stat-row'>
+      <div class='stat-cell'>
+        <div class='stat-num'>{leads_count}</div>
+        <div class='stat-lbl'>leads esperando</div>
+      </div>
+      <div class='stat-cell'>
+        <div class='stat-num'>{threshold}</div>
+        <div class='stat-lbl'>threshold</div>
+      </div>
+    </div>
+
+    <div class='info'>
+      <strong>Tenant:</strong> {business_name} <span style='color:#6b7280;'>({tenant_id})</span><br>
+      <strong>Plan:</strong> {plan or 'desconocido'}<br>
+      <strong>Producto:</strong> {product_name}
+    </div>
+
+    <p style='font-size:13px;'>
+      Señal temprana: el bot está capturando demanda que el tenant no puede satisfacer.
+      {"Buen candidato para upsell a Enterprise." if (plan or "").lower() in ("pro", "basic", "starter") else "Verificá si necesita ayuda para reponer stock."}
+    </p>
+
+    <div style='text-align:center;'>
+      <a href='{tenant_url}' class='cta' data-testid='waitlist-alert-cta'>Abrir panel SuperAdmin →</a>
+    </div>
+  </div>
+  <div class='footer'>
+    Alerta automática. Cooldown activo: no recibirás otra por este producto hasta dentro de varios días.
+  </div>
+</div></body></html>"""
+
+        return await self.send_email(
+            to_emails=[to_email],
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            email_type=EmailType.WAITLIST_THRESHOLD_ALERT,
         )
 
 

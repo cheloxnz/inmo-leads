@@ -445,3 +445,55 @@ async def run_admin_report_now(
     tasks = ScheduledTasks(_db, email_svc)
     ok = await tasks._send_admin_report()
     return {"sent": ok}
+
+
+# ============================================================
+# Reset demo data (P1 Quick Win)
+# ============================================================
+
+class ResetDemoRequest(BaseModel):
+    confirm: bool = False
+    include_leads: bool = False
+
+
+@router.post("/superadmin/tenants/{tenant_id}/reset-demo-data")
+async def reset_demo_data(
+    tenant_id: str,
+    body: ResetDemoRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: limpia productos + waitlist (+ opcionalmente leads) de un tenant.
+
+    Útil para resetear datos de testing/demo en 1 click.
+    Requiere `confirm=true` para ejecutar (safety).
+    """
+    _require_superadmin(current_user)
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Falta confirm=true")
+
+    tenant = await _db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0, "tenant_id": 1})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    products_res = await _db.products.delete_many({"tenant_id": tenant_id})
+    waitlist_res = await _db.product_waitlist.delete_many({"tenant_id": tenant_id})
+    alerts_res = await _db.waitlist_admin_alerts.delete_many({"tenant_id": tenant_id})
+
+    result = {
+        "tenant_id": tenant_id,
+        "products_deleted": products_res.deleted_count,
+        "waitlist_deleted": waitlist_res.deleted_count,
+        "waitlist_alerts_deleted": alerts_res.deleted_count,
+    }
+
+    if body.include_leads:
+        leads_res = await _db.leads.delete_many({"tenant_id": tenant_id})
+        conv_res = await _db.conversations.delete_many({"tenant_id": tenant_id})
+        msg_res = await _db.messages.delete_many({"tenant_id": tenant_id})
+        result.update({
+            "leads_deleted": leads_res.deleted_count,
+            "conversations_deleted": conv_res.deleted_count,
+            "messages_deleted": msg_res.deleted_count,
+        })
+
+    return result

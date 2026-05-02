@@ -387,6 +387,13 @@ class CatalogService:
             },
             upsert=True,
         )
+        # P1 quick win: dispara alerta al superadmin si el producto cruzó threshold
+        # Best-effort: cualquier error se loguea pero NO interrumpe el flujo del bot.
+        try:
+            from waitlist_alert_service import maybe_alert_superadmin
+            await maybe_alert_superadmin(self.db, tenant_id, product_id, product_name)
+        except Exception as e:
+            logger.warning(f"[waitlist_alert] hook failed tenant={tenant_id} product={product_id}: {e}")
 
     async def notify_back_in_stock(
         self,

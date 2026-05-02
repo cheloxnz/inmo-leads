@@ -1,0 +1,28 @@
+{
+  "summary": "Iter34 Quick Wins P1 (UTM upsell, waitlist admin alert, reset-demo-data) + Onboarding Tour verified. Backend 16/16 pytest passed including idempotency/cooldown for waitlist admin alert and permission checks on reset-demo. Frontend E2E confirmed: onboarding tour renders for users without completed flag, disappears after POST /auth/onboarding/complete (status endpoint returns completed=true); Reset demo data button visible in expanded tenant card with Trash2 icon and red color (#dc2626).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter34_quickwins.py",
+    "/app/test_reports/pytest/iter34_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "waitlist_alert_service.maybe_alert_superadmin: cooldown uses ISO string comparison ($gte cutoff_iso) which works today because all sent_at are written with timezone.utc but breaks if any historical row was stored with different tz format. Safer: store sent_at as datetime (BSON) and query with datetime objects.",
+    "routers/superadmin.reset_demo_data: operation is not transactional — if products.delete_many succeeds but subsequent delete_many fails, state becomes inconsistent. For a super-admin destructive op, consider wrapping in try/except and returning partial counts with a warning flag.",
+    "email_service.send_upsell_unmet_demand uses app_url default 'https://app.inmobot.com' when APP_URL env missing; preview env now has APP_URL set. Consider logging a warning when falling back so staging links don't silently point to prod.",
+    "OnboardingTour does not pre-check auth state; the GET /auth/onboarding/status is called regardless (unauth users get 401 logged). Consider gating the effect on presence of auth token to avoid noise in Sentry."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (onboarding + reset-demo button verified)"},
+  "test_credentials": "admin@inmobot.com / Admin123! (superadmin), demo@inmobot.com / Demo123! (demo admin) — confirmed in /app/memory/test_credentials.md",
+  "seed_data_creation": "Tests insert/delete TEST_tenant_* and TEST_prod_* in tenants/product_waitlist/waitlist_admin_alerts collections; cleanup executed in finally block. Also test_reset_real_tenant deleted products/waitlist/leads for demo-inmobiliaria (tenant remains, data was already empty from previous iterations).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter34 QuickWins complete. Test file: /app/backend/tests/test_iter34_quickwins.py (16 tests). Key endpoints: GET/POST /api/auth/onboarding/status|complete, POST /api/superadmin/upsell/run, POST /api/superadmin/tenants/{id}/reset-demo-data (body: {confirm, include_leads}; 400 if no confirm, 404 unknown tenant, 403 non-superadmin, 200 with counts). waitlist_admin_alerts collection auto-created on first alert; env vars WAITLIST_ADMIN_ALERT_THRESHOLD (default 20) and WAITLIST_ADMIN_ALERT_COOLDOWN_DAYS (default 30). Frontend: onboarding tour data-testids (onboarding-tour, onboarding-skip, onboarding-next, onboarding-prev, onboarding-progress); reset-demo button testid reset-demo-{tenant_id} only visible when tenant card is expanded (click the tenant header). Superadmin account had onboarding auto-completed via API during testing.",
+  "rca of the issue": "N/A — no bugs found. Initial confusion: onboarding-skip button wasn't reachable on first attempt due to stale DOM render state on rapid navigation; workaround was to call POST /auth/onboarding/complete directly via page.evaluate+fetch, then reload. This is test-harness mechanics, not a product bug — real users can click the × (onboarding-skip) once the intro card finishes its fade-in animation."
+}

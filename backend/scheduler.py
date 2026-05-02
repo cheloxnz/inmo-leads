@@ -468,7 +468,7 @@ class ScheduledTasks:
                 if now.day <= 3 and now.hour == 4:
                     period_key = now.strftime("%Y-%m")
                     if last_run_period != period_key:
-                        logger.info(f"[Scheduler] Iniciando facturacion overage del mes anterior")
+                        logger.info("[Scheduler] Iniciando facturacion overage del mes anterior")
                         try:
                             results = await self.payment.bill_all_overages()
                             logger.info(f"[Scheduler] Overage billing completo: {results.get('billed')} facturados, {results.get('skipped')} skipped, {results.get('errors')} errores")

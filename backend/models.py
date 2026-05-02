@@ -79,6 +79,7 @@ class EmailType(str, Enum):
     WEEKLY_DIGEST = "weekly_digest"
     WELCOME_TENANT = "welcome_tenant"
     UPSELL_UNMET_DEMAND = "upsell_unmet_demand"
+    WAITLIST_THRESHOLD_ALERT = "waitlist_threshold_alert"
     TEST = "test"
 
 

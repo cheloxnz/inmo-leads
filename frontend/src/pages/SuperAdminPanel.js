@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Building2, Users, MessageSquare, Plus, Search, 
   ChevronDown, ChevronUp, Power, PowerOff, Settings,
-  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag
+  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag, Trash2
 } from 'lucide-react';
 import TenantFeatureFlags from '../components/TenantFeatureFlags';
 import FounderSeatsPanel from '../components/FounderSeatsPanel';
@@ -270,6 +270,43 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
     }
   };
 
+  const resetDemoData = async () => {
+    const includeLeads = window.confirm(
+      `¿Querés incluir leads y conversaciones en el reset?\n\n` +
+      `OK = borrar productos + waitlist + leads + conversaciones (reset TOTAL)\n` +
+      `Cancelar = borrar sólo productos + waitlist (reset parcial)`
+    );
+    const confirmMsg = includeLeads
+      ? `⚠️ RESET TOTAL de "${tenant.name}":\n\nSe borrarán productos, waitlist, leads, conversaciones y mensajes.\n\n¿Confirmás?`
+      : `Reset parcial de "${tenant.name}":\n\nSe borrarán solamente productos y waitlist.\n\n¿Confirmás?`;
+    if (!window.confirm(confirmMsg)) return;
+    setUpdating(true);
+    try {
+      const res = await axios.post(
+        `${API}/superadmin/tenants/${tenant.tenant_id}/reset-demo-data`,
+        { confirm: true, include_leads: includeLeads }
+      );
+      const d = res.data;
+      const parts = [
+        `✅ Demo data reseteado para ${tenant.name}`,
+        `• Productos: ${d.products_deleted}`,
+        `• Waitlist: ${d.waitlist_deleted}`,
+        `• Alerts waitlist: ${d.waitlist_alerts_deleted}`,
+      ];
+      if (d.leads_deleted !== undefined) {
+        parts.push(`• Leads: ${d.leads_deleted}`);
+        parts.push(`• Conversaciones: ${d.conversations_deleted}`);
+        parts.push(`• Mensajes: ${d.messages_deleted}`);
+      }
+      alert(parts.join('\n'));
+      onUpdate();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <Card className={`sa-tenant-card ${!tenant.active ? 'inactive' : ''}`} data-testid={`tenant-${tenant.tenant_id}`}>
       <div className="sa-tenant-row" onClick={onToggle}>
@@ -356,6 +393,18 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
             >
               {tenant.active ? <PowerOff className="w-3 h-3 mr-1" /> : <Power className="w-3 h-3 mr-1" />}
               {tenant.active ? 'Desactivar' : 'Reactivar'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={resetDemoData}
+              disabled={updating}
+              style={{ borderColor: '#fecaca', color: '#dc2626' }}
+              data-testid={`reset-demo-${tenant.tenant_id}`}
+              title="Borra productos y waitlist (opcional: leads/conversaciones) para este tenant"
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Reset demo data
             </Button>
           </div>
 
