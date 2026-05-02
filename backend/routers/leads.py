@@ -1,8 +1,11 @@
 """Router de leads: CRUD, kanban, stats, tags, AI summary."""
+import csv
+import io
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from auth_routes import get_current_user, tenant_filter, get_db
 from models import Lead, LeadUpdate, User
@@ -83,6 +86,111 @@ async def get_kanban_data(current_user: User = Depends(get_current_user)):
             kanban_columns[status]["leads"] = result["leads"][:20]
             kanban_columns[status]["count"] = result["count"]
     return kanban_columns
+
+
+# Mapping de status técnico a label castellano (consistente con kanban_columns)
+_STATUS_LABELS = {
+    "new": "Nuevo",
+    "contacted": "Contactado",
+    "qualified": "Calificado",
+    "appointment": "Cita Agendada",
+    "hot": "Caliente",
+    "warm": "Tibio",
+    "cold": "Frío",
+    "completed": "Cerrado",
+}
+
+# Columnas del CSV (orden importa)
+_CSV_HEADERS = [
+    "Nombre", "Teléfono", "Estado", "Score", "Tags",
+    "Zona", "Presupuesto", "Intención", "Cita agendada",
+    "Asesor asignado", "Notas", "Fuente",
+    "Creado", "Última actualización",
+]
+
+
+def _fmt_dt(val) -> str:
+    if not val:
+        return ""
+    if isinstance(val, str):
+        try:
+            val = datetime.fromisoformat(val)
+        except ValueError:
+            return val
+    if isinstance(val, datetime):
+        return val.strftime("%Y-%m-%d %H:%M")
+    return str(val)
+
+
+def _lead_to_row(lead: dict) -> List[str]:
+    return [
+        lead.get("name") or "",
+        lead.get("phone") or "",
+        _STATUS_LABELS.get(lead.get("status", ""), lead.get("status", "")),
+        str(lead.get("score") or 0),
+        ", ".join(lead.get("tags") or []),
+        lead.get("zone") or "",
+        lead.get("budget_text") or "",
+        lead.get("intent") or "",
+        _fmt_dt(lead.get("appointment_datetime")),
+        lead.get("assigned_agent_name") or "",
+        (lead.get("notes") or "").replace("\n", " ").strip(),
+        lead.get("source") or "",
+        _fmt_dt(lead.get("created_at")),
+        _fmt_dt(lead.get("last_message_at")),
+    ]
+
+
+@router.get("/leads/export")
+async def export_leads_csv(
+    status: Optional[str] = None,
+    tag: Optional[str] = None,
+    days: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Exporta leads del tenant a CSV (UTF-8 con BOM para Excel-friendly).
+
+    Filtros opcionales:
+    - `status`: kanban column key (new, contacted, qualified, appointment, hot,
+      warm, cold, completed). Si es CSV con coma → múltiples.
+    - `tag`: tag exacto a filtrar (ej. "interesado").
+    - `days`: solo leads creados en los últimos N días.
+    """
+    query = tenant_filter(current_user)
+    if status:
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        if len(statuses) == 1:
+            query["status"] = statuses[0]
+        elif len(statuses) > 1:
+            query["status"] = {"$in": statuses}
+    if tag:
+        query["tags"] = tag
+    if days and days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        query["created_at"] = {"$gte": cutoff}
+
+    leads = await _db.leads.find(
+        query, {"_id": 0, "conversation_history": 0}
+    ).sort("created_at", -1).to_list(10000)
+
+    buf = io.StringIO()
+    # BOM para que Excel detecte UTF-8 correctamente
+    buf.write("\ufeff")
+    writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(_CSV_HEADERS)
+    for lead in leads:
+        writer.writerow(_lead_to_row(lead))
+
+    buf.seek(0)
+    filename = f"leads_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Total-Rows": str(len(leads)),
+        },
+    )
 
 
 @router.get("/leads/assigned-to-me")

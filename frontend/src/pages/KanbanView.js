@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { 
   User, MapPin, DollarSign, Calendar, Tag, 
-  GripVertical, ArrowRight, Phone
+  GripVertical, ArrowRight, Phone, Download
 } from 'lucide-react';
 
 const statusColors = {
@@ -40,6 +40,33 @@ export default function KanbanView() {
       toast.error('Error cargando datos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const exportToCSV = async () => {
+    setExporting(true);
+    try {
+      const response = await axios.get(`${API}/leads/export`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ts = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+      a.download = `leads_${ts}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      const totalRows = response.headers?.['x-total-rows'] || '?';
+      toast.success(`CSV exportado: ${totalRows} leads`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Error exportando CSV');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -106,9 +133,22 @@ export default function KanbanView() {
 
   return (
     <div className="kanban-container" data-testid="kanban-view">
-      <div className="kanban-header">
-        <h1>Pipeline de Leads</h1>
-        <p>Arrastrá y soltá los leads para cambiar su estado</p>
+      <div className="kanban-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1>Pipeline de Leads</h1>
+          <p>Arrastrá y soltá los leads para cambiar su estado</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportToCSV}
+          disabled={exporting}
+          data-testid="kanban-export-csv-btn"
+          style={{ marginTop: 4 }}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          {exporting ? 'Exportando...' : 'Exportar CSV'}
+        </Button>
       </div>
 
       <div className="kanban-board">

@@ -33,6 +33,27 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter36 - Export Kanban a CSV)
+- **Endpoint** `GET /api/leads/export` (`routers/leads.py`):
+  - Exporta leads del tenant a CSV UTF-8 con BOM (Excel-friendly).
+  - 14 columnas en español: Nombre, Teléfono, Estado, Score, Tags, Zona,
+    Presupuesto, Intención, Cita agendada, Asesor asignado, Notas, Fuente,
+    Creado, Última actualización.
+  - Filtros opcionales: `status` (acepta CSV multi-valor), `tag`, `days`.
+  - Status técnicos mapeados a labels castellano (new→Nuevo, hot→Caliente, etc.).
+  - Headers de respuesta: `Content-Disposition` con filename `leads_YYYYMMDD_HHMM.csv`,
+    `X-Total-Rows` para mostrar count en la UI.
+  - StreamingResponse para no cargar todo a memoria.
+- **Frontend** (`pages/KanbanView.js`):
+  - Botón "Exportar CSV" (icon Download) en header del Kanban, al lado del título.
+  - Descarga blob con filename autogenerado por timestamp local.
+  - Toast con cantidad de leads exportados.
+  - data-testid: `kanban-export-csv-btn`.
+- **Validación**: smoke test via curl con tenant demo-inmobiliaria
+  (20 leads exportados, filtro status=hot retorna 10, 401 sin auth).
+
+
+
 ### 2026-02-XX (Iter35 - Seed Demo Data + Code Review Improvements + Login Fix)
 - **Bug fix (preview)**: `/app/frontend/build/` no existía → `/login` retornaba 404.
   Solución: `yarn build` + restart frontend supervisor. (Recordatorio: SIEMPRE
