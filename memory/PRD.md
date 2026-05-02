@@ -32,6 +32,32 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ---
 
+
+### 2026-02-XX (Iter34 - Quick Wins P1 + Lint cleanup)
+- **UTM tracking en Upsell email** (`email_service.send_upsell_unmet_demand`):
+  - Nuevo kwarg `tenant_id` en la firma. CTAs dual (upgrade + dashboard) con query
+    `?utm_source=upsell&utm_medium=email&utm_campaign=unmet_demand&utm_content={tenant_id}`.
+  - Fallback `APP_URL` env (default `https://app.inmobot.com`). Preview usa URL del ingress.
+  - Text body también incluye ambas URLs planas.
+- **Waitlist Threshold Alert al SuperAdmin** (`waitlist_alert_service.py` + hook en `catalog_service.add_to_waitlist`):
+  - Cuando un producto cruza `WAITLIST_ADMIN_ALERT_THRESHOLD` (default 20) leads,
+    dispara email al `SUPERADMIN_EMAIL` con detalle del tenant, plan y producto.
+  - Idempotencia: colección `waitlist_admin_alerts` con cooldown
+    `WAITLIST_ADMIN_ALERT_COOLDOWN_DAYS` (default 30) por (tenant_id, product_id).
+  - Best-effort: errores en el alert NO interrumpen el flujo del bot.
+  - Email con CTA al panel SuperAdmin pre-filtrado por tenant.
+  - Nuevo `EmailType.WAITLIST_THRESHOLD_ALERT`.
+- **Reset Demo Data** (`POST /api/superadmin/tenants/{tenant_id}/reset-demo-data`):
+  - Body: `{confirm: bool, include_leads: bool}`.
+  - Parcial: borra `products` + `product_waitlist` + `waitlist_admin_alerts`.
+  - Total (include_leads=true): + `leads` + `conversations` + `messages`.
+  - Safety: `confirm=true` requerido, 404 si tenant no existe, 403 si no es superadmin.
+  - UI: botón "Reset demo data" (rojo, icon Trash2) en cada TenantCard expandido del SuperAdminPanel.
+- **Lint cleanup**: eliminados f-strings sin placeholders en `scheduler.py:471` y `email_service.py:183`.
+- **Testing**: 16/16 pytest backend + E2E frontend (onboarding tour + reset-demo button).
+  Test file: `/app/backend/tests/test_iter34_quickwins.py`.
+
+
 ## Changelog
 
 ### 2026-05-02 (Iter33b - Churn Risk + Shopify Leaderboard Block)
