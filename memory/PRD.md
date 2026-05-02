@@ -33,6 +33,32 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter35 - Seed Demo Data + Code Review Improvements + Login Fix)
+- **Bug fix (preview)**: `/app/frontend/build/` no existía → `/login` retornaba 404.
+  Solución: `yarn build` + restart frontend supervisor. (Recordatorio: SIEMPRE
+  rebuild + restart después de cambios en `/app/frontend/src/`.)
+- **Seed Demo Data** (`demo_seed_service.py` + endpoint
+  `POST /api/superadmin/tenants/{tenant_id}/seed-demo-data`):
+  - Dataset diferenciado por `tenant.template_id`: inmobiliaria, ecommerce,
+    restaurante, clinica, servicios (con fallback genérico).
+  - 12 productos verosímiles + waitlist (5 leads ficticios por producto agotado)
+    + opcional 20 leads + conversations + messages para mostrar dashboard rico.
+  - Idempotente: si tenant ya tiene productos, requiere `force=true`.
+  - UI: botón "Seed demo data" (verde, icon Sparkles) al lado del Reset en TenantCard.
+  - Útil para demos comerciales: en 5s el dashboard muestra métricas creíbles.
+- **Code review improvements** (de iter34):
+  - `waitlist_admin_alerts.sent_at` ahora es BSON datetime nativo (no isoformat),
+    permitiendo queries por rango de fechas más robustas.
+  - `reset_demo_data` ahora hace cada delete con try/except (`_safe_delete`),
+    retornando `partial:bool` y `errors:list` ante fallos parciales en lugar
+    de abortar transacción a medio camino.
+  - `APP_URL` ausente ahora dispara `logger.warning` en upsell + waitlist alert
+    emails (evita que staging mande links a producción silenciosamente).
+- **Testing**: 16/16 pytest backend + frontend E2E.
+  Test file: `/app/backend/tests/test_iter35_seed_demo.py`.
+
+
+
 ### 2026-02-XX (Iter34 - Quick Wins P1 + Lint cleanup)
 - **UTM tracking en Upsell email** (`email_service.send_upsell_unmet_demand`):
   - Nuevo kwarg `tenant_id` en la firma. CTAs dual (upgrade + dashboard) con query
