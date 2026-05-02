@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import {
-  CheckCircle2, AlertCircle, ExternalLink, Copy, Eye, EyeOff, Save,
+  CheckCircle2, AlertCircle, ExternalLink, Copy, Eye, EyeOff, Save, Zap,
 } from 'lucide-react';
 
 /**
@@ -28,6 +28,8 @@ export default function WhatsAppConfigSection() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
   const [showToken, setShowToken] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -74,6 +76,31 @@ export default function WhatsAppConfigSection() {
       toast.error('Error guardando: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await axios.post(`${API}/config/whatsapp/test`);
+      setTestResult(res.data);
+      if (res.data.ok) {
+        toast.success(res.data.message);
+      } else {
+        toast.error(res.data.message);
+      }
+    } catch (err) {
+      console.error('Test error:', err);
+      setTestResult({
+        ok: false,
+        status: 'api_error',
+        message: 'Error: ' + (err.response?.data?.detail || err.message),
+        details: {},
+      });
+      toast.error('Error probando conexión');
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -248,10 +275,19 @@ export default function WhatsAppConfigSection() {
           </div>
         </div>
 
-        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="outline"
+            onClick={testConnection}
+            disabled={testing || saving}
+            data-testid="btn-test-wa-connection"
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            {testing ? 'Probando...' : 'Probar conexión'}
+          </Button>
           <Button
             onClick={save}
-            disabled={saving}
+            disabled={saving || testing}
             data-testid="btn-save-wa-config"
             style={{ background: '#16a34a', color: '#fff' }}
           >
@@ -259,6 +295,65 @@ export default function WhatsAppConfigSection() {
             {saving ? 'Guardando...' : 'Guardar configuración'}
           </Button>
         </div>
+
+        {testResult && (
+          <div
+            data-testid="wa-test-result"
+            style={{
+              marginTop: 16,
+              padding: '14px 18px',
+              borderRadius: 10,
+              border: `1px solid ${testResult.ok ? '#a7f3d0' : '#fecaca'}`,
+              background: testResult.ok ? '#f0fdf4' : '#fef2f2',
+              color: testResult.ok ? '#065f46' : '#7f1d1d',
+              fontSize: 13,
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              {testResult.ok ? (
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: '#059669', marginTop: 2 }} />
+              ) : (
+                <AlertCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#dc2626', marginTop: 2 }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <strong style={{ display: 'block', marginBottom: 4 }}>
+                  {testResult.ok ? 'Conexión exitosa' : 'No se pudo conectar'}
+                </strong>
+                <div>{testResult.message}</div>
+                {testResult.details && Object.values(testResult.details).some(v => v) && (
+                  <div style={{
+                    marginTop: 10, padding: '10px 12px', background: '#fff',
+                    borderRadius: 6, fontSize: 12, color: '#374151',
+                    border: '1px solid #e5e7eb',
+                  }}>
+                    <div><strong>Diagnóstico Meta:</strong></div>
+                    <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                      {testResult.details.display_phone_number && (
+                        <li>Número: <code>{testResult.details.display_phone_number}</code></li>
+                      )}
+                      {testResult.details.verified_name && (
+                        <li>Nombre verificado: <strong>{testResult.details.verified_name}</strong></li>
+                      )}
+                      {testResult.details.code_verification_status && (
+                        <li>Verificación SMS/voz: <strong>{testResult.details.code_verification_status}</strong></li>
+                      )}
+                      {testResult.details.quality_rating && (
+                        <li>Quality rating: <strong style={{
+                          color: testResult.details.quality_rating === 'GREEN' ? '#059669'
+                                : testResult.details.quality_rating === 'YELLOW' ? '#b45309' : '#dc2626'
+                        }}>{testResult.details.quality_rating}</strong></li>
+                      )}
+                      {testResult.details.messaging_limit_tier && (
+                        <li>Tier de mensajes: <code>{testResult.details.messaging_limit_tier}</code></li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

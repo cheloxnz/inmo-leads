@@ -33,6 +33,33 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter38 - Probar conexión WhatsApp + CTA Liquid review)
+- **Endpoint** `POST /api/config/whatsapp/test` (`routers/config.py`):
+  - Hace 1 call read-only a `https://graph.facebook.com/v18.0/{phone_number_id}`
+    con fields: `id, display_phone_number, verified_name, quality_rating,
+    code_verification_status, name_status, messaging_limit_tier`.
+  - Mapea a 8 estados: `connected`, `missing_credentials`, `invalid_token`,
+    `not_found`, `permission_denied`, `unverified_number`, `low_quality`,
+    `api_error`.
+  - Detecta token inválido por error code 190 de Meta o "access token" en el
+    mensaje (Meta a veces retorna 400, no 401, ante token malformado).
+  - Detecta phone_number_id inexistente por code 100 + subcode 33.
+  - NO envía mensajes — totalmente read-only.
+  - Timeout 10s con manejo de network errors.
+- **UI** (`WhatsAppConfigSection.js`):
+  - Botón "Probar conexión" (icon Zap) al lado de "Guardar configuración".
+  - Card de resultado con badge verde/rojo, mensaje y diagnóstico expandido
+    (número verificado, quality rating con color GREEN/YELLOW/RED, tier).
+  - data-testid: `btn-test-wa-connection`, `wa-test-result`.
+- **Liquid Shopify CTA review**:
+  - El CTA "Detectá demanda como estos negocios →" YA estaba implementado
+    desde iter previa en `docs/shopify-inmobot-leaderboard.liquid` (línea 47).
+  - URL configurable vía `{{ settings.inmobot_cta_url }}` (default `/products/inmobot-plan-pro`).
+  - Sub-texto "Prueba gratis 7 días · Sin tarjeta".
+  - No requirió cambios.
+
+
+
 ### 2026-02-XX (Iter37 - WhatsApp Config + Plan Button + Tour Fix)
 - **Bug fix - OnboardingTour**: step "whatsapp" apuntaba a `/configuracion` pero
   la ruta real es `/config`. Corregido en `OnboardingTour.js` STEPS.

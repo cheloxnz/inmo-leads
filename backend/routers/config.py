@@ -95,6 +95,177 @@ async def update_whatsapp_config(
     return {"message": "Configuracion de WhatsApp actualizada"}
 
 
+@router.post("/config/whatsapp/test")
+async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
+    """Admin: prueba la conexión a Meta Graph API con las credenciales
+    guardadas del tenant. Hace UN call read-only (no envía mensajes) y
+    retorna info útil del número + status de verificación + quality rating.
+
+    Response shape:
+      {
+        "ok": bool,
+        "status": "connected" | "invalid_token" | "not_found" | "permission_denied"
+                 | "unverified_number" | "low_quality" | "missing_credentials" | "api_error",
+        "message": str,
+        "details": {phone_number, verified_name, quality_rating, code_verification_status, ...}
+      }
+    """
+    import httpx
+
+    tenant = await _db.tenants.find_one(
+        {"tenant_id": current_user.tenant_id}, {"_id": 0}
+    )
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    phone_id = tenant.get("whatsapp_phone_number_id", "").strip()
+    token = tenant.get("whatsapp_access_token", "").strip()
+
+    if not phone_id or not token:
+        return {
+            "ok": False,
+            "status": "missing_credentials",
+            "message": "Faltan credenciales. Cargá Phone Number ID y Access Token y guardá antes de probar.",
+            "details": {},
+        }
+
+    # Read-only call a Graph API: fetch info del phone number con campos diagnósticos
+    url = f"https://graph.facebook.com/v18.0/{phone_id}"
+    params = {
+        "fields": "id,display_phone_number,verified_name,quality_rating,code_verification_status,name_status,messaging_limit_tier",
+        "access_token": token,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params=params)
+    except httpx.TimeoutException:
+        return {
+            "ok": False,
+            "status": "api_error",
+            "message": "Timeout al contactar Meta. Intentá de nuevo en unos segundos.",
+            "details": {},
+        }
+    except Exception as e:
+        logger.warning(f"[wa_test] network error tenant={current_user.tenant_id}: {e}")
+        return {
+            "ok": False,
+            "status": "api_error",
+            "message": "No se pudo contactar a Meta Graph API.",
+            "details": {},
+        }
+
+    # Mapeo de errores
+    if resp.status_code == 401:
+        return {
+            "ok": False,
+            "status": "invalid_token",
+            "message": "Access Token inválido o expirado. Generá uno nuevo en Meta y volvé a guardar.",
+            "details": {},
+        }
+    if resp.status_code == 403:
+        return {
+            "ok": False,
+            "status": "permission_denied",
+            "message": "El token no tiene permisos para acceder a este Phone Number ID. Verificá que sean del mismo Business Account.",
+            "details": {},
+        }
+    if resp.status_code == 404:
+        return {
+            "ok": False,
+            "status": "not_found",
+            "message": "Phone Number ID no existe o no es accesible con este token.",
+            "details": {},
+        }
+    if resp.status_code == 429:
+        return {
+            "ok": False,
+            "status": "api_error",
+            "message": "Meta rate-limited. Esperá un minuto y volvé a probar.",
+            "details": {},
+        }
+    if resp.status_code >= 500:
+        return {
+            "ok": False,
+            "status": "api_error",
+            "message": f"Error en Meta ({resp.status_code}). Intentá más tarde.",
+            "details": {},
+        }
+    if resp.status_code != 200:
+        # Captura mensaje de error si viene en el body
+        try:
+            err_body = resp.json().get("error", {})
+            err_msg = err_body.get("message", "")
+            err_code = err_body.get("code")
+            err_subcode = err_body.get("error_subcode")
+        except Exception:
+            err_msg = ""
+            err_code = None
+            err_subcode = None
+        # Meta a veces devuelve 400 con error code 190 (token inválido) en lugar de 401
+        if err_code == 190 or "access token" in err_msg.lower() or "oauth" in err_msg.lower():
+            return {
+                "ok": False,
+                "status": "invalid_token",
+                "message": f"Access Token inválido o expirado. Detalle Meta: {err_msg}".strip(),
+                "details": {},
+            }
+        # Code 100 con subcode 33 → object no existe
+        if err_code == 100 and err_subcode == 33:
+            return {
+                "ok": False,
+                "status": "not_found",
+                "message": "Phone Number ID no existe o no es accesible con este token.",
+                "details": {},
+            }
+        return {
+            "ok": False,
+            "status": "api_error",
+            "message": f"Respuesta inesperada de Meta (HTTP {resp.status_code}). {err_msg}".strip(),
+            "details": {},
+        }
+
+    data = resp.json()
+    details = {
+        "phone_number_id": data.get("id"),
+        "display_phone_number": data.get("display_phone_number"),
+        "verified_name": data.get("verified_name"),
+        "quality_rating": data.get("quality_rating"),
+        "code_verification_status": data.get("code_verification_status"),
+        "name_status": data.get("name_status"),
+        "messaging_limit_tier": data.get("messaging_limit_tier"),
+    }
+
+    # Reglas de negocio: mostrar warnings si algo no está OK
+    code_ver = (data.get("code_verification_status") or "").upper()
+    quality = (data.get("quality_rating") or "").upper()
+
+    if code_ver and code_ver != "VERIFIED":
+        return {
+            "ok": False,
+            "status": "unverified_number",
+            "message": f"El número aún no está verificado (estado: {code_ver}). Completá la verificación SMS/voz en Meta Business Manager antes de enviar mensajes.",
+            "details": details,
+        }
+    if quality == "RED":
+        return {
+            "ok": False,
+            "status": "low_quality",
+            "message": "El número tiene quality rating ROJO en Meta. Riesgo alto de suspensión. Revisá en Meta Business Manager.",
+            "details": details,
+        }
+
+    return {
+        "ok": True,
+        "status": "connected",
+        "message": (
+            f"✅ Conectado a Meta. Número {data.get('display_phone_number') or '—'} "
+            f"({data.get('verified_name') or 'sin nombre verificado'}). "
+            f"Quality: {quality or 'desconocida'}."
+        ),
+        "details": details,
+    }
+
+
 # ============================================
 # AI Config (per tenant)
 # ============================================
