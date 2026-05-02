@@ -456,6 +456,13 @@ class ResetDemoRequest(BaseModel):
     include_leads: bool = False
 
 
+class SeedDemoRequest(BaseModel):
+    products_count: int = 12
+    waitlist_per_product: int = 5
+    include_leads: bool = False
+    force: bool = False
+
+
 @router.post("/superadmin/tenants/{tenant_id}/reset-demo-data")
 async def reset_demo_data(
     tenant_id: str,
@@ -466,6 +473,10 @@ async def reset_demo_data(
 
     Útil para resetear datos de testing/demo en 1 click.
     Requiere `confirm=true` para ejecutar (safety).
+
+    Cada delete es independiente: si uno falla, el resto continúa y se reporta
+    `partial=true` con los errores encontrados (no transaccional, pero no
+    deja al usuario sin info ante fallos parciales).
     """
     _require_superadmin(current_user)
     if not body.confirm:
@@ -475,25 +486,64 @@ async def reset_demo_data(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
 
-    products_res = await _db.products.delete_many({"tenant_id": tenant_id})
-    waitlist_res = await _db.product_waitlist.delete_many({"tenant_id": tenant_id})
-    alerts_res = await _db.waitlist_admin_alerts.delete_many({"tenant_id": tenant_id})
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    errors: list = []
+    counts: dict = {}
+
+    async def _safe_delete(label: str, collection):
+        try:
+            res = await collection.delete_many({"tenant_id": tenant_id})
+            counts[f"{label}_deleted"] = res.deleted_count
+        except Exception as e:
+            _log.warning(f"[reset-demo] delete failed col={label} tenant={tenant_id}: {e}")
+            counts[f"{label}_deleted"] = 0
+            errors.append({"collection": label, "error": str(e)})
+
+    await _safe_delete("products", _db.products)
+    await _safe_delete("waitlist", _db.product_waitlist)
+    await _safe_delete("waitlist_alerts", _db.waitlist_admin_alerts)
+
+    if body.include_leads:
+        await _safe_delete("leads", _db.leads)
+        await _safe_delete("conversations", _db.conversations)
+        await _safe_delete("messages", _db.messages)
 
     result = {
         "tenant_id": tenant_id,
-        "products_deleted": products_res.deleted_count,
-        "waitlist_deleted": waitlist_res.deleted_count,
-        "waitlist_alerts_deleted": alerts_res.deleted_count,
+        **counts,
+        "partial": bool(errors),
     }
+    if errors:
+        result["errors"] = errors
+    return result
 
-    if body.include_leads:
-        leads_res = await _db.leads.delete_many({"tenant_id": tenant_id})
-        conv_res = await _db.conversations.delete_many({"tenant_id": tenant_id})
-        msg_res = await _db.messages.delete_many({"tenant_id": tenant_id})
-        result.update({
-            "leads_deleted": leads_res.deleted_count,
-            "conversations_deleted": conv_res.deleted_count,
-            "messages_deleted": msg_res.deleted_count,
-        })
 
+@router.post("/superadmin/tenants/{tenant_id}/seed-demo-data")
+async def seed_demo_data_endpoint(
+    tenant_id: str,
+    body: SeedDemoRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: pueble un tenant con productos + waitlist (+ leads opcionales)
+    ficticios pero verosímiles para demos comerciales en vivo.
+
+    El dataset varía según `tenant.template_id` (inmobiliaria, ecommerce,
+    restaurante, clinica, servicios). Si el tenant ya tiene productos,
+    requiere `force=true` para agregar más.
+    """
+    _require_superadmin(current_user)
+    tenant = await _db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0, "tenant_id": 1})
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    from demo_seed_service import seed_demo_data
+    result = await seed_demo_data(
+        _db,
+        tenant_id=tenant_id,
+        products_count=body.products_count,
+        waitlist_per_product=body.waitlist_per_product,
+        include_leads=body.include_leads,
+        force=body.force,
+    )
     return result

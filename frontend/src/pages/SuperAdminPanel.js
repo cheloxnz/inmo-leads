@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   Building2, Users, MessageSquare, Plus, Search, 
   ChevronDown, ChevronUp, Power, PowerOff, Settings,
-  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag, Trash2
+  Globe, CreditCard, Activity, DollarSign, TrendingDown, Zap, Flag, Trash2, Sparkles
 } from 'lucide-react';
 import TenantFeatureFlags from '../components/TenantFeatureFlags';
 import FounderSeatsPanel from '../components/FounderSeatsPanel';
@@ -298,7 +298,60 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
         parts.push(`• Conversaciones: ${d.conversations_deleted}`);
         parts.push(`• Mensajes: ${d.messages_deleted}`);
       }
+      if (d.partial) {
+        parts.push(`\n⚠️ Borrado parcial — algunas colecciones fallaron:`);
+        (d.errors || []).forEach(e => parts.push(`  - ${e.collection}: ${e.error}`));
+      }
       alert(parts.join('\n'));
+      onUpdate();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const seedDemoData = async () => {
+    const includeLeads = window.confirm(
+      `¿Generar también leads y conversaciones ficticios?\n\n` +
+      `OK = productos + waitlist + leads + conversaciones (demo COMPLETA)\n` +
+      `Cancelar = solo productos + waitlist (demo BÁSICA)`
+    );
+    const confirmMsg = includeLeads
+      ? `🎲 Seed demo data COMPLETA para "${tenant.name}":\n\nSe generarán ~12 productos + ~30 leads en waitlist + 20 leads con conversaciones.\n\n¿Continuar?`
+      : `🎲 Seed demo data BÁSICA para "${tenant.name}":\n\nSe generarán ~12 productos + ~30 leads en waitlist.\n\n¿Continuar?`;
+    if (!window.confirm(confirmMsg)) return;
+    setUpdating(true);
+    try {
+      const res = await axios.post(
+        `${API}/superadmin/tenants/${tenant.tenant_id}/seed-demo-data`,
+        { products_count: 12, waitlist_per_product: 5, include_leads: includeLeads, force: false }
+      );
+      const d = res.data;
+      if (d.skipped) {
+        if (window.confirm(`El tenant ya tiene ${d.existing_products} productos. ¿Querés AGREGAR los demo de todos modos?`)) {
+          const res2 = await axios.post(
+            `${API}/superadmin/tenants/${tenant.tenant_id}/seed-demo-data`,
+            { products_count: 12, waitlist_per_product: 5, include_leads: includeLeads, force: true }
+          );
+          const d2 = res2.data;
+          alert(
+            `✅ Seed agregado a "${tenant.name}" (template: ${d2.template_used})\n` +
+            `• Productos: +${d2.products_inserted}\n` +
+            `• Waitlist: +${d2.waitlist_inserted}\n` +
+            `• Leads: +${d2.leads_inserted}\n` +
+            `• Conversaciones: +${d2.conversations_inserted}`
+          );
+        }
+      } else {
+        alert(
+          `✅ Demo data generada para "${tenant.name}" (template: ${d.template_used})\n` +
+          `• Productos: ${d.products_inserted}\n` +
+          `• Waitlist: ${d.waitlist_inserted}\n` +
+          `• Leads: ${d.leads_inserted}\n` +
+          `• Conversaciones: ${d.conversations_inserted}`
+        );
+      }
       onUpdate();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.detail || err.message));
@@ -393,6 +446,18 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
             >
               {tenant.active ? <PowerOff className="w-3 h-3 mr-1" /> : <Power className="w-3 h-3 mr-1" />}
               {tenant.active ? 'Desactivar' : 'Reactivar'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={seedDemoData}
+              disabled={updating}
+              style={{ borderColor: '#a7f3d0', color: '#059669' }}
+              data-testid={`seed-demo-${tenant.tenant_id}`}
+              title="Genera productos + waitlist (+ leads) ficticios para demos comerciales"
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              Seed demo data
             </Button>
             <Button
               size="sm"

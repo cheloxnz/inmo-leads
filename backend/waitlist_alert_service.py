@@ -56,12 +56,12 @@ async def maybe_alert_superadmin(
         return False
 
     # Cooldown check
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=cooldown_days)).isoformat()
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=cooldown_days)
     existing = await db.waitlist_admin_alerts.find_one(
         {
             "tenant_id": tenant_id,
             "product_id": product_id,
-            "sent_at": {"$gte": cutoff},
+            "sent_at": {"$gte": cutoff_dt},
         },
         {"_id": 0},
     )
@@ -102,7 +102,7 @@ async def maybe_alert_superadmin(
         "product_name": product_name,
         "leads_count": count,
         "threshold": threshold,
-        "sent_at": datetime.now(timezone.utc).isoformat(),
+        "sent_at": datetime.now(timezone.utc),
         "delivered": bool(ok),
     })
     if ok:

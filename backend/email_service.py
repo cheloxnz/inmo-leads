@@ -812,7 +812,13 @@ InmoBot AI - Sistema de Calificación Automática
         top = demand.get("top_products", []) or []
 
         # UTM-tagged CTAs (P1 quick win)
-        app_url = os.environ.get("APP_URL", "https://app.inmobot.com").rstrip("/")
+        app_url_env = os.environ.get("APP_URL")
+        if not app_url_env:
+            logger.warning(
+                "[upsell] APP_URL no configurado en .env — usando default https://app.inmobot.com. "
+                "En staging/preview esto puede generar links a producción."
+            )
+        app_url = (app_url_env or "https://app.inmobot.com").rstrip("/")
         utm_base = (
             "utm_source=upsell&utm_medium=email&utm_campaign=unmet_demand"
             + (f"&utm_content={tenant_id}" if tenant_id else "")
@@ -986,7 +992,13 @@ InmoBot AI - Sistema de Calificación Automática
         if not to_email:
             return False
 
-        app_url = os.environ.get("APP_URL", "https://app.inmobot.com").rstrip("/")
+        app_url_env = os.environ.get("APP_URL")
+        if not app_url_env:
+            logger.warning(
+                "[waitlist_alert] APP_URL no configurado en .env — usando default. "
+                "Los links del email pueden apuntar a producción."
+            )
+        app_url = (app_url_env or "https://app.inmobot.com").rstrip("/")
         utm = (
             "utm_source=admin_alert&utm_medium=email&utm_campaign=waitlist_threshold"
             f"&utm_content={tenant_id}"

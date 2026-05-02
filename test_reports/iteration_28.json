@@ -1,0 +1,32 @@
+{
+  "summary": "Iter 35 - Tested Seed Demo Data endpoint + 3 code-review quick wins (BSON datetime in waitlist_admin_alerts, reset_demo_data error handling with partial/errors, APP_URL warning in email_service) + regression. 16/16 backend pytest cases PASSED. Frontend SuperAdminPanel verified: both Seed Demo and Reset Demo buttons render on expanded TenantCard with correct data-testids.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter35_seed_demo.py",
+    "/app/test_reports/pytest/iter35_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "demo_seed_service.py stores dates as .isoformat() strings in products/waitlist/leads/conversations/messages while the iter35 fix rightly switched waitlist_admin_alerts.sent_at to native datetime — consider unifying: the rest of the collections also query by date ranges in other services (demand, coach) and string dates won't sort correctly once epochs cross month boundaries.",
+    "maybe_alert_superadmin (waitlist_alert_service.py) uses find_one cooldown check then insert_one without atomic upsert — under race conditions two concurrent callers could both send the alert. Low risk but consider replace_one(upsert=True) with filter on composite key.",
+    "SeedDemoRequest has no upper bounds on products_count / waitlist_per_product — a superadmin could pass large numbers. Dataset sample is capped by dataset length so products_count is safe, but consider validating 1<=n<=100 via Pydantic Field."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter35_seed_demo.py (new file, 16 tests)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@inmobot.com/Admin123! (superadmin), demo@inmobot.com/Demo123! (demo tenant)",
+  "seed_data_creation": "Used test-pizzeria-e2e tenant for seed/reset cycles; cleaned up after tests. demo-inmobiliaria NOT touched per instructions (user wants clean onboarding).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 16 backend tests in test_iter35_seed_demo.py pass. Frontend SuperAdminPanel: click a tenant-{id} card to expand, then seed-demo-{id} and reset-demo-{id} buttons render. Both endpoints (seed-demo-data and reset-demo-data) return proper shapes (partial bool, skipped idempotency, template_used varying per template_id). waitlist_admin_alerts.sent_at is now BSON datetime (cooldown verified idempotent). APP_URL warning log verified in both send_upsell_unmet_demand and send_waitlist_threshold_alert.",
+  "rca of the issue": "N/A - no bugs found. Initial test writing issues (wrong function names, response shape assumptions for /auth/onboarding/status -> returns 'completed' not 'onboarding_completed') were corrected in the test file."
+}
