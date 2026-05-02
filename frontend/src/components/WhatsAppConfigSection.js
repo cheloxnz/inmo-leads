@@ -41,6 +41,10 @@ export default function WhatsAppConfigSection() {
     try {
       const res = await axios.get(`${API}/config/whatsapp`);
       setData(res.data);
+      // Si el tenant ya tiene un test previo persistido, lo mostramos
+      if (res.data.last_check) {
+        setTestResult(res.data.last_check);
+      }
     } catch (err) {
       console.error('Error fetching whatsapp config:', err);
       toast.error('Error cargando configuración WhatsApp');
@@ -68,8 +72,17 @@ export default function WhatsAppConfigSection() {
       ) {
         payload.whatsapp_access_token = data.whatsapp_access_token;
       }
-      await axios.put(`${API}/config/whatsapp`, payload);
+      const res = await axios.put(`${API}/config/whatsapp`, payload);
       toast.success('Configuración WhatsApp guardada');
+      // El backend dispara auto-test post-save y devuelve el resultado
+      if (res.data?.test) {
+        setTestResult(res.data.test);
+        if (res.data.test.ok) {
+          toast.success('Conexión a Meta verificada');
+        } else if (res.data.test.status !== 'missing_credentials') {
+          toast.warning('Conexión guardada pero el test falló — revisá los detalles');
+        }
+      }
       await fetch();
     } catch (err) {
       console.error('Error saving:', err);

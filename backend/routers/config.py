@@ -66,6 +66,7 @@ async def get_whatsapp_config(current_user: User = Depends(require_admin)):
         "configured": bool(
             tenant.get("whatsapp_access_token") and tenant.get("whatsapp_phone_number_id")
         ),
+        "last_check": tenant.get("whatsapp_last_check"),
     }
 
 
@@ -74,7 +75,13 @@ async def update_whatsapp_config(
     config: dict,
     current_user: User = Depends(require_admin),
 ):
-    """Admin: Actualiza config de WhatsApp del tenant"""
+    """Admin: Actualiza config de WhatsApp del tenant.
+
+    Después de guardar, dispara automáticamente un test de conexión
+    contra Meta Graph API y persiste el resultado en
+    `tenants.whatsapp_last_check` para que el SuperAdmin pueda ver el
+    estado de cada tenant sin tener que abrir la config de cada uno.
+    """
     update_fields = {}
     allowed = [
         "whatsapp_phone_number_id",
@@ -92,44 +99,46 @@ async def update_whatsapp_config(
         {"tenant_id": current_user.tenant_id},
         {"$set": update_fields},
     )
-    return {"message": "Configuracion de WhatsApp actualizada"}
+
+    # Auto-test de conexión post-save
+    test_result = await _run_whatsapp_check(current_user.tenant_id)
+    return {
+        "message": "Configuracion de WhatsApp actualizada",
+        "test": test_result,
+    }
 
 
-@router.post("/config/whatsapp/test")
-async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
-    """Admin: prueba la conexión a Meta Graph API con las credenciales
-    guardadas del tenant. Hace UN call read-only (no envía mensajes) y
-    retorna info útil del número + status de verificación + quality rating.
+async def _run_whatsapp_check(tenant_id: str) -> dict:
+    """Ejecuta el check contra Meta Graph API y persiste el resultado
+    en `tenants.whatsapp_last_check`. Retorna el resultado para el caller.
 
-    Response shape:
-      {
-        "ok": bool,
-        "status": "connected" | "invalid_token" | "not_found" | "permission_denied"
-                 | "unverified_number" | "low_quality" | "missing_credentials" | "api_error",
-        "message": str,
-        "details": {phone_number, verified_name, quality_rating, code_verification_status, ...}
-      }
+    Reusable desde el endpoint manual (`/config/whatsapp/test`) y desde
+    el auto-test post-save (PUT `/config/whatsapp`).
     """
     import httpx
 
-    tenant = await _db.tenants.find_one(
-        {"tenant_id": current_user.tenant_id}, {"_id": 0}
-    )
+    tenant = await _db.tenants.find_one({"tenant_id": tenant_id}, {"_id": 0})
     if not tenant:
-        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+        return {
+            "ok": False,
+            "status": "missing_credentials",
+            "message": "Tenant no encontrado",
+            "details": {},
+        }
 
-    phone_id = tenant.get("whatsapp_phone_number_id", "").strip()
-    token = tenant.get("whatsapp_access_token", "").strip()
+    phone_id = (tenant.get("whatsapp_phone_number_id") or "").strip()
+    token = (tenant.get("whatsapp_access_token") or "").strip()
 
     if not phone_id or not token:
-        return {
+        result = {
             "ok": False,
             "status": "missing_credentials",
             "message": "Faltan credenciales. Cargá Phone Number ID y Access Token y guardá antes de probar.",
             "details": {},
         }
+        await _persist_check_result(tenant_id, result)
+        return result
 
-    # Read-only call a Graph API: fetch info del phone number con campos diagnósticos
     url = f"https://graph.facebook.com/v18.0/{phone_id}"
     params = {
         "fields": "id,display_phone_number,verified_name,quality_rating,code_verification_status,name_status,messaging_limit_tier",
@@ -139,59 +148,63 @@ async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, params=params)
     except httpx.TimeoutException:
-        return {
+        result = {
             "ok": False,
             "status": "api_error",
             "message": "Timeout al contactar Meta. Intentá de nuevo en unos segundos.",
             "details": {},
         }
+        await _persist_check_result(tenant_id, result)
+        return result
     except Exception as e:
-        logger.warning(f"[wa_test] network error tenant={current_user.tenant_id}: {e}")
-        return {
+        logger.warning(f"[wa_test] network error tenant={tenant_id}: {e}")
+        result = {
             "ok": False,
             "status": "api_error",
             "message": "No se pudo contactar a Meta Graph API.",
             "details": {},
         }
+        await _persist_check_result(tenant_id, result)
+        return result
 
     # Mapeo de errores
+    result = None
     if resp.status_code == 401:
-        return {
+        result = {
             "ok": False,
             "status": "invalid_token",
             "message": "Access Token inválido o expirado. Generá uno nuevo en Meta y volvé a guardar.",
             "details": {},
         }
-    if resp.status_code == 403:
-        return {
+    elif resp.status_code == 403:
+        result = {
             "ok": False,
             "status": "permission_denied",
             "message": "El token no tiene permisos para acceder a este Phone Number ID. Verificá que sean del mismo Business Account.",
             "details": {},
         }
-    if resp.status_code == 404:
-        return {
+    elif resp.status_code == 404:
+        result = {
             "ok": False,
             "status": "not_found",
             "message": "Phone Number ID no existe o no es accesible con este token.",
             "details": {},
         }
-    if resp.status_code == 429:
-        return {
+    elif resp.status_code == 429:
+        result = {
             "ok": False,
             "status": "api_error",
             "message": "Meta rate-limited. Esperá un minuto y volvé a probar.",
             "details": {},
         }
-    if resp.status_code >= 500:
-        return {
+    elif resp.status_code >= 500:
+        result = {
             "ok": False,
             "status": "api_error",
             "message": f"Error en Meta ({resp.status_code}). Intentá más tarde.",
             "details": {},
         }
-    if resp.status_code != 200:
-        # Captura mensaje de error si viene en el body
+    elif resp.status_code != 200:
         try:
             err_body = resp.json().get("error", {})
             err_msg = err_body.get("message", "")
@@ -201,69 +214,103 @@ async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
             err_msg = ""
             err_code = None
             err_subcode = None
-        # Meta a veces devuelve 400 con error code 190 (token inválido) en lugar de 401
         if err_code == 190 or "access token" in err_msg.lower() or "oauth" in err_msg.lower():
-            return {
+            result = {
                 "ok": False,
                 "status": "invalid_token",
                 "message": f"Access Token inválido o expirado. Detalle Meta: {err_msg}".strip(),
                 "details": {},
             }
-        # Code 100 con subcode 33 → object no existe
-        if err_code == 100 and err_subcode == 33:
-            return {
+        elif err_code == 100 and err_subcode == 33:
+            result = {
                 "ok": False,
                 "status": "not_found",
                 "message": "Phone Number ID no existe o no es accesible con este token.",
                 "details": {},
             }
-        return {
-            "ok": False,
-            "status": "api_error",
-            "message": f"Respuesta inesperada de Meta (HTTP {resp.status_code}). {err_msg}".strip(),
-            "details": {},
+        else:
+            result = {
+                "ok": False,
+                "status": "api_error",
+                "message": f"Respuesta inesperada de Meta (HTTP {resp.status_code}). {err_msg}".strip(),
+                "details": {},
+            }
+
+    if result is None:
+        # 200 OK
+        data = resp.json()
+        details = {
+            "phone_number_id": data.get("id"),
+            "display_phone_number": data.get("display_phone_number"),
+            "verified_name": data.get("verified_name"),
+            "quality_rating": data.get("quality_rating"),
+            "code_verification_status": data.get("code_verification_status"),
+            "name_status": data.get("name_status"),
+            "messaging_limit_tier": data.get("messaging_limit_tier"),
         }
+        code_ver = (data.get("code_verification_status") or "").upper()
+        quality = (data.get("quality_rating") or "").upper()
 
-    data = resp.json()
-    details = {
-        "phone_number_id": data.get("id"),
-        "display_phone_number": data.get("display_phone_number"),
-        "verified_name": data.get("verified_name"),
-        "quality_rating": data.get("quality_rating"),
-        "code_verification_status": data.get("code_verification_status"),
-        "name_status": data.get("name_status"),
-        "messaging_limit_tier": data.get("messaging_limit_tier"),
-    }
+        if code_ver and code_ver != "VERIFIED":
+            result = {
+                "ok": False,
+                "status": "unverified_number",
+                "message": f"El número aún no está verificado (estado: {code_ver}). Completá la verificación SMS/voz en Meta Business Manager antes de enviar mensajes.",
+                "details": details,
+            }
+        elif quality == "RED":
+            result = {
+                "ok": False,
+                "status": "low_quality",
+                "message": "El número tiene quality rating ROJO en Meta. Riesgo alto de suspensión. Revisá en Meta Business Manager.",
+                "details": details,
+            }
+        else:
+            result = {
+                "ok": True,
+                "status": "connected",
+                "message": (
+                    f"✅ Conectado a Meta. Número {data.get('display_phone_number') or '—'} "
+                    f"({data.get('verified_name') or 'sin nombre verificado'}). "
+                    f"Quality: {quality or 'desconocida'}."
+                ),
+                "details": details,
+            }
 
-    # Reglas de negocio: mostrar warnings si algo no está OK
-    code_ver = (data.get("code_verification_status") or "").upper()
-    quality = (data.get("quality_rating") or "").upper()
+    await _persist_check_result(tenant_id, result)
+    return result
 
-    if code_ver and code_ver != "VERIFIED":
-        return {
-            "ok": False,
-            "status": "unverified_number",
-            "message": f"El número aún no está verificado (estado: {code_ver}). Completá la verificación SMS/voz en Meta Business Manager antes de enviar mensajes.",
-            "details": details,
-        }
-    if quality == "RED":
-        return {
-            "ok": False,
-            "status": "low_quality",
-            "message": "El número tiene quality rating ROJO en Meta. Riesgo alto de suspensión. Revisá en Meta Business Manager.",
-            "details": details,
-        }
 
-    return {
-        "ok": True,
-        "status": "connected",
-        "message": (
-            f"✅ Conectado a Meta. Número {data.get('display_phone_number') or '—'} "
-            f"({data.get('verified_name') or 'sin nombre verificado'}). "
-            f"Quality: {quality or 'desconocida'}."
-        ),
-        "details": details,
-    }
+async def _persist_check_result(tenant_id: str, result: dict) -> None:
+    """Guarda el último resultado del WhatsApp test en el tenant para mostrar
+    en SuperAdmin sin re-llamar a Meta."""
+    try:
+        await _db.tenants.update_one(
+            {"tenant_id": tenant_id},
+            {"$set": {
+                "whatsapp_last_check": {
+                    "ok": result.get("ok", False),
+                    "status": result.get("status", "api_error"),
+                    "message": result.get("message", ""),
+                    "details": result.get("details", {}),
+                    "checked_at": datetime.utcnow().isoformat(),
+                },
+            }},
+        )
+    except Exception as e:
+        logger.warning(f"[wa_test] persist failed tenant={tenant_id}: {e}")
+
+
+@router.post("/config/whatsapp/test")
+async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
+    """Admin: prueba la conexión a Meta Graph API con las credenciales
+    guardadas del tenant. Hace UN call read-only (no envía mensajes) y
+    retorna info útil del número + status de verificación + quality rating.
+
+    Persiste el resultado en `tenants.whatsapp_last_check` para que el
+    SuperAdmin pueda ver el estado de cada tenant en su listado.
+    """
+    return await _run_whatsapp_check(current_user.tenant_id)
 
 
 # ============================================

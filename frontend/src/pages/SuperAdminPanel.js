@@ -225,6 +225,119 @@ export default function SuperAdminPanel() {
 }
 
 
+function formatTimeAgo(iso) {
+  if (!iso) return '';
+  try {
+    const then = new Date(iso);
+    const diffMs = Date.now() - then.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'recién';
+    if (mins < 60) return `hace ${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `hace ${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `hace ${days}d`;
+    return then.toLocaleDateString('es');
+  } catch {
+    return '';
+  }
+}
+
+function WhatsAppHealthBadge({ tenant, mini = false }) {
+  const check = tenant.whatsapp_last_check;
+  const hasCreds = !!tenant.whatsapp_phone_number_id;
+
+  // Sin credenciales aún
+  if (!check && !hasCreds) {
+    return (
+      <span
+        className="sa-badge"
+        style={{ background: '#f1f5f9', color: '#64748b', fontSize: 11 }}
+        data-testid={`wa-health-${tenant.tenant_id}`}
+        title="WhatsApp no configurado"
+      >
+        WA: —
+      </span>
+    );
+  }
+
+  // Tiene creds pero nunca corrió el check
+  if (!check) {
+    return (
+      <span
+        className="sa-badge"
+        style={{ background: '#fef3c7', color: '#b45309', fontSize: 11 }}
+        data-testid={`wa-health-${tenant.tenant_id}`}
+        title="WhatsApp configurado pero sin test ejecutado"
+      >
+        WA: sin test
+      </span>
+    );
+  }
+
+  // Resultado conocido
+  const ok = check.ok;
+  const status = check.status;
+  const quality = (check.details?.quality_rating || '').toUpperCase();
+
+  let bg = '#fee2e2';
+  let color = '#b91c1c';
+  let label = 'WA: error';
+  let icon = '✕';
+
+  if (ok && status === 'connected') {
+    if (quality === 'GREEN') {
+      bg = '#dcfce7'; color = '#15803d'; label = 'WA: ✓ GREEN'; icon = '✓';
+    } else if (quality === 'YELLOW') {
+      bg = '#fef3c7'; color = '#b45309'; label = 'WA: ✓ YELLOW'; icon = '⚠';
+    } else {
+      bg = '#dcfce7'; color = '#15803d'; label = 'WA: conectado'; icon = '✓';
+    }
+  } else if (status === 'unverified_number') {
+    bg = '#fef3c7'; color = '#b45309'; label = 'WA: sin verificar'; icon = '⚠';
+  } else if (status === 'low_quality') {
+    bg = '#fee2e2'; color = '#b91c1c'; label = 'WA: RED'; icon = '⚠';
+  } else if (status === 'invalid_token') {
+    bg = '#fee2e2'; color = '#b91c1c'; label = 'WA: token inválido'; icon = '✕';
+  } else if (status === 'not_found' || status === 'permission_denied') {
+    bg = '#fee2e2'; color = '#b91c1c'; label = 'WA: creds incorrectas'; icon = '✕';
+  } else if (status === 'missing_credentials') {
+    bg = '#f1f5f9'; color = '#64748b'; label = 'WA: pendiente'; icon = '○';
+  }
+
+  const ago = formatTimeAgo(check.checked_at);
+  const tooltip = `${check.message}${ago ? ` · ${ago}` : ''}`;
+
+  if (mini) {
+    return (
+      <span
+        className="sa-badge"
+        style={{ background: bg, color, fontSize: 11, fontWeight: 600 }}
+        title={tooltip}
+        data-testid={`wa-health-${tenant.tenant_id}`}
+      >
+        {icon} {label}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        background: bg, color, padding: '4px 10px', borderRadius: 12,
+        fontSize: 12, fontWeight: 600,
+      }}
+      title={tooltip}
+      data-testid={`wa-health-${tenant.tenant_id}`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+      {ago && <span style={{ opacity: 0.7, fontWeight: 400 }}>· {ago}</span>}
+    </span>
+  );
+}
+
 function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
   const [updating, setUpdating] = useState(false);
   const [editingBranding, setEditingBranding] = useState(false);
@@ -376,6 +489,7 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
           <span className="sa-badge">{tenant.country || '-'}</span>
           <span className="sa-badge leads">{tenant.leads_count || 0} leads</span>
           <span className="sa-badge agents">{tenant.agents_count || 0} agentes</span>
+          <WhatsAppHealthBadge tenant={tenant} mini />
           {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </div>
       </div>
@@ -395,9 +509,12 @@ function TenantCard({ tenant, expanded, onToggle, onUpdate }) {
               <CreditCard className="w-4 h-4" />
               <span>Suscripcion: {tenant.subscription_status || 'active'}</span>
             </div>
-            <div className="sa-detail-item">
-              <Activity className="w-4 h-4" />
-              <span>WhatsApp: {tenant.whatsapp_phone_number_id ? 'Configurado' : 'Pendiente'}</span>
+            <div className="sa-detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Activity className="w-4 h-4" />
+                <span>WhatsApp:</span>
+              </div>
+              <WhatsAppHealthBadge tenant={tenant} />
             </div>
             <div className="sa-detail-item">
               <MessageSquare className="w-4 h-4" />

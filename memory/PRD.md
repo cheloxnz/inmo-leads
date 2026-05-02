@@ -33,6 +33,34 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter39 - Auto WhatsApp health check + SuperAdmin badge)
+- **Refactor**: extraído el check de WhatsApp a `_run_whatsapp_check(tenant_id)`
+  reusable + helper `_persist_check_result(tenant_id, result)`.
+- **Auto-test post-save** (`PUT /api/config/whatsapp`):
+  - Después de actualizar credenciales, dispara automáticamente el check
+    contra Meta Graph API y persiste el resultado.
+  - Response ahora incluye `{"message", "test": {ok, status, message, details}}`.
+  - El frontend muestra toast diferenciado y prepopula la card de resultado.
+- **Persistencia** en `tenants.whatsapp_last_check`:
+  `{ok, status, message, details, checked_at}` — actualizado tanto en el
+  manual test como en el auto-test post-save.
+- **GET /config/whatsapp** ahora retorna `last_check` para que el tenant
+  vea el resultado anterior al cargar la pantalla (sin tener que pulsar
+  Probar conexión otra vez).
+- **SuperAdmin badge** (`SuperAdminPanel.js`):
+  - Nuevo helper `formatTimeAgo(iso)` (recién, hace N min, hace Nh, hace Nd).
+  - Nuevo componente `<WhatsAppHealthBadge tenant mini={false} />`.
+  - Mini badge en la fila del tenant (siempre visible): "✓ WA: GREEN",
+    "✕ WA: token inválido", "WA: —", etc. con colores semafóricos.
+  - Badge expandido con timestamp ("hace 2h") al abrir el detalle.
+  - Tooltip con el mensaje completo del último check.
+  - Mapeo de status → label/color: connected+GREEN (verde), connected+YELLOW
+    (amarillo), unverified_number (amarillo), low_quality/invalid_token/
+    not_found/permission_denied (rojo), missing_credentials (gris).
+  - data-testid: `wa-health-{tenant_id}`.
+
+
+
 ### 2026-02-XX (Iter38 - Probar conexión WhatsApp + CTA Liquid review)
 - **Endpoint** `POST /api/config/whatsapp/test` (`routers/config.py`):
   - Hace 1 call read-only a `https://graph.facebook.com/v18.0/{phone_number_id}`
