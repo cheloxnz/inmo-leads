@@ -43,6 +43,15 @@
         <span>leads procesados</span>
       </div>
     </div>
+    <div class="inmobot-proof-cta-wrap">
+      <a href="{{ settings.inmobot_cta_url | default: '/products/inmobot-plan-pro' }}" class="inmobot-proof-cta">
+        Detectá demanda como estos negocios
+        <span class="inmobot-proof-cta-arrow">→</span>
+      </a>
+      <div class="inmobot-proof-cta-sub">
+        Prueba gratis 7 días · Sin tarjeta
+      </div>
+    </div>
   </div>
 </div>
 
@@ -147,6 +156,45 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
+  }
+
+  .inmobot-proof-cta-wrap {
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    text-align: center;
+  }
+  .inmobot-proof-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+    color: #1e1b4b !important;
+    padding: 14px 30px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 16px;
+    text-decoration: none;
+    letter-spacing: -0.2px;
+    box-shadow: 0 8px 24px rgba(251, 191, 36, 0.35), 0 0 0 3px rgba(251, 191, 36, 0.15);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+  .inmobot-proof-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(251, 191, 36, 0.45), 0 0 0 4px rgba(251, 191, 36, 0.25);
+  }
+  .inmobot-proof-cta-arrow {
+    font-weight: 600;
+    transition: transform 0.15s ease-out;
+  }
+  .inmobot-proof-cta:hover .inmobot-proof-cta-arrow {
+    transform: translateX(4px);
+  }
+  .inmobot-proof-cta-sub {
+    margin-top: 10px;
+    font-size: 12px;
+    opacity: 0.72;
+    letter-spacing: 0.2px;
   }
 
   @media (max-width: 520px) {

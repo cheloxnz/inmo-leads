@@ -167,6 +167,52 @@ async def change_password(
 
 
 # ============================================
+# Onboarding Tour (Iter33c)
+# ============================================
+
+@router.get("/onboarding/status")
+async def get_onboarding_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Retorna si el usuario completó el onboarding tour.
+
+    El flag se guarda en el agente (no en el tenant) para que cada usuario
+    haga el tour una sola vez aunque compartan tenant.
+    """
+    agent = await db.agents.find_one(
+        {"email": current_user.email},
+        {"_id": 0, "onboarding_completed": 1, "onboarding_started_at": 1},
+    )
+    return {
+        "completed": bool(agent and agent.get("onboarding_completed")),
+        "started_at": (agent or {}).get("onboarding_started_at"),
+    }
+
+
+@router.post("/onboarding/complete")
+async def complete_onboarding(
+    body: dict = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+):
+    """Marca el onboarding como completado. Body opcional: `{skipped: bool}`."""
+    from datetime import datetime, timezone
+    skipped = bool((body or {}).get("skipped", False))
+    await db.agents.update_one(
+        {"email": current_user.email},
+        {"$set": {
+            "onboarding_completed": True,
+            "onboarding_completed_at": datetime.now(timezone.utc).isoformat(),
+            "onboarding_skipped": skipped,
+        }},
+    )
+    return {"ok": True, "skipped": skipped}
+
+
+
+
+# ============================================
 # Agent Management (tenant-scoped)
 # ============================================
 

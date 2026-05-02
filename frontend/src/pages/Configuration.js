@@ -169,7 +169,7 @@ export default function Configuration() {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card data-testid="whatsapp-section">
           <CardHeader>
             <CardTitle>Integraciones WhatsApp</CardTitle>
           </CardHeader>

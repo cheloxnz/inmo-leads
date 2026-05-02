@@ -34,6 +34,7 @@ import Broadcast from './pages/Broadcast';
 import MarketingEffectiveness from './pages/MarketingEffectiveness';
 import Changelog from './pages/Changelog';
 import UpdateBanner from './components/UpdateBanner';
+import OnboardingTour from './components/OnboardingTour';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
 import '@/App.css';
 
@@ -426,6 +427,7 @@ function AppContent() {
       <main className="main-content">
         <UpdateBanner />
         <AppHeader />
+        <OnboardingTour />
         <Routes>
           {/* Ruta SuperAdmin */}
           <Route path="/superadmin" element={
