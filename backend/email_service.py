@@ -971,6 +971,7 @@ InmoBot AI - Sistema de Calificación Automática
         upsells_mrr = stats.get("upsells_mrr_added", 0)
         demand_usd = stats.get("total_demand_detected_usd", 0)
         top = stats.get("top_tenants", []) or []
+        churn = stats.get("churn_risk", []) or []
 
         conv_rate = (
             round(upsells_converted / upsells_sent * 100, 1)
@@ -995,6 +996,33 @@ InmoBot AI - Sistema de Calificación Automática
                 "color:#6b7280;font-size:13px;'>Sin data todavía.</td></tr>"
             )
 
+        # Sección Churn Risk (Iter33b)
+        churn_html = ""
+        churn_text = ""
+        if churn:
+            rows = ""
+            for c in churn:
+                rows += (
+                    f"<tr>"
+                    f"<td style='padding:8px 10px;'><strong>{c['name']}</strong> "
+                    f"<span style='font-size:11px;color:#6b7280;'>({c['plan']})</span></td>"
+                    f"<td style='padding:8px 10px;text-align:right;color:#6b7280;font-size:12px;'>"
+                    f"{c['leads_this_week']} vs. {c['avg_weekly']}/sem</td>"
+                    f"<td style='padding:8px 10px;text-align:right;color:#dc2626;font-weight:700;'>"
+                    f"-{c['drop_pct']:.0f}%</td>"
+                    f"</tr>"
+                )
+                churn_text += f"  • {c['name']} ({c['plan']}): {c['leads_this_week']} vs {c['avg_weekly']}/sem (caída -{c['drop_pct']:.0f}%)\n"
+            churn_html = (
+                "<div class='section'>"
+                "<h3 style='color:#dc2626;'>⚠️ Churn Risk ({n} tenants)</h3>"
+                "<p style='font-size:12px;color:#6b7280;margin:0 0 8px;'>"
+                "Actividad esta semana por debajo del 50% del promedio de las últimas 4 semanas. "
+                "Llamalos ANTES que se den de baja.</p>"
+                "<table>{rows}</table>"
+                "</div>"
+            ).format(n=len(churn), rows=rows)
+
         text_body = (
             f"InmoBot Admin Report ({days}d)\n"
             f"========================\n\n"
@@ -1006,6 +1034,8 @@ InmoBot AI - Sistema de Calificación Automática
             f"  • MRR adicional: ${upsells_mrr:,.0f}\n\n"
             f"Demanda detectada total: ${demand_usd:,.0f} USD\n"
         )
+        if churn:
+            text_body += f"\n⚠️ Churn Risk ({len(churn)} tenants):\n{churn_text}"
 
         html_body = f"""<!DOCTYPE html>
 <html><head><meta charset='utf-8'><style>
@@ -1057,6 +1087,7 @@ InmoBot AI - Sistema de Calificación Automática
     <h3>Top tenants por actividad</h3>
     <table>{top_html}</table>
   </div>
+  {churn_html}
   <div class='footer'>
     Reporte generado automáticamente por InmoBot. Sólo lo recibís vos (superadmin).
   </div>

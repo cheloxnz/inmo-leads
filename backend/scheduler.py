@@ -370,6 +370,50 @@ class ScheduledTasks:
                     "leads": r["leads"],
                 })
 
+        # Churn risk: tenants activos con leads esta semana < 50% del promedio
+        # de las últimas 4 semanas (excluyendo trial < 14d porque ramp-up es normal).
+        churn_risk = []
+        try:
+            four_weeks_ago = (now - timedelta(days=28)).isoformat()
+            tenants_active = self.db.tenants.find({
+                "active": True,
+                "subscription_status": {"$nin": ["cancelled", "trial"]},
+            }, {"_id": 0, "tenant_id": 1, "business_name": 1, "subscription_plan": 1, "created_at": 1})
+            async for t in tenants_active:
+                tid = t["tenant_id"]
+                created = t.get("created_at", "")
+                # Skip si el tenant es muy nuevo (< 28 días) — no hay baseline
+                if created and created > four_weeks_ago:
+                    continue
+                leads_this_week = await self.db.leads.count_documents({
+                    "tenant_id": tid,
+                    "created_at": {"$gte": cutoff_iso},
+                })
+                leads_last_4w = await self.db.leads.count_documents({
+                    "tenant_id": tid,
+                    "created_at": {"$gte": four_weeks_ago, "$lt": cutoff_iso},
+                })
+                avg_weekly = leads_last_4w / 4 if leads_last_4w else 0
+                # Ruido: solo considerar si el baseline tenía al menos 5 leads/sem
+                if avg_weekly < 5:
+                    continue
+                ratio = leads_this_week / avg_weekly if avg_weekly else 1
+                if ratio < 0.5:
+                    drop_pct = round((1 - ratio) * 100, 0)
+                    churn_risk.append({
+                        "name": t.get("business_name", tid),
+                        "plan": t.get("subscription_plan", "—"),
+                        "tenant_id": tid,
+                        "leads_this_week": leads_this_week,
+                        "avg_weekly": round(avg_weekly, 1),
+                        "drop_pct": drop_pct,
+                    })
+            # Top 10 riesgos ordenados por drop
+            churn_risk.sort(key=lambda x: x["drop_pct"], reverse=True)
+            churn_risk = churn_risk[:10]
+        except Exception as e:
+            logger.warning(f"[admin_report] churn risk calc failed: {e}")
+
         stats = {
             "days": 7,
             "active_tenants": active_tenants,
@@ -381,6 +425,7 @@ class ScheduledTasks:
             "upsells_mrr_added": upsells_mrr,
             "total_demand_detected_usd": round(total_demand_usd, 2),
             "top_tenants": top_tenants,
+            "churn_risk": churn_risk,
         }
         ok = await self.email.send_admin_weekly_report(
             to_email=target, stats=stats,

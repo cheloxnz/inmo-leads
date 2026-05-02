@@ -34,6 +34,25 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-02 (Iter33b - Churn Risk + Shopify Leaderboard Block)
+- **Churn Risk en Admin Digest** (`scheduler._send_admin_report` + `email_service.send_admin_weekly_report`):
+  - Algoritmo: tenants activos (no trial, no nuevos <28d) con `leads_this_week < 50% × avg_weekly_4w`. Filtra baselines <5 leads/sem (ruido).
+  - Output: lista top-10 con `{name, plan, tenant_id, leads_this_week, avg_weekly, drop_pct}`.
+  - Sección HTML roja en el email con tabla: tenant → this_week vs avg/sem → -drop_pct%.
+  - Plain text fallback.
+  - La sección solo aparece en el email si hay tenants en riesgo (sino se omite).
+- **Shopify Leaderboard Block** (`docs/shopify-inmobot-leaderboard.liquid`):
+  - Block liquid self-contained: HTML + CSS inline + JS vanilla (sin dependencias).
+  - Polling cada 60s a `/api/public/demand-detected` y `/api/public/platform-stats`.
+  - Animación count-up con easing cubic-out, gradient morado-índigo, pulse dot verde "EN VIVO".
+  - 4 métricas: USD detectados (hero gigante), negocios, productos trackeados, leads procesados.
+  - Responsive para mobile.
+  - Config via `settings.inmobot_api_url` o override directo del `data-inmobot-api`.
+- **CORS verificado**: `/api/public/*` retorna `Access-Control-Allow-Origin: *` → fetch desde Shopify funciona sin config adicional.
+- **Tests**: `test_iter33b_churn_risk.py` con **3/3 PASS** (detecta drop, skip new tenants, skip low baseline). Total acumulado: **57+ tests passing**.
+- **Email admin report v2 enviado en vivo a cheloxnz@gmail.com ✓**
+- **Archivos**: `scheduler.py` (+55 líneas: churn calc), `email_service.py` (+28: sección HTML+text), `docs/shopify-inmobot-leaderboard.liquid` (NEW, 180 líneas), `tests/test_iter33b_churn_risk.py` (NEW).
+
 ### 2026-05-02 (Iter33 - Leaderboard + ROI + Bulk Import + Admin Digest + Whitelabel)
 - **Leaderboard público** (`routers/public_metrics.py`):
   - `GET /api/public/demand-detected`: USD detectados cross-tenant últimos 30 días (con cache 5min).

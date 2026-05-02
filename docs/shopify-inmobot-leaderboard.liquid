@@ -1,0 +1,207 @@
+{%- comment -%}
+  ===================================================================
+  InmoBot · Proof of Value Widget (Leaderboard público)
+  ===================================================================
+
+  Pegá este block en tu Shopify theme editor donde quieras el widget.
+  Muestra en tiempo real la demanda que InmoBot detectó en su plataforma
+  (cross-tenant, anonimizado): "$42,580 USD en demanda detectada este mes".
+
+  Fetch cada 60 segundos. Cache propio del endpoint 5 min.
+
+  Configuración:
+  - Cambiá API_URL por tu URL de producción (ej: https://api.inmobot.app)
+  - Ajustá la paleta de colores a tu brand
+{%- endcomment -%}
+
+<div class="inmobot-proof" id="inmobot-proof-widget" data-inmobot-api="{{ settings.inmobot_api_url | default: 'https://inmobot-preview.preview.emergentagent.com' }}">
+  <div class="inmobot-proof-wrap">
+    <div class="inmobot-proof-badge">
+      <span class="inmobot-proof-pulse"></span>
+      EN VIVO · Últimos 30 días
+    </div>
+    <div class="inmobot-proof-metric">
+      <div class="inmobot-proof-value">
+        <span class="inmobot-proof-currency">$</span><span id="inmobot-demand-usd">—</span>
+      </div>
+      <div class="inmobot-proof-label">
+        en demanda detectada por InmoBot
+        <span class="inmobot-proof-sub">para sus clientes este mes</span>
+      </div>
+    </div>
+    <div class="inmobot-proof-stats">
+      <div class="inmobot-proof-stat">
+        <strong id="inmobot-tenants">—</strong>
+        <span>negocios</span>
+      </div>
+      <div class="inmobot-proof-stat">
+        <strong id="inmobot-products">—</strong>
+        <span>productos tracked</span>
+      </div>
+      <div class="inmobot-proof-stat">
+        <strong id="inmobot-leads">—</strong>
+        <span>leads procesados</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .inmobot-proof {
+    max-width: 720px;
+    margin: 32px auto;
+    padding: 28px 32px;
+    background: linear-gradient(135deg, #1e1b4b 0%, #4338ca 55%, #7c3aed 100%);
+    color: #fff;
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(67, 56, 202, 0.25);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+  .inmobot-proof::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.12), transparent 55%);
+    pointer-events: none;
+  }
+  .inmobot-proof-wrap { position: relative; z-index: 1; }
+
+  .inmobot-proof-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    backdrop-filter: blur(8px);
+    margin-bottom: 20px;
+  }
+  .inmobot-proof-pulse {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: inmobotPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  @keyframes inmobotPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  }
+
+  .inmobot-proof-metric {
+    margin-bottom: 24px;
+  }
+  .inmobot-proof-value {
+    font-size: 64px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #ffffff 0%, #e9d5ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .inmobot-proof-currency {
+    font-size: 36px;
+    vertical-align: top;
+    padding-right: 4px;
+    opacity: 0.75;
+  }
+  .inmobot-proof-label {
+    margin-top: 10px;
+    font-size: 17px;
+    opacity: 0.95;
+    line-height: 1.4;
+  }
+  .inmobot-proof-sub {
+    display: block;
+    font-size: 13px;
+    opacity: 0.7;
+    margin-top: 2px;
+  }
+
+  .inmobot-proof-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .inmobot-proof-stat strong {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+  }
+  .inmobot-proof-stat span {
+    font-size: 12px;
+    opacity: 0.75;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  @media (max-width: 520px) {
+    .inmobot-proof { padding: 22px 20px; margin: 20px 12px; }
+    .inmobot-proof-value { font-size: 46px; }
+    .inmobot-proof-currency { font-size: 28px; }
+    .inmobot-proof-label { font-size: 14px; }
+    .inmobot-proof-stats { gap: 10px; }
+    .inmobot-proof-stat strong { font-size: 18px; }
+  }
+</style>
+
+<script>
+(function() {
+  var el = document.getElementById('inmobot-proof-widget');
+  if (!el) return;
+  var API = el.getAttribute('data-inmobot-api') || 'https://inmobot-preview.preview.emergentagent.com';
+
+  function formatNum(n) {
+    return Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+  }
+
+  function animateTo(id, target) {
+    var node = document.getElementById(id);
+    if (!node) return;
+    var start = 0;
+    var duration = 1200;
+    var t0 = performance.now();
+    function step(now) {
+      var p = Math.min((now - t0) / duration, 1);
+      var easeOut = 1 - Math.pow(1 - p, 3);
+      var val = Math.round(start + (target - start) * easeOut);
+      node.textContent = formatNum(val);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function fetchData() {
+    Promise.all([
+      fetch(API + '/api/public/demand-detected').then(function(r) { return r.json(); }),
+      fetch(API + '/api/public/platform-stats').then(function(r) { return r.json(); }),
+    ]).then(function(results) {
+      var demand = results[0] || {};
+      var stats = results[1] || {};
+      animateTo('inmobot-demand-usd', demand.total_detected_usd || 0);
+      animateTo('inmobot-tenants', stats.active_tenants || demand.unique_tenants || 0);
+      animateTo('inmobot-products', demand.unique_products_tracked || 0);
+      animateTo('inmobot-leads', stats.total_leads || 0);
+    }).catch(function(err) {
+      console.warn('[inmobot-proof] fetch error', err);
+    });
+  }
+
+  fetchData();
+  setInterval(fetchData, 60000);
+})();
+</script>
