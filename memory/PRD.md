@@ -33,6 +33,30 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter37 - WhatsApp Config + Plan Button + Tour Fix)
+- **Bug fix - OnboardingTour**: step "whatsapp" apuntaba a `/configuracion` pero
+  la ruta real es `/config`. Corregido en `OnboardingTour.js` STEPS.
+- **Bug fix - Botón "Cambiar plan" invisible** (`BillingSection.js`):
+  el `Button` shadcn sin variant explícito heredaba bg del card. Forzado
+  `background:#4f46e5; color:#fff` inline → ahora visible siempre.
+- **Sección WhatsApp Config nueva** (`components/WhatsAppConfigSection.js`):
+  - Reemplaza el card legacy read-only que sólo leía env vars del frontend.
+  - Form editable por admin del tenant: Phone Number ID, Business Account ID,
+    Access Token (con eye toggle, mantiene `***last10` si ya hay uno guardado),
+    Webhook Verify Token. Webhook URL read-only con botón copy.
+  - Status badge dinámico: "Conectado" verde / "Pendiente" naranja según
+    si el tenant tiene `whatsapp_access_token + whatsapp_phone_number_id`.
+  - Toggle "¿Cómo obtengo estos datos?" con guía paso a paso de Meta Business
+    Manager + WhatsApp Cloud API (7 pasos, con links a business.facebook.com
+    y developers.facebook.com).
+  - Wraps endpoints existentes `GET/PUT /api/config/whatsapp` (ya existían en
+    `routers/config.py`, no requirió cambios backend).
+  - Test ids: whatsapp-section, input-wa-phone-number-id, input-wa-access-token,
+    input-wa-business-account-id, input-wa-verify-token, input-wa-webhook-url,
+    btn-toggle-wa-help, btn-save-wa-config.
+
+
+
 ### 2026-02-XX (Iter36 - Export Kanban a CSV)
 - **Endpoint** `GET /api/leads/export` (`routers/leads.py`):
   - Exporta leads del tenant a CSV UTF-8 con BOM (Excel-friendly).

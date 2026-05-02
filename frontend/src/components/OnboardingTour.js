@@ -21,7 +21,7 @@ const STEPS = [
   {
     id: 'whatsapp',
     kind: 'highlight',
-    path: '/configuracion',
+    path: '/config',
     testid: 'whatsapp-section',
     title: 'Conectá tu WhatsApp',
     body: 'Acá pegás las credenciales de Meta WhatsApp Cloud API. Sin esto el bot no puede responder.',

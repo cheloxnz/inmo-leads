@@ -144,7 +144,17 @@ export default function BillingSection() {
           </div>
 
           <div className="billing-actions">
-            <Button size="sm" onClick={() => setShowPlans(!showPlans)} data-testid="btn-change-plan">
+            <Button
+              size="sm"
+              onClick={() => setShowPlans(!showPlans)}
+              data-testid="btn-change-plan"
+              style={{
+                background: '#4f46e5',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 600,
+              }}
+            >
               <ArrowUpCircle className="w-4 h-4 mr-1" />
               {showPlans ? 'Ocultar planes' : 'Cambiar plan'}
             </Button>

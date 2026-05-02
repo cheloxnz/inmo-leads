@@ -9,6 +9,7 @@ import BillingSection from '../components/BillingSection';
 import ReferralProgramSection from '../components/ReferralProgramSection';
 import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 import BrandingPanel from '../components/BrandingPanel';
+import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -169,7 +170,7 @@ export default function Configuration() {
           </CardContent>
         </Card>
         
-        <Card data-testid="whatsapp-section">
+        <Card data-testid="whatsapp-section-legacy" style={{ display: 'none' }}>
           <CardHeader>
             <CardTitle>Integraciones WhatsApp</CardTitle>
           </CardHeader>
@@ -187,6 +188,9 @@ export default function Configuration() {
             </div>
           </CardContent>
         </Card>
+
+        {/* WhatsApp Business config (per-tenant editable) */}
+        <WhatsAppConfigSection />
         
         <Card>
           <CardHeader>
