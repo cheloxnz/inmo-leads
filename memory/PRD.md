@@ -34,6 +34,35 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 
 ## Changelog
 
+### 2026-05-02 (Iter33 - Leaderboard + ROI + Bulk Import + Admin Digest + Whitelabel)
+- **Leaderboard público** (`routers/public_metrics.py`):
+  - `GET /api/public/demand-detected`: USD detectados cross-tenant últimos 30 días (con cache 5min).
+  - `GET /api/public/platform-stats`: active_tenants + total_leads + ai_messages_processed.
+  - Sin auth, listos para embeber en Shopify landing.
+- **Dashboard ROI del tenant** (`routers/roi.py` + `ROICard.js`):
+  - `GET /api/dashboard/roi?days=30` → hot/warm/total leads, conversion_rate, pipeline_usd (hot×avg + warm×avg×0.3), ai_messages, hours_saved (msgs × 2min/60), unmet_demand_usd, summary_sentence.
+  - `avg_deal_value_usd` configurable por tenant (default $500).
+  - Card hero en Dashboard con gradient morado + 5 métricas + footer con link a ajustes.
+- **Bulk Import CSV** (`routers/catalog.py` + `BulkImportModal.js`):
+  - `POST /api/catalog/bulk-import` (multipart): acepta .csv/.tsv hasta 2MB/1000 filas. Valida headers, tipos, sincroniza active según stock. Reporta imported/skipped/errors por fila.
+  - `GET /api/catalog/bulk-import/template`: devuelve columnas aceptadas + sample row + notas.
+  - UI: modal con dropzone, botón "Descargar CSV de ejemplo", preview de resultados con stats ok/warn + lista de errores (primeros 20).
+- **Admin Digest Semanal** (para vos, superadmin) (`scheduler._send_admin_report` + `email_service.send_admin_weekly_report`):
+  - Cron lunes 09 UTC, envía a `SUPERADMIN_EMAIL` (configurado en `.env`).
+  - Email HTML con: active_tenants / new_tenants / total_leads / hot_leads / demand_detected_usd / upsells_sent / upsells_converted (%) / upsells_mrr_added / top-10 tenants por actividad.
+  - Endpoint `POST /api/superadmin/admin-report/run` para disparar manualmente.
+  - **Probado en vivo: enviado a cheloxnz@gmail.com correctamente ✓**.
+- **Whitelabel parcial** (`routers/branding.py` + `BrandingPanel.js`):
+  - Nuevos campos tenant: `brand_name, logo_url, primary_color, custom_subdomain, whitelabel_enabled`.
+  - `GET/PUT /api/branding` (admin, requiere plan Pro+), validación subdomain (regex a-z0-9-, reserved list de 20 subdominios, uniqueness check).
+  - `GET /api/public/branding/{subdomain}` resuelve por subdomain (para que el frontend cargue logo antes del login cuando accede vía cliente1.inmobot.app).
+  - `GET /api/branding/check-subdomain/{sub}` para UX en tiempo real.
+  - UI: card con subdomain input (suffix .inmobot.app + check disponibilidad), URL logo (con preview), nombre marca, color picker + hex, preview card con borde superior del color elegido. Empty state "locked" si plan < Pro.
+- **SMTP configurado** (`cheloxnz@gmail.com` App Password) para envío real de emails.
+- **Tests**: `test_iter33_features.py` con **16/16 PASS** (3 public metrics, 2 ROI, 5 bulk import, 5 branding, 1 admin report).
+- **Archivos nuevos**: `routers/public_metrics.py`, `routers/roi.py`, `routers/branding.py`, `components/ROICard.js`, `components/BrandingPanel.js`, `pages/catalog/BulkImportModal.js`, `tests/test_iter33_features.py`, `scripts/send_test_digest.py`.
+- **Modificados**: `server.py` (+7 líneas routers), `scheduler.py` (+120: admin report + os import), `email_service.py` (+140: send_admin_weekly_report + fix mongo db bool check), `routers/catalog.py` (+120: bulk import + template), `routers/superadmin.py` (+18: admin-report trigger endpoint), `CatalogPage.js` (+10: btn bulk + modal), `Dashboard.js` (+1: ROI card), `Configuration.js` (+4: Branding panel), `App.css` (+380 líneas estilos).
+
 ### 2026-05-01 (Iter32e - Upsell History + Conversion Tracking)
 - **Conversion tracking** (`upsell_service.py`):
   - `mark_upsell_conversions(db, lookback_days=90)`: scanea eventos delivered y marca `converted=true` si el tenant upgradeó a Enterprise DESPUÉS de `sent_at` (comparando `subscription_updated_at`). Idempotente (no re-procesa ya marcados).

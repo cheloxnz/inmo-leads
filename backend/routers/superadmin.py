@@ -427,3 +427,21 @@ async def get_upsell_history(
         it["current_plan"] = (tenant or {}).get("subscription_plan", "")
     stats = await get_upsell_stats(_db, days=days)
     return {"items": items, "total": len(items), "stats": stats}
+
+
+@router.post("/superadmin/admin-report/run")
+async def run_admin_report_now(
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: dispara el email de reporte semanal al SUPERADMIN_EMAIL ahora.
+
+    Útil para testear y para enviártelo a tu inbox cuando quieras ver el estado.
+    """
+    _require_superadmin(current_user)
+    from scheduler import ScheduledTasks
+    from email_service import EmailService
+
+    email_svc = EmailService(_db)
+    tasks = ScheduledTasks(_db, email_svc)
+    ok = await tasks._send_admin_report()
+    return {"sent": ok}

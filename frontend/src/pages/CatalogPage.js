@@ -7,12 +7,13 @@ import { toast } from 'sonner';
 import {
   Plus, Trash2, Pencil, Package, Tag, DollarSign,
   X, Search, Filter, Sparkles, Globe, Copy,
-  PackageX, AlertTriangle, CheckCircle2, Wand2, Replace, Users
+  PackageX, AlertTriangle, CheckCircle2, Wand2, Replace, Users, Upload
 } from 'lucide-react';
 import ProductForm from './catalog/ProductForm';
 import SubstitutesModal from './catalog/SubstitutesModal';
 import SubstitutePreviewModal from './catalog/SubstitutePreviewModal';
 import WaitlistModal from './catalog/WaitlistModal';
+import BulkImportModal from './catalog/BulkImportModal';
 
 // ---------------- Helpers ----------------
 const getAvailability = (p) => {
@@ -66,6 +67,7 @@ export default function CatalogPage() {
   const [subsModalProduct, setSubsModalProduct] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -160,6 +162,14 @@ export default function CatalogPage() {
           <p>{products.length} productos</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <Button
+            variant="outline"
+            onClick={() => setBulkImportOpen(true)}
+            data-testid="btn-bulk-import"
+            title="Importar catálogo desde CSV"
+          >
+            <Upload className="w-4 h-4 mr-1" /> Importar CSV
+          </Button>
           <Button
             variant="outline"
             onClick={() => setWaitlistOpen(true)}
@@ -343,6 +353,13 @@ export default function CatalogPage() {
 
       {waitlistOpen && (
         <WaitlistModal onClose={() => setWaitlistOpen(false)} />
+      )}
+
+      {bulkImportOpen && (
+        <BulkImportModal
+          onClose={() => setBulkImportOpen(false)}
+          onImported={() => fetchProducts()}
+        />
       )}
     </div>
   );

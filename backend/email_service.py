@@ -945,3 +945,128 @@ InmoBot AI - Sistema de Calificación Automática
             text_body=text_body,
             email_type=EmailType.UPSELL_UNMET_DEMAND,
         )
+
+
+    async def send_admin_weekly_report(
+        self,
+        to_email: str,
+        stats: dict,
+    ) -> bool:
+        """Admin digest SEMANAL (para vos, el superadmin).
+
+        stats:
+          {days, active_tenants, new_tenants, total_leads, hot_leads,
+           upsells_sent, upsells_converted, upsells_mrr_added,
+           total_demand_detected_usd, top_tenants: [{name, leads, plan}]}
+        """
+        if not to_email:
+            return False
+        days = stats.get("days", 7)
+        active_tenants = stats.get("active_tenants", 0)
+        new_tenants = stats.get("new_tenants", 0)
+        total_leads = stats.get("total_leads", 0)
+        hot_leads = stats.get("hot_leads", 0)
+        upsells_sent = stats.get("upsells_sent", 0)
+        upsells_converted = stats.get("upsells_converted", 0)
+        upsells_mrr = stats.get("upsells_mrr_added", 0)
+        demand_usd = stats.get("total_demand_detected_usd", 0)
+        top = stats.get("top_tenants", []) or []
+
+        conv_rate = (
+            round(upsells_converted / upsells_sent * 100, 1)
+            if upsells_sent > 0 else 0.0
+        )
+
+        subject = f"📊 InmoBot Admin · Reporte semanal ({days}d)"
+
+        top_html = ""
+        for i, t in enumerate(top[:10], 1):
+            top_html += (
+                f"<tr>"
+                f"<td style='padding:8px 10px;width:28px;font-weight:700;color:#6366f1;'>#{i}</td>"
+                f"<td style='padding:8px 10px;'><strong>{t.get('name', '')}</strong></td>"
+                f"<td style='padding:8px 10px;font-size:11px;color:#6b7280;'>{t.get('plan', '—')}</td>"
+                f"<td style='padding:8px 10px;text-align:right;font-weight:600;'>{t.get('leads', 0)} leads</td>"
+                f"</tr>"
+            )
+        if not top_html:
+            top_html = (
+                "<tr><td colspan='4' style='padding:14px;text-align:center;"
+                "color:#6b7280;font-size:13px;'>Sin data todavía.</td></tr>"
+            )
+
+        text_body = (
+            f"InmoBot Admin Report ({days}d)\n"
+            f"========================\n\n"
+            f"Tenants activos: {active_tenants} ({new_tenants} nuevos esta semana)\n"
+            f"Leads gestionados: {total_leads} ({hot_leads} hot)\n\n"
+            f"Upsells automáticos:\n"
+            f"  • Enviados: {upsells_sent}\n"
+            f"  • Convertidos: {upsells_converted} ({conv_rate}%)\n"
+            f"  • MRR adicional: ${upsells_mrr:,.0f}\n\n"
+            f"Demanda detectada total: ${demand_usd:,.0f} USD\n"
+        )
+
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; }}
+  .container {{ max-width:640px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08); }}
+  .header {{ background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 100%); color:#fff; padding:26px 28px; }}
+  .header h1 {{ margin:0; font-size:22px; font-weight:700; }}
+  .header p {{ margin:6px 0 0; opacity:0.9; font-size:13px; }}
+  .grid {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px 28px; }}
+  .cell {{ background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }}
+  .cell .val {{ font-size:24px; font-weight:800; color:#111827; line-height:1; }}
+  .cell .lbl {{ font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; margin-top:6px; }}
+  .cell.hl {{ background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%); border-color:#6ee7b7; }}
+  .cell.hl .val {{ color:#065f46; }}
+  .section {{ padding:0 28px 18px; }}
+  .section h3 {{ font-size:13px; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em; font-weight:700; margin:18px 0 10px; }}
+  table {{ width:100%; border-collapse:collapse; font-size:13px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; }}
+  table tr {{ border-bottom:1px solid #f3f4f6; }}
+  table tr:last-child {{ border:none; }}
+  .footer {{ padding:16px 28px; color:#6b7280; font-size:11px; border-top:1px solid #f3f4f6; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'>
+    <h1>📊 InmoBot Admin</h1>
+    <p>Reporte semanal · últimos {days} días</p>
+  </div>
+  <div class='grid'>
+    <div class='cell'><div class='val'>{active_tenants}</div><div class='lbl'>Tenants activos</div></div>
+    <div class='cell'><div class='val'>+{new_tenants}</div><div class='lbl'>Nuevos esta semana</div></div>
+    <div class='cell'><div class='val'>{total_leads}</div><div class='lbl'>Leads gestionados</div></div>
+    <div class='cell'><div class='val'>{hot_leads}</div><div class='lbl'>Hot leads</div></div>
+    <div class='cell hl' style='grid-column:1/-1;'>
+      <div class='val'>${demand_usd:,.0f}</div>
+      <div class='lbl'>Demanda detectada (cross-tenant)</div>
+    </div>
+  </div>
+  <div class='section'>
+    <h3>Upsells automáticos</h3>
+    <div class='grid' style='padding:0;'>
+      <div class='cell'><div class='val'>{upsells_sent}</div><div class='lbl'>Enviados</div></div>
+      <div class='cell'><div class='val'>{upsells_converted}</div><div class='lbl'>Convertidos ({conv_rate}%)</div></div>
+      <div class='cell hl' style='grid-column:1/-1;'>
+        <div class='val'>${upsells_mrr:,.0f}</div>
+        <div class='lbl'>MRR adicional generado</div>
+      </div>
+    </div>
+  </div>
+  <div class='section'>
+    <h3>Top tenants por actividad</h3>
+    <table>{top_html}</table>
+  </div>
+  <div class='footer'>
+    Reporte generado automáticamente por InmoBot. Sólo lo recibís vos (superadmin).
+  </div>
+</div></body></html>"""
+
+        return await self.send_email(
+            to_emails=[to_email],
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            email_type=EmailType.WEEKLY_DIGEST,
+        )
+

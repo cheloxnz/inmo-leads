@@ -1289,6 +1289,9 @@ from routers.catalog import router as catalog_router
 from routers.leads import router as leads_router
 from routers.config import router as config_router
 from routers.usage import router as usage_router
+from routers.public_metrics import router as public_metrics_router
+from routers.roi import router as roi_router
+from routers.branding import router as branding_router
 from routers.billing import router as billing_router
 from routers.metrics import router as metrics_router
 from routers.widget import router as widget_router
@@ -1309,6 +1312,9 @@ app.include_router(catalog_router, prefix="/api")
 app.include_router(leads_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
 app.include_router(usage_router, prefix="/api")
+app.include_router(public_metrics_router, prefix="/api")
+app.include_router(roi_router, prefix="/api")
+app.include_router(branding_router, prefix="/api")
 app.include_router(billing_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
 app.include_router(widget_router, prefix="/api")

@@ -1,6 +1,10 @@
 """Router de catalogo de productos por tenant"""
+import csv
+import io
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 from auth_routes import get_current_user, require_admin, get_db
 from catalog_service import CatalogService
@@ -397,4 +401,156 @@ async def notify_waitlist_now(
         current_user.tenant_id, product_id,
     )
     return {"notified_leads": notified}
+
+
+
+# ============================================================
+# Bulk import CSV (Iter33)
+# ============================================================
+
+ALLOWED_CSV_HEADERS = {
+    "name", "description", "price", "currency", "category",
+    "image_url", "stock_quantity", "substitute_product_ids",
+}
+REQUIRED_HEADERS = {"name"}
+MAX_ROWS_PER_IMPORT = 1000
+
+
+@router.post("/catalog/bulk-import")
+async def bulk_import_catalog(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+):
+    """Admin: importa productos desde CSV.
+
+    Columnas aceptadas: name (requerida), description, price, currency, category,
+    image_url, stock_quantity, substitute_product_ids (separados por `;`).
+
+    Valida headers, tipo de dato y precio, y reporta errores por fila.
+    Retorna `{imported, skipped, errors: [{row, reason}], total_rows}`.
+    """
+    if not file.filename or not file.filename.lower().endswith((".csv", ".tsv")):
+        raise HTTPException(status_code=400, detail="El archivo debe ser .csv o .tsv")
+
+    content = await file.read()
+    if len(content) > 2_000_000:  # 2MB
+        raise HTTPException(status_code=400, detail="Archivo muy grande (max 2MB)")
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        try:
+            text = content.decode("latin-1")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Encoding inválido (usa UTF-8)")
+
+    delim = "\t" if file.filename.lower().endswith(".tsv") else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delim)
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV sin headers")
+
+    headers = {h.strip().lower() for h in reader.fieldnames}
+    missing = REQUIRED_HEADERS - headers
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Faltan columnas requeridas: {', '.join(missing)}",
+        )
+    unknown = headers - ALLOWED_CSV_HEADERS
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Columnas no reconocidas: {', '.join(unknown)}. "
+                   f"Válidas: {', '.join(sorted(ALLOWED_CSV_HEADERS))}",
+        )
+
+    imported = 0
+    skipped = 0
+    errors = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+    to_insert = []
+    for idx, row in enumerate(reader, start=2):  # línea 2 = primera de data
+        if idx - 1 > MAX_ROWS_PER_IMPORT:
+            errors.append({"row": idx, "reason": f"excede límite de {MAX_ROWS_PER_IMPORT} filas"})
+            break
+        # Normalizar keys
+        row = {k.strip().lower(): (v.strip() if isinstance(v, str) else v) for k, v in row.items() if k}
+        name = row.get("name", "")
+        if not name:
+            skipped += 1
+            errors.append({"row": idx, "reason": "name vacío"})
+            continue
+        try:
+            price = float(row.get("price") or 0)
+        except ValueError:
+            skipped += 1
+            errors.append({"row": idx, "reason": f"price inválido: '{row.get('price')}'"})
+            continue
+        stock_raw = row.get("stock_quantity")
+        stock = None
+        if stock_raw not in (None, ""):
+            try:
+                stock = int(stock_raw)
+            except ValueError:
+                skipped += 1
+                errors.append({"row": idx, "reason": f"stock_quantity inválido: '{stock_raw}'"})
+                continue
+        subs_raw = row.get("substitute_product_ids", "") or ""
+        subs = [s.strip() for s in subs_raw.split(";") if s.strip()] if subs_raw else []
+
+        active = True
+        if stock is not None and stock <= 0:
+            active = False
+
+        to_insert.append({
+            "product_id": str(uuid.uuid4()),
+            "tenant_id": current_user.tenant_id,
+            "name": name,
+            "description": row.get("description", ""),
+            "price": price,
+            "currency": (row.get("currency") or "USD").upper(),
+            "category": row.get("category", ""),
+            "image_url": row.get("image_url", ""),
+            "stock_quantity": stock,
+            "substitute_product_ids": subs,
+            "active": active,
+            "created_at": now_iso,
+        })
+        imported += 1
+
+    if to_insert:
+        await _db.products.insert_many(to_insert)
+
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors[:50],  # primeros 50 para no flood
+        "total_errors": len(errors),
+        "total_rows": imported + skipped,
+    }
+
+
+@router.get("/catalog/bulk-import/template")
+async def bulk_import_template(current_user: User = Depends(require_admin)):
+    """Admin: retorna una fila de ejemplo para ayudar a construir el CSV."""
+    return {
+        "columns": sorted(ALLOWED_CSV_HEADERS),
+        "required": sorted(REQUIRED_HEADERS),
+        "sample_row": {
+            "name": "iPhone 15 Pro 256GB",
+            "description": "Smartphone premium",
+            "price": "1299",
+            "currency": "USD",
+            "category": "Smartphones",
+            "image_url": "https://cdn.example.com/iphone15.jpg",
+            "stock_quantity": "10",
+            "substitute_product_ids": "",
+        },
+        "notes": [
+            "name es la única columna obligatoria",
+            "price se parsea como float, default 0",
+            "stock_quantity vacío = sin tracking, 0 = agotado, >0 = disponible",
+            "substitute_product_ids: IDs separados por ';' (opcional)",
+            "Encoding: UTF-8 recomendado, max 2MB, max 1000 filas por import",
+        ],
+    }
 

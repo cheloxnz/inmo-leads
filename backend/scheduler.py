@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from email_service import EmailService
 
@@ -30,6 +31,7 @@ class ScheduledTasks:
         asyncio.create_task(self.send_trial_ending_emails())
         asyncio.create_task(self.send_weekly_digest_emails())
         asyncio.create_task(self.run_upsell_checks())
+        asyncio.create_task(self.send_admin_weekly_report())
 
     async def run_commission_expiry(self):
         """Cada 24h, marca como EXPIRED las commissions que cumplieron 365 dias."""
@@ -262,6 +264,132 @@ class ScheduledTasks:
             except Exception as e:
                 logger.error(f"[Scheduler] upsell run error: {e}")
             await asyncio.sleep(24 * 3600)
+
+    async def send_admin_weekly_report(self):
+        """Todos los lunes 9 UTC: envía reporte agregado al superadmin.
+
+        Override con DIGEST_FORCE=1 para disparo manual al arrancar.
+        """
+        await asyncio.sleep(600)  # warmup
+        while self.running:
+            now = datetime.now(timezone.utc)
+            force = os.environ.get("DIGEST_FORCE") == "1"
+            should_run = (now.weekday() == 0 and now.hour == 9) or force
+            if should_run:
+                try:
+                    await self._send_admin_report()
+                    if force:
+                        os.environ["DIGEST_FORCE"] = "0"
+                        break
+                except Exception as e:
+                    logger.error(f"[Scheduler] admin report error: {e}")
+            await asyncio.sleep(3600)
+
+    async def _send_admin_report(self) -> bool:
+        """Arma stats cross-tenant + envía el email al SUPERADMIN_EMAIL."""
+        target = os.environ.get("SUPERADMIN_EMAIL")
+        if not target:
+            logger.info("[admin_report] SUPERADMIN_EMAIL no configurado, skip")
+            return False
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=7)
+        cutoff_iso = cutoff.isoformat()
+
+        active_tenants = await self.db.tenants.count_documents({
+            "active": True,
+            "subscription_status": {"$ne": "cancelled"},
+        })
+        new_tenants = await self.db.tenants.count_documents({
+            "created_at": {"$gte": cutoff_iso},
+        })
+        total_leads = await self.db.leads.count_documents({
+            "created_at": {"$gte": cutoff_iso},
+        })
+        hot_leads = await self.db.leads.count_documents({
+            "status": "hot",
+            "created_at": {"$gte": cutoff_iso},
+        })
+
+        # Upsells (Iter32d/e)
+        upsells_sent = 0
+        upsells_converted = 0
+        upsells_mrr = 0
+        try:
+            upsells_sent = await self.db.upsell_events.count_documents({
+                "sent_at": {"$gte": cutoff_iso},
+            })
+            upsells_converted = await self.db.upsell_events.count_documents({
+                "sent_at": {"$gte": cutoff_iso},
+                "converted": True,
+            })
+            # MRR adicional estimado (Enterprise $249 - Pro $99 = $150 × convertidos)
+            upsells_mrr = upsells_converted * 150
+        except Exception:
+            pass
+
+        # Demanda total cross-tenant
+        total_demand_usd = 0.0
+        try:
+            pipeline = [
+                {"$match": {"notified_at": None}},
+                {"$group": {
+                    "_id": {"tenant_id": "$tenant_id", "product_id": "$product_id"},
+                    "leads_count": {"$sum": 1},
+                }},
+            ]
+            rows = await self.db.product_waitlist.aggregate(pipeline).to_list(5000)
+            for r in rows:
+                tid = r["_id"]["tenant_id"]
+                pid = r["_id"]["product_id"]
+                prod = await self.db.products.find_one(
+                    {"tenant_id": tid, "product_id": pid}, {"_id": 0, "price": 1},
+                )
+                price = (prod or {}).get("price", 0) or 0
+                total_demand_usd += r["leads_count"] * price
+        except Exception:
+            pass
+
+        # Top 10 tenants por leads esta semana
+        pipeline_top = [
+            {"$match": {"created_at": {"$gte": cutoff_iso}}},
+            {"$group": {"_id": "$tenant_id", "leads": {"$sum": 1}}},
+            {"$sort": {"leads": -1}},
+            {"$limit": 10},
+        ]
+        top_rows = await self.db.leads.aggregate(pipeline_top).to_list(10)
+        top_tenants = []
+        for r in top_rows:
+            tenant = await self.db.tenants.find_one(
+                {"tenant_id": r["_id"]},
+                {"_id": 0, "business_name": 1, "subscription_plan": 1},
+            )
+            if tenant:
+                top_tenants.append({
+                    "name": tenant.get("business_name", r["_id"]),
+                    "plan": tenant.get("subscription_plan", "—"),
+                    "leads": r["leads"],
+                })
+
+        stats = {
+            "days": 7,
+            "active_tenants": active_tenants,
+            "new_tenants": new_tenants,
+            "total_leads": total_leads,
+            "hot_leads": hot_leads,
+            "upsells_sent": upsells_sent,
+            "upsells_converted": upsells_converted,
+            "upsells_mrr_added": upsells_mrr,
+            "total_demand_detected_usd": round(total_demand_usd, 2),
+            "top_tenants": top_tenants,
+        }
+        ok = await self.email.send_admin_weekly_report(
+            to_email=target, stats=stats,
+        )
+        logger.info(
+            f"[admin_report] sent={ok} tenants={active_tenants} "
+            f"upsells_sent={upsells_sent} demand=${total_demand_usd:.0f}"
+        )
+        return ok
 
     async def run_onboarding_coach(self):
         """Cada 6 horas, evalua todos los tenants y crea nudges del Coach."""

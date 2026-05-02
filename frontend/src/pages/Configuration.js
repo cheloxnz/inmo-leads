@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import BillingSection from '../components/BillingSection';
 import ReferralProgramSection from '../components/ReferralProgramSection';
 import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
+import BrandingPanel from '../components/BrandingPanel';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -227,6 +228,10 @@ export default function Configuration() {
       </div>
 
       <BillingSection />
+
+      <div style={{ marginTop: 24 }}>
+        <BrandingPanel />
+      </div>
 
       <ReferralProgramSection />
     </div>

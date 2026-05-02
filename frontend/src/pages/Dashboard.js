@@ -7,6 +7,7 @@ import UsagePanel from '../components/UsagePanel';
 import CoachNudges from '../components/CoachNudges';
 import CoachCelebrations from '../components/CoachCelebrations';
 import PremiumFeaturesShowcase from '../components/PremiumFeaturesShowcase';
+import ROICard from '../components/ROICard';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
@@ -63,6 +64,9 @@ export default function Dashboard() {
 
       <CoachCelebrations />
       <CoachNudges />
+
+      {/* ROI Hero Card */}
+      <ROICard />
 
       <div className="stats-grid">
         <Card className="stat-card" data-testid="stat-total-leads">
