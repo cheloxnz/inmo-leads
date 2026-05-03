@@ -180,19 +180,6 @@ async def agent_suggestions(
     return {"suggestions": suggestions}
 
 
-@router.post("/bot-learning/backfill-embeddings")
-async def backfill_embeddings_endpoint(
-    current_user: User = Depends(get_current_user),
-):
-    """Re-procesa learned_responses del tenant para asignarles embedding
-    semántico (384-d). Útil para entradas viejas guardadas antes de habilitar
-    embeddings. Idempotente: solo procesa entradas sin embedding."""
-    from bot_learning_service import backfill_embeddings
-    db = _get_db()
-    result = await backfill_embeddings(db, tenant_id=current_user.tenant_id)
-    return result
-
-
 @router.get("/bot-learning/embeddings-status")
 async def embeddings_status(
     current_user: User = Depends(get_current_user),
@@ -229,3 +216,43 @@ async def embeddings_status(
             "pending_backfill": total - with_emb,
         },
     }
+
+
+
+@router.post("/bot-learning/coaching-opportunity")
+async def coaching_opportunity(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Detecta oportunidad de "coaching proactivo": cuánta demanda
+    semánticamente similar a `customer_question` existe en leads recientes
+    sin respuesta aprendida del bot.
+
+    Body: {
+      customer_question: str,                # pregunta del cliente que el asesor respondió
+      exclude_lead_phone: str (opcional),    # no contar el lead actual
+      days: int = 30,                        # ventana de tiempo
+      min_count: int = 3,                    # mínimo para recomendar "teach"
+    }
+    Returns: {already_taught, similar_pending_count, sample_questions,
+              recommendation, reason}
+    """
+    from bot_learning_service import find_coaching_opportunity
+    q = (body or {}).get("customer_question", "").strip()
+    if not q:
+        return {
+            "already_taught": False,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "not_enough",
+            "reason": "pregunta vacía",
+        }
+    db = _get_db()
+    return await find_coaching_opportunity(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        customer_question=q,
+        exclude_lead_phone=(body or {}).get("exclude_lead_phone", ""),
+        days=int((body or {}).get("days", 30)),
+        min_count_to_recommend=int((body or {}).get("min_count", 3)),
+    )

@@ -1,0 +1,38 @@
+{
+  "summary": "Iter46 'Coaching proactivo' tested e2e end-to-end. 14/14 unit tests + 6/6 backend live tests + 4/4 critical UI flows ALL PASS. Backend POST /api/bot-learning/coaching-opportunity returns correct shape for all 4 cases (empty/teach/already_taught/not_enough). Frontend: card data-testid='coaching-opportunity-card' renders en /leads/5491199999999 (Federico Demo) con badge '3 consultas similares', sample questions visibles (data-testid='coaching-sample-0'), botones 'Enseñar al bot' y 'Ahora no'. Click 'Ahora no' desmonta card. Click 'Enseñar al bot' POSTea /api/bot-learning, muestra toast '✅ Enseñado...', desmonta card, y la nueva entrada aparece en /config. Mutual exclusivity verificada: Ana Ruiz (último msg=customer) NO muestra coaching card. Regresión OK: /api/agent-suggestions y /api/bot-learning siguen funcionando.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_embeddings.py",
+    "/app/backend/tests/test_iter46_coaching_live.py",
+    "/app/test_reports/pytest/iter46_coaching_results.xml"
+  ],
+  "action_items": [
+    "(opcional / cleanup) Tras el test 'Enseñar al bot' quedó persistido un learned_response sobre mascotas en demo-inmobiliaria (la pregunta de Federico). Si se quiere re-demostrar el coaching desde cero, hay que borrar manualmente ese learned_response (o re-correr seed que lo limpie). El test test_coaching_already_taught_palermo_price ya valida ese escenario directamente, así que no es bloqueante.",
+    "(opcional / cleanup) Quedó una entrada TEST_iter46 regression question? en learned_responses por el test de regresión POST /api/bot-learning. No bloquea pero ensucia /config.",
+    "(pre-existente, no bloqueante) Para Ana Ruiz (último msg=customer) no aparecen suggestions; esto puede deberse a que la query 'Aceptan mascotas en el depto?' no cruza el threshold de match_method=embedding contra learned_responses existentes (alquiler Palermo / visitas sábados son temas distintos) — comportamiento correcto, sólo lo dejo registrado."
+  ],
+  "critical_code_review_comments": [
+    "LeadDetail.js useEffect (líneas 41-74): la lógica de decisión suggestions vs coaching es correcta y robusta — busca el último msg customer ANTES del último msg del agente para extraer la pareja (pregunta, respuesta) que se usa al enseñar. Buen pattern.",
+    "fetchCoachingOpportunity sólo setea coaching cuando recommendation==='teach' Y similar_pending_count >= 3 — defensa redundante pero correcta (el backend ya filtra), evita renders accidentales si el threshold del backend bajara.",
+    "bot_learning_service.find_coaching_opportunity: usa similarity_threshold=0.45 (más laxo que find_learned_answer 0.52) — diseño consciente y documentado en review_request (priorizar recall). Verificado: pets question matchea con scores 0.71-0.86.",
+    "Backend dedup clustering: el response visible muestra 2 sample_questions (Ana, Pedro) aunque similar_pending_count=3, lo cual es correcto (clustering colapsa preguntas casi idénticas). El UI no requiere mostrar las 3 muestras — el badge muestra el conteo total y los samples son ilustrativos."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter46_coaching_live.py (nuevo - 6 integration tests reusables como regresión)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant demo-inmobiliaria)",
+  "seed_data_creation": "No creé nuevos seeds. Los leads Ana/Pedro/Laura/Mario/Juli + Federico Demo ya estaban seedeados por el main agent. Sí quedó persistido (efecto colateral del test 'Enseñar al bot') un nuevo learned_response sobre mascotas — ver action_items.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Feature COACHING PROACTIVO está 100% funcional en preview. Endpoint: POST /api/bot-learning/coaching-opportunity con body {customer_question, exclude_lead_phone?}. Threshold cosine=0.45 (más laxo que find_learned_answer=0.52). Sample_questions vienen ya dedupeadas (clustering). Si re-corren el flow 'Enseñar al bot' sobre Federico devolverá already_taught porque ya quedó learned_response sobre mascotas — usar otro lead/pregunta o borrar la entrada en /config primero. Test file reusable: /app/backend/tests/test_iter46_coaching_live.py.",
+  "rca of the issue": "No issues found. Feature works end-to-end: backend embeddings + lead clustering + UI conditional rendering + persistence + toast feedback + dismiss + mutual exclusivity con suggestions card."
+}

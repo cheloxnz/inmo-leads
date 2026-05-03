@@ -23,7 +23,7 @@ import logging
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -508,4 +508,199 @@ async def backfill_embeddings(
         "skipped": 0,
         "failed": failed,
         "total_pending": len(pending),
+    }
+
+
+
+async def find_coaching_opportunity(
+    db: AsyncIOMotorDatabase,
+    tenant_id: str,
+    customer_question: str,
+    exclude_lead_phone: str = "",
+    days: int = 30,
+    min_count_to_recommend: int = 3,
+    similarity_threshold: float = 0.45,
+    dedup_threshold: float = 0.85,
+    max_candidates: int = 80,
+) -> dict:
+    """Detecta oportunidades de "coaching proactivo": mide cuántas preguntas
+    de OTROS leads (últimos `days` días) son semánticamente similares a
+    `customer_question` y NO están cubiertas por una learned_response del bot.
+
+    Si el asesor respondió manualmente a una pregunta, y la misma pregunta
+    aparece 3+ veces sin respuesta aprendida del bot, vale la pena enseñarla
+    para que el bot la responda automáticamente la próxima vez.
+
+    Returns:
+        {
+          "already_taught": bool,            # Ya existe una learned_response que matchea
+          "similar_pending_count": int,      # Cuántas preguntas sin cubrir se parecen
+          "sample_questions": [              # Top 3 preguntas reales para mostrar al asesor
+            {"question": str, "lead_name": str, "days_ago": int}
+          ],
+          "recommendation": "teach" | "already_taught" | "not_enough",
+          "reason": str,
+        }
+    """
+    import embeddings_service as embed_svc
+
+    if not tenant_id or not customer_question.strip():
+        return {
+            "already_taught": False,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "not_enough",
+            "reason": "pregunta vacía",
+        }
+
+    # 1. ¿Ya existe una learned response que matchee esta pregunta?
+    existing_match = await find_learned_answer(
+        db, tenant_id, customer_question, embedding_threshold=0.52,
+    )
+    if existing_match:
+        return {
+            "already_taught": True,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "already_taught",
+            "reason": f"el bot ya tiene una respuesta enseñada (score {existing_match['score']})",
+            "existing_learned_id": existing_match.get("source_id"),
+        }
+
+    # 2. Buscar preguntas similares en leads recientes
+    query_vec = await embed_svc.embed_text(customer_question)
+    # Si el modelo de embeddings no está disponible, no podemos hacer coaching
+    if not query_vec:
+        return {
+            "already_taught": False,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "not_enough",
+            "reason": "modelo de embeddings no disponible",
+        }
+
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    lead_query = {
+        "tenant_id": tenant_id,
+        "conversation_history.0": {"$exists": True},
+        "last_message_at": {"$gte": cutoff_date},
+    }
+    if exclude_lead_phone:
+        lead_query["phone"] = {"$ne": exclude_lead_phone}
+
+    cursor = db.leads.find(
+        lead_query,
+        {"_id": 0, "phone": 1, "name": 1, "conversation_history": 1, "last_message_at": 1},
+    ).sort("last_message_at", -1).limit(max_candidates)
+
+    now = datetime.now(timezone.utc)
+    raw_questions = []  # lista de {text, lead_name, lead_phone, ts}
+    async for lead in cursor:
+        history = lead.get("conversation_history") or []
+        for msg in history:
+            if msg.get("from") != "customer":
+                continue
+            text = (msg.get("text") or "").strip()
+            if len(text) < 8 or len(text) > 400:
+                continue
+            # Pre-filter ligero por Jaccard (ahorra embeddings)
+            jscore = similarity_score(customer_question, text)
+            if jscore < 0.10:
+                continue
+            ts = msg.get("timestamp") or lead.get("last_message_at") or ""
+            raw_questions.append({
+                "text": text,
+                "lead_name": lead.get("name") or lead.get("phone"),
+                "lead_phone": lead.get("phone"),
+                "timestamp": ts,
+                "jaccard": jscore,
+            })
+
+    if not raw_questions:
+        return {
+            "already_taught": False,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "not_enough",
+            "reason": "no hay preguntas similares recientes",
+        }
+
+    # Tomamos top 40 por Jaccard para embeber (evita explotar el batch)
+    raw_questions.sort(key=lambda x: x["jaccard"], reverse=True)
+    raw_questions = raw_questions[:40]
+
+    texts = [q["text"] for q in raw_questions]
+    vecs = await embed_svc.embed_batch(texts)
+
+    similar = []  # con score cosine
+    for q, vec in zip(raw_questions, vecs):
+        if vec is None:
+            continue
+        cos = embed_svc.cosine_similarity(query_vec, vec)
+        if cos < similarity_threshold:
+            continue
+        similar.append({**q, "cosine": cos, "vec": vec})
+
+    if not similar:
+        return {
+            "already_taught": False,
+            "similar_pending_count": 0,
+            "sample_questions": [],
+            "recommendation": "not_enough",
+            "reason": "ninguna pregunta similar alcanza el umbral semántico",
+        }
+
+    # Deduplicación solo para las muestras visuales (evitar mostrar 3 veces
+    # la misma pregunta). El count sigue siendo el TOTAL de leads distintos
+    # afectados, porque esa es la medida de demanda que vale para coaching.
+    similar.sort(key=lambda x: x["cosine"], reverse=True)
+
+    # Contamos leads únicos (una misma persona puede haber preguntado 2 veces)
+    unique_phones = {s["lead_phone"] for s in similar if s.get("lead_phone")}
+    count = len(unique_phones) if unique_phones else len(similar)
+
+    # Clustering para las 3 muestras visibles (variedad)
+    unique_clusters: List[dict] = []
+    for s in similar:
+        duplicated = False
+        for cluster in unique_clusters:
+            if embed_svc.cosine_similarity(s["vec"], cluster["vec"]) >= dedup_threshold:
+                duplicated = True
+                break
+        if not duplicated:
+            unique_clusters.append(s)
+
+    # Armamos las 3 mejores muestras para mostrar al asesor
+    sample_questions = []
+    for c in unique_clusters[:3]:
+        days_ago = 0
+        try:
+            ts = c.get("timestamp") or ""
+            if ts:
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                days_ago = max(0, (now - dt).days)
+        except Exception:
+            pass
+        sample_questions.append({
+            "question": c["text"],
+            "lead_name": c["lead_name"],
+            "days_ago": days_ago,
+            "score": round(c["cosine"], 3),
+        })
+
+    recommendation = "teach" if count >= min_count_to_recommend else "not_enough"
+    reason = (
+        f"hay {count} pregunta(s) similar(es) en los últimos {days} días sin respuesta del bot"
+        if recommendation == "teach"
+        else f"solo {count} pregunta(s) similar(es) — necesita ≥ {min_count_to_recommend}"
+    )
+    return {
+        "already_taught": False,
+        "similar_pending_count": count,
+        "sample_questions": sample_questions,
+        "recommendation": recommendation,
+        "reason": reason,
     }

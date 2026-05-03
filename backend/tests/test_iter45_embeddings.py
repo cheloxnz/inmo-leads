@@ -110,12 +110,40 @@ class FakeMongoCollection:
                 if not any(self._match(doc, sub) for sub in v):
                     return False
             elif isinstance(v, dict):
+                # Soporte para dotted paths como "conversation_history.0"
+                if "." in k:
+                    parts = k.split(".")
+                    cur = doc
+                    exists = True
+                    for p in parts:
+                        if isinstance(cur, list):
+                            try:
+                                cur = cur[int(p)]
+                            except (ValueError, IndexError):
+                                exists = False
+                                break
+                        elif isinstance(cur, dict):
+                            if p in cur:
+                                cur = cur[p]
+                            else:
+                                exists = False
+                                break
+                        else:
+                            exists = False
+                            break
+                    if "$exists" in v:
+                        if v["$exists"] != exists:
+                            return False
+                    continue
                 if "$exists" in v:
                     has = k in doc
                     if v["$exists"] != has:
                         return False
                 if "$ne" in v:
                     if doc.get(k) == v["$ne"]:
+                        return False
+                if "$gte" in v:
+                    if doc.get(k) is None or doc.get(k) < v["$gte"]:
                         return False
             else:
                 if doc.get(k) != v:
@@ -275,3 +303,109 @@ async def test_find_agent_suggestions_combines_learned_and_history():
     assert suggestions[0]["source"] == "learned"
     # match_method debe estar presente
     assert "match_method" in suggestions[0]
+
+
+# --- Tests para find_coaching_opportunity ---
+
+from bot_learning_service import find_coaching_opportunity
+
+
+def _mk_lead(tenant, phone, name, customer_q, agent_a, days_ago=1):
+    from datetime import datetime, timezone, timedelta
+    ts = (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
+    return {
+        "tenant_id": tenant,
+        "phone": phone,
+        "name": name,
+        "last_message_at": ts,
+        "conversation_history": [
+            {"from": "customer", "text": customer_q, "timestamp": ts},
+            {"from": "agent", "text": agent_a, "timestamp": ts},
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_coaching_recommends_teach_when_demand_and_not_yet_taught():
+    db = FakeDB()
+    tenant = "tc1"
+    # 5 leads con preguntas similares sobre mascotas (no hay learned response)
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+111", "Ana", "Aceptan mascotas en el depto?",
+                 "Sí, mascotas pequeñas de hasta 10kg están permitidas", 0),
+        _mk_lead(tenant, "+112", "Pedro", "Puedo llevar mi perro al departamento?",
+                 "Sí, aceptan mascotas chicas", 1),
+        _mk_lead(tenant, "+113", "Laura", "Se permiten gatos en la propiedad?",
+                 "Sí, gatos y perros pequeños están OK", 2),
+        _mk_lead(tenant, "+114", "Julio", "El depto permite mascotas chicas?",
+                 "Sí, hasta 10kg", 3),
+    ])
+    res = await find_coaching_opportunity(
+        db, tenant, "Puedo llevar a mi gato al depto?", exclude_lead_phone="+999",
+    )
+    assert res["already_taught"] is False
+    assert res["similar_pending_count"] >= 3, res
+    assert res["recommendation"] == "teach"
+    assert len(res["sample_questions"]) > 0
+    # Cada sample tiene shape esperada
+    for s in res["sample_questions"]:
+        assert "question" in s and "lead_name" in s and "days_ago" in s
+
+
+@pytest.mark.asyncio
+async def test_coaching_already_taught_when_learned_response_matches():
+    db = FakeDB()
+    tenant = "tc2"
+    # Enseñamos una respuesta sobre el tema
+    await save_learned_response(
+        db=db, tenant_id=tenant,
+        question="Cual es el precio del alquiler del depto?",
+        answer="850 mil pesos por mes",
+    )
+    # 3 leads con preguntas similares al learned
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+201", "A", "cuanto cuesta alquilar", "850k", 1),
+        _mk_lead(tenant, "+202", "B", "que precio tiene el depto", "850k", 1),
+        _mk_lead(tenant, "+203", "C", "a cuanto sale el alquiler", "850k", 1),
+    ])
+    res = await find_coaching_opportunity(
+        db, tenant, "Cuanto vale rentar el departamento?",
+    )
+    # Ya enseñado → recomendación = already_taught, no se enseña de nuevo
+    assert res["already_taught"] is True
+    assert res["recommendation"] == "already_taught"
+    assert res["similar_pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_coaching_not_enough_when_low_demand():
+    db = FakeDB()
+    tenant = "tc3"
+    # Solo 1 lead con pregunta similar
+    db.leads.docs.append(
+        _mk_lead(tenant, "+301", "X", "Aceptan mascotas?", "Sí", 1),
+    )
+    res = await find_coaching_opportunity(
+        db, tenant, "Puedo llevar a mi perro?", min_count_to_recommend=3,
+    )
+    assert res["already_taught"] is False
+    assert res["similar_pending_count"] < 3
+    assert res["recommendation"] == "not_enough"
+
+
+@pytest.mark.asyncio
+async def test_coaching_excludes_current_lead():
+    db = FakeDB()
+    tenant = "tc4"
+    # 3 leads con la misma pregunta, uno es el excluido
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+CURRENT", "Me", "Aceptan mascotas?", "Sí", 1),
+        _mk_lead(tenant, "+401", "A", "Aceptan gatos?", "Sí", 1),
+        _mk_lead(tenant, "+402", "B", "Se permiten perros?", "Sí", 1),
+    ])
+    res = await find_coaching_opportunity(
+        db, tenant, "Puedo llevar a mi mascota?", exclude_lead_phone="+CURRENT",
+    )
+    # Solo contamos "+401" y "+402" — excluimos "+CURRENT"
+    assert res["similar_pending_count"] <= 2
+    assert all(s["lead_name"] != "Me" for s in res["sample_questions"])

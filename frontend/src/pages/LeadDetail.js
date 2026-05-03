@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import TagsManager from '../components/TagsManager';
 import AILeadSummary from '../components/AILeadSummary';
-import { Sparkles, Lightbulb, Copy } from 'lucide-react';
+import { Sparkles, Lightbulb, Copy, GraduationCap, TrendingUp } from 'lucide-react';
 
 export default function LeadDetail() {
   const { phone } = useParams();
@@ -29,20 +29,47 @@ export default function LeadDetail() {
   const [savingLearned, setSavingLearned] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [coaching, setCoaching] = useState(null);
+  const [teachingFromCoaching, setTeachingFromCoaching] = useState(false);
 
   useEffect(() => {
     fetchLead();
   }, [phone]);
 
   // Cuando carga el lead, si el último mensaje es del cliente, pedimos sugerencias
+  // Si el último mensaje es del asesor (ya respondió), chequeamos coaching proactivo
   useEffect(() => {
-    if (!lead?.conversation_history?.length) return;
-    const last = lead.conversation_history[lead.conversation_history.length - 1];
-    if (last?.from !== 'customer' || !last?.text) {
+    if (!lead?.conversation_history?.length) {
       setSuggestions([]);
+      setCoaching(null);
       return;
     }
-    fetchSuggestions(last.text);
+    const history = lead.conversation_history;
+    const last = history[history.length - 1];
+    if (last?.from === 'customer' && last?.text) {
+      // Caso 1: cliente espera respuesta → mostrar sugerencias
+      setCoaching(null);
+      fetchSuggestions(last.text);
+    } else if (last?.from !== 'customer') {
+      // Caso 2: el asesor ya respondió → buscar oportunidad de coaching
+      setSuggestions([]);
+      // Buscar el último mensaje del cliente antes de esta respuesta del agente
+      let lastCustomerMsg = null;
+      for (let i = history.length - 2; i >= 0; i--) {
+        if (history[i]?.from === 'customer' && history[i]?.text) {
+          lastCustomerMsg = history[i];
+          break;
+        }
+      }
+      if (lastCustomerMsg) {
+        fetchCoachingOpportunity(lastCustomerMsg.text, last.text);
+      } else {
+        setCoaching(null);
+      }
+    } else {
+      setSuggestions([]);
+      setCoaching(null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.conversation_history?.length, lead?.phone]);
 
@@ -58,6 +85,52 @@ export default function LeadDetail() {
       console.error('agent-suggestions error:', err);
     } finally {
       setLoadingSuggestions(false);
+    }
+  };
+
+  /** Busca oportunidad de coaching: cuántas preguntas similares a la del
+   * cliente tienen otros leads sin respuesta enseñada al bot. */
+  const fetchCoachingOpportunity = async (customerQuestion, agentAnswer) => {
+    try {
+      const res = await axios.post(`${API}/bot-learning/coaching-opportunity`, {
+        customer_question: customerQuestion,
+        exclude_lead_phone: lead?.phone || '',
+      });
+      const data = res.data || {};
+      // Solo mostramos la tarjeta cuando la recomendación es "teach"
+      if (data.recommendation === 'teach' && (data.similar_pending_count || 0) >= 3) {
+        setCoaching({
+          ...data,
+          customer_question: customerQuestion,
+          agent_answer: agentAnswer,
+        });
+      } else {
+        setCoaching(null);
+      }
+    } catch (err) {
+      console.error('coaching-opportunity error:', err);
+      setCoaching(null);
+    }
+  };
+
+  /** Enseñar al bot usando la pareja (customer_question, agent_answer) de la
+   * tarjeta de coaching. */
+  const teachFromCoaching = async () => {
+    if (!coaching) return;
+    setTeachingFromCoaching(true);
+    try {
+      await axios.post(`${API}/bot-learning`, {
+        question: coaching.customer_question,
+        answer: coaching.agent_answer,
+        lead_phone: lead.phone,
+        notes: `Coaching proactivo: ${coaching.similar_pending_count} consulta(s) similar(es) sin respuesta del bot`,
+      });
+      toast.success(`✅ Enseñado. El bot lo usará para ${coaching.similar_pending_count} consulta(s) similar(es).`);
+      setCoaching(null);
+    } catch (err) {
+      toast.error('Error: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setTeachingFromCoaching(false);
     }
   };
 
@@ -389,6 +462,107 @@ export default function LeadDetail() {
           </CardContent>
         </Card>
         
+        {/* Coaching proactivo: "esta respuesta resolvería N consultas similares" */}
+        {coaching && (
+          <Card
+            data-testid="coaching-opportunity-card"
+            style={{
+              borderLeft: '4px solid #8b5cf6',
+              background: 'linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%)',
+            }}
+          >
+            <CardHeader style={{ paddingBottom: 8 }}>
+              <CardTitle style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <GraduationCap className="w-4 h-4" style={{ color: '#8b5cf6' }} />
+                Coaching proactivo
+                <span
+                  style={{
+                    marginLeft: 'auto', padding: '2px 8px',
+                    background: '#8b5cf6', color: '#fff',
+                    borderRadius: 999, fontSize: 10, fontWeight: 700,
+                    letterSpacing: '0.03em',
+                  }}
+                  data-testid="coaching-count-badge"
+                >
+                  <TrendingUp className="w-3 h-3 inline mr-1" />
+                  {coaching.similar_pending_count} consultas similares
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div style={{ fontSize: 13, color: '#4c1d95', marginBottom: 10, lineHeight: 1.5 }}>
+                Tu respuesta a <em>"{coaching.customer_question.slice(0, 70)}
+                {coaching.customer_question.length > 70 ? '…' : ''}"</em> resolvería{' '}
+                <strong>{coaching.similar_pending_count} consultas similares</strong> que otros clientes
+                hicieron en los últimos 30 días <strong>sin que el bot pudiera responder</strong>.
+              </div>
+
+              <div style={{
+                background: '#fff', border: '1px solid #e9d5ff',
+                borderRadius: 8, padding: '8px 12px', marginBottom: 10,
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                  Ejemplos de preguntas relacionadas:
+                </div>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {(coaching.sample_questions || []).map((s, i) => (
+                    <li
+                      key={i}
+                      data-testid={`coaching-sample-${i}`}
+                      style={{
+                        fontSize: 12, color: '#374151', padding: '4px 0',
+                        borderBottom: i < coaching.sample_questions.length - 1 ? '1px solid #f3e8ff' : 'none',
+                      }}
+                    >
+                      <span style={{ color: '#7c3aed', marginRight: 6 }}>→</span>
+                      "{s.question}"
+                      <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 6 }}>
+                        ({s.lead_name} · hace {s.days_ago}d)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div style={{
+                background: '#fffbeb', border: '1px solid #fde68a',
+                borderRadius: 8, padding: '8px 12px', marginBottom: 10,
+                fontSize: 12, color: '#78350f',
+              }}>
+                <strong>Tu respuesta enseñada:</strong>{' '}
+                <span style={{ whiteSpace: 'pre-wrap' }}>
+                  {coaching.agent_answer.slice(0, 200)}
+                  {coaching.agent_answer.length > 200 ? '…' : ''}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Button
+                  onClick={teachFromCoaching}
+                  disabled={teachingFromCoaching}
+                  data-testid="btn-teach-from-coaching"
+                  style={{
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    color: '#fff', border: 'none',
+                  }}
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {teachingFromCoaching ? 'Enseñando...' : 'Enseñar al bot'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setCoaching(null)}
+                  data-testid="btn-dismiss-coaching"
+                  style={{ fontSize: 12, color: '#6b7280' }}
+                >
+                  Ahora no
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sugerencias para el asesor (basadas en últimas conversaciones) */}
         {(loadingSuggestions || suggestions.length > 0) && (
           <Card data-testid="agent-suggestions-card" style={{ borderLeft: '4px solid #f59e0b' }}>
