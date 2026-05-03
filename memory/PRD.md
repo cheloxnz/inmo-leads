@@ -33,6 +33,43 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter42 - Bot intelligence overhaul: 6 mejoras + Emergent LLM)
+**Cimiento — Datos del Negocio (Fix #4)**:
+- Nuevo `business_profile_service.py`: model + helper `build_business_context_text(profile)` + `get_business_context(db, tenant_id)` + `upsert_business_profile`.
+- Endpoints `GET/PUT /api/business-profile` (admin only) en `routers/config.py`.
+- Componente `BusinessProfileSection.js` en `/config`: form completo con identidad, ubicación, pagos (6 switches), modalidades (delivery/pickup/in-person/parking/cita-previa), políticas (cambios, garantía, NO ofrecemos), custom FAQs (add/remove), tono del bot (neutro/casual/formal/vendedor).
+- Texto generado se inyecta en system prompt del LLM con reglas estrictas: "si no está acá, decí 'no tengo esa info' en vez de inventar".
+
+**Fix #1 — Sustitución con razón LLM**:
+- `llm_service.explain_substitute_value(original, alt, lead_ctx)`: 1 frase corta comparando precio/features.
+- `catalog_service.build_substitute_message_async(orig, subs, llm_service, lead_ctx)`: para cada alternativa pide razón al LLM en paralelo (asyncio.gather), embebe en cursiva.
+- Fallback automático al copy genérico si llm_service es None o falla.
+
+**Fix #2 — Bot vertical-aware**: el `business_profile.industry` + `bot_tone` reemplaza los handlers fijos de inmobiliaria en `handle_faq` y `handle_consulting`. El LLM adapta tono y contexto sin necesidad de handlers por vertical.
+
+**Fix #3 — Catálogo vacío handling** (`bot_flow.process_message`):
+- Si `template_id` ∈ {ecommerce, restaurante, clinica} Y `products` count = 0:
+  manda mensaje "estamos actualizando catálogo, te contacta un humano" + `trigger_handoff` + flag `metadata.empty_catalog_warned` para no repetir.
+- Verticales sin dependencia de catálogo (inmobiliaria, servicios) no aplican.
+
+**Fix #5 — Memoria entre turnos**:
+- `Lead.metadata: dict` nuevo campo en models.py.
+- `generate_contextual_response` recibe `history` (últimos 6 mensajes) y mantiene coherencia.
+- Lead context dict (name, intent, zone, budget) inyectado en cada response.
+
+**Fix #6 — Sentiment + auto-handoff**:
+- `llm_service.detect_sentiment(message, history)`: clasifica `frustrated|positive|normal`.
+- Hook en `process_message`: al detectar 'frustrated' acumula en `metadata.frustration_streak`. Con 2 detecciones consecutivas dispara handoff con mensaje empático ("perdón por la espera, ya te paso con un humano"). 1 sola detección NO escala (evita falsos positivos).
+- Reset del streak cuando vuelve a 'normal'.
+
+**Bonus — Soporte EMERGENT_LLM_KEY**:
+- `LLMService` ahora detecta si hay `OPENAI_API_KEY` (backend=openai con AsyncOpenAI nativo) o `EMERGENT_LLM_KEY` (backend=emergent con `emergentintegrations.LlmChat`).
+- Selección automática, transparente para el resto del código.
+- Fix `from llm_provider` typo histórico en `catalog_service.py` → `from llm_service`.
+- Resultado validado end-to-end: sentiment, contextual, substitute reasoning todos funcionan con la universal key.
+
+
+
 ### 2026-02-XX (Iter41 - WhatsApp Regression Email Alerts)
 - **Email** `send_whatsapp_regression_alert` (`email_service.py`):
   - HTML con tabla de tenants regresados, badge rojo con status nuevo,

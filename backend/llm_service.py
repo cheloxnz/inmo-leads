@@ -1,4 +1,5 @@
 import os
+import uuid
 import logging
 from openai import AsyncOpenAI
 from typing import Dict, Optional
@@ -9,56 +10,113 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """
     Servicio de IA multi-tenant.
-    Usa la key de la plataforma por defecto, o la key propia del tenant si la tiene.
+    
+    Soporta DOS backends:
+    1. **OpenAI directo** (con OPENAI_API_KEY): usa AsyncOpenAI nativo.
+    2. **Emergent Universal Key** (con EMERGENT_LLM_KEY): usa emergentintegrations.LlmChat
+       que enruta a OpenAI/Anthropic/Gemini con un key único.
+    
+    El sistema decide automáticamente qué backend usar según las env vars
+    disponibles, prefiriendo OPENAI_API_KEY (margen propio del tenant) sobre
+    EMERGENT_LLM_KEY (universal de Emergent).
     """
 
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model_name = "gpt-4o"
-        self.client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
-        self.enabled = bool(self.client)
+        explicit_or_openai = api_key or os.getenv("OPENAI_API_KEY") or ""
+        emergent_key = os.getenv("EMERGENT_LLM_KEY") or ""
 
-        if not self.api_key:
-            logger.warning("OPENAI_API_KEY no configurada - LLM deshabilitado")
+        # Default model
+        self.model_name = "gpt-4o"
+
+        if explicit_or_openai:
+            # Backend 1: OpenAI nativo
+            self.api_key = explicit_or_openai
+            self.client = AsyncOpenAI(api_key=self.api_key)
+            self._backend = "openai"
+            self.enabled = True
+        elif emergent_key:
+            # Backend 2: Emergent Universal Key vía emergentintegrations
+            self.api_key = emergent_key
+            self.client = "emergent"  # marker
+            self._backend = "emergent"
+            self.enabled = True
+            logger.info("LLMService: usando EMERGENT_LLM_KEY (universal)")
+        else:
+            self.api_key = ""
+            self.client = None
+            self._backend = "none"
+            self.enabled = False
+            logger.warning("OPENAI_API_KEY/EMERGENT_LLM_KEY no configuradas - LLM deshabilitado")
 
     async def _send_message(self, system_message: str, user_message: str) -> str:
-        if not self.client:
+        if not self.enabled:
             return "Error: API key no configurada"
 
+        if self._backend == "openai":
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0.7,
+                    max_tokens=500,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Error en OpenAI: {e}")
+                return f"Error: {str(e)}"
+
+        # Backend Emergent: usa emergentintegrations.LlmChat
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message}
-                ],
-                temperature=0.7,
-                max_tokens=500
-            )
-            return response.choices[0].message.content
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id=f"oneshot-{uuid.uuid4().hex[:12]}",
+                system_message=system_message,
+            ).with_model("openai", self.model_name)
+            response = await chat.send_message(UserMessage(text=user_message))
+            return str(response or "")
         except Exception as e:
-            logger.error(f"Error en OpenAI: {e}")
+            logger.error(f"Error en Emergent LLM: {e}")
             return f"Error: {str(e)}"
 
     async def send_message(self, system_message: str, user_message: str, max_tokens: int = 500) -> str:
         """API publica: envia un mensaje al LLM. Levanta RuntimeError si no hay client.
 
         max_tokens override permite responses mas largos (ej. flow trees)."""
-        if not self.client:
+        if not self.enabled:
             raise RuntimeError("LLM no configurado (api_key faltante)")
+
+        if self._backend == "openai":
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": system_message},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0.4,
+                    max_tokens=max_tokens,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as e:
+                logger.error(f"Error en OpenAI (send_message): {e}")
+                raise
+
+        # Backend Emergent
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0.4,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content or ""
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id=f"oneshot-{uuid.uuid4().hex[:12]}",
+                system_message=system_message,
+            ).with_model("openai", self.model_name)
+            response = await chat.send_message(UserMessage(text=user_message))
+            return str(response or "")
         except Exception as e:
-            logger.error(f"Error en OpenAI (send_message): {e}")
+            logger.error(f"Error en Emergent LLM (send_message): {e}")
             raise
 
     async def classify_intent(self, user_message: str, intents: list = None) -> Dict:

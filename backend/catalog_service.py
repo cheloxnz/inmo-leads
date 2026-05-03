@@ -287,7 +287,7 @@ class CatalogService:
 
         # 3. GPT fallback: usa nombre + desc del agotado como query sobre todo el catálogo
         try:
-            from llm_provider import create_llm_for_tenant
+            from llm_service import create_llm_for_tenant
             tenant = await self.db.tenants.find_one(
                 {"tenant_id": tenant_id}, {"_id": 0},
             )
