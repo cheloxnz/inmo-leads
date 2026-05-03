@@ -33,6 +33,80 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter45 - Embeddings semánticos en Bot Learning + UI Sugerencias verificada)
+**Backend** — `embeddings_service.py` (nuevo, 110 líneas):
+- Singleton lazy-loaded de `fastembed.TextEmbedding` con modelo
+  `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384-dim,
+  ~225MB, 50+ idiomas, ONNX runtime — sin torch).
+- API: `embed_text(str)`, `embed_batch(list[str])`, `cosine_similarity(a, b)`,
+  `is_available()`. `EMBEDDING_MODEL_NAME` configurable por env.
+- Las llamadas blocking corren en `asyncio.to_thread` (no bloquea el event loop).
+- Si el modelo no carga (sin internet, etc.), `is_available()=False` → fallback
+  automático a Jaccard.
+
+**Hybrid scoring** en `bot_learning_service.py`:
+- `find_learned_answer`: si la entrada tiene `embedding` y el modelo está
+  disponible, usa cosine similarity (threshold ≥ 0.52). Sino, Jaccard fuzzy
+  (threshold ≥ 0.45). Devuelve `match_method="embedding"|"lexical"` en el
+  resultado para trazabilidad.
+- `save_learned_response`: computa el embedding al guardar (best-effort) y lo
+  persiste como `embedding` (lista de 384 floats) + `embedding_model`.
+- `find_agent_suggestions`: pre-filtra históricos por Jaccard ≥ 0.15 (recall
+  amplio), toma top-40, re-rankea con cosine. Threshold final: 0.40 cosine
+  para historia, 0.42 para learned.
+
+**Backfill** + `find_agent_suggestions` re-ranking:
+- `backfill_embeddings(db, tenant_id?)`: procesa entradas legacy en batches
+  de 32. Idempotente (solo procesa entradas con `embedding=None`).
+
+**Endpoints** nuevos en `routers/bot_learning.py`:
+- `POST /api/bot-learning/backfill-embeddings` (admin/asesor): backfill del tenant.
+- `GET /api/bot-learning/embeddings-status`: muestra `available, model, dim,
+  tenant_coverage{total_active, with_embedding, pending_backfill}`. Fuerza
+  load del modelo en el primer call (warmup).
+
+**Frontend `LeadDetail.js`**:
+- Badge violeta "IA semántica" en cada sugerencia con `match_method==='embedding'`
+  (tooltip: "Match semántico vía embeddings — detecta paráfrasis").
+- El bug original "card no aparece" era falsa alarma: la lógica del useEffect
+  era correcta (solo dispara cuando el último mensaje es del cliente). El
+  problema real era que los demo leads tenían `conversation_history=[]`.
+- Seed script `scripts/seed_iter45_demo_leads.py` (idempotente) crea Carlos
+  (last msg customer → muestra card) y Maria (last msg agente → no muestra).
+
+**Validación con paráfrasis reales** (cosine):
+- "que precio tiene el departamento de palermo" → match a "Cuanto sale el
+  alquiler del depto en Palermo?" (cosine 0.506) ✓
+- "cuanto vale rentar ese inmueble" → match (0.496) ✓ — Jaccard nunca lo
+  hubiera atrapado (sin token en común relevante).
+- "atienden el dia sabado" → match a "Hacen visitas los sabados?" (0.549) ✓
+- "como va a estar el clima manana" → 0 matches (0.207) ✓ correcto.
+
+**Tests**: `test_iter45_embeddings.py` 10/10 PASS unit + testing agent E2E
+9/9 PASS (5 backend + 4 frontend). Total iter34+35+45 acumulado: **42/42**.
+
+**Archivos**:
+- +`/app/backend/embeddings_service.py` (110 líneas)
+- ~`/app/backend/bot_learning_service.py` (+90 líneas: hybrid scoring, backfill)
+- ~`/app/backend/routers/bot_learning.py` (+50 líneas: 2 endpoints)
+- ~`/app/frontend/src/pages/LeadDetail.js` (+15 líneas: badge IA semántica)
+- +`/app/backend/tests/test_iter45_embeddings.py` (10 tests con FakeDB)
+- +`/app/backend/scripts/seed_iter45_demo_leads.py` (seed Carlos+Maria, idempotente)
+- ~`/app/backend/requirements.txt` (+fastembed==0.8.0, +onnxruntime==1.25.1
+  + deps transitivas: loguru, mmh3, py-rust-stemmers, flatbuffers)
+
+**Trade-offs documentados**:
+- Modelo local 384-d en lugar de OpenAI text-embedding-3-small 1536-d:
+  EMERGENT_LLM_KEY no expone embeddings, y el modelo local cuesta $0/query +
+  funciona offline. Calidad para queries cortas (<200 chars) en español es
+  comparable. Si el usuario provee `OPENAI_API_KEY` propio en el futuro,
+  swap es trivial (cambiar `embeddings_service.py`).
+- Primera carga del modelo (~3s, 225MB descarga) ocurre en el primer query
+  o explícitamente vía `GET /embeddings-status`. Subsiguientes embeddings
+  ~25ms en CPU.
+
+
+
 ### 2026-02-XX (Iter44 - Auto-aprendizaje del bot)
 **Backend** — `bot_learning_service.py`:
 - Algoritmo similarity sin embeddings: normalización (lower + sin tildes) +
