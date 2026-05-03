@@ -33,6 +33,46 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter44 - Auto-aprendizaje del bot)
+**Backend** — `bot_learning_service.py`:
+- Algoritmo similarity sin embeddings: normalización (lower + sin tildes) +
+  tokenización (>=3 chars sin stopwords) + stemming simple (-s/-es/-ar/-er/-ir/-an/-en) +
+  Jaccard + bonus por substring exacto.
+- `find_learned_answer(db, tenant_id, msg, threshold=0.45)`: retorna match o None.
+  Auto-incrementa `used_count` y `last_used_at` cuando hay hit.
+- `save_learned_response`: idempotente por `question_normalized` (overwrite si
+  existía la misma pregunta).
+- `list_learned_responses`: ordenadas por `used_count` desc.
+
+**Endpoints** (nuevo router `routers/bot_learning.py` registrado en server.py):
+- `POST /api/bot-learning` — guardar respuesta validada (asesor o admin)
+- `GET /api/bot-learning?include_inactive=` — listado del tenant
+- `PUT /api/bot-learning/{id}` — editar pregunta/respuesta/active/notes
+- `DELETE /api/bot-learning/{id}` — borrar definitivamente
+- `POST /api/bot-learning/test` — probar match para una query (debug)
+
+**Hook bot_flow.handle_faq** ANTES del LLM:
+1. `find_learned_answer` (instantáneo, $0)
+2. Si no hay match → `answer_catalog_question` (catálogo semántico)
+3. Si no es query de catálogo → `generate_contextual_response` (business profile)
+4. Fallback genérico
+
+**UI** dos componentes:
+- **`LeadDetail.js`**: cada mensaje saliente del bot/asesor tiene un botón
+  "✨ Enseñar al bot". Click → toma el último mensaje del cliente como
+  pregunta, el mensaje actual como answer, y guarda. Toast confirma.
+- **`BotLearningPanel.js`** en `/config`: lista todas las learned responses
+  con uses count + last_used. Edit inline. Toggle active. Delete. Add manual.
+  Tester: probar si una pregunta hace match (muestra score + answer).
+
+**Resultado validado**:
+- Variaciones cercanas matchean: `hacés envíos al interior?` (score 0.50) ✅
+- Parafraseos lejanos NO matchean: `mandan al interior del país?` (score 0.20) ❌
+  → cae al LLM contextual (correcto)
+- Preguntas distintas NO matchean: `cuál es la dirección?` (score 0.00) ❌
+
+
+
 ### 2026-02-XX (Iter43 - Bug fix cursor + Sentiment cache + Pydantic + Catalog search)
 **🐛 Bug crítico fix - Pérdida de foco al tipear** (`BusinessProfileSection.js`):
 - Causa: `Field` y `Switch` estaban definidos como funciones internas dentro

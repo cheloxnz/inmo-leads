@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import TagsManager from '../components/TagsManager';
 import AILeadSummary from '../components/AILeadSummary';
+import { Sparkles } from 'lucide-react';
 
 export default function LeadDetail() {
   const { phone } = useParams();
@@ -25,10 +26,48 @@ export default function LeadDetail() {
   const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
   
+  const [savingLearned, setSavingLearned] = useState(null);
+
   useEffect(() => {
     fetchLead();
   }, [phone]);
-  
+
+  /**
+   * Guarda este mensaje del agente/bot como "respuesta válida" para que el bot
+   * la use en el futuro cuando reciba preguntas similares.
+   * Toma como pregunta el último mensaje del cliente justo antes de este.
+   */
+  const saveLearned = async (msgIndex) => {
+    if (!lead?.conversation_history) return;
+    const targetMsg = lead.conversation_history[msgIndex];
+    if (!targetMsg || targetMsg.from === 'customer') return;
+    // Buscar el último mensaje del cliente antes de este
+    let questionMsg = null;
+    for (let i = msgIndex - 1; i >= 0; i--) {
+      if (lead.conversation_history[i].from === 'customer') {
+        questionMsg = lead.conversation_history[i];
+        break;
+      }
+    }
+    if (!questionMsg) {
+      toast.error('No hay pregunta del cliente previa para asociar');
+      return;
+    }
+    setSavingLearned(msgIndex);
+    try {
+      await axios.post(`${API}/bot-learning`, {
+        question: questionMsg.text,
+        answer: targetMsg.text,
+        lead_phone: lead.phone,
+      });
+      toast.success('✅ El bot va a usar esta respuesta para preguntas similares');
+    } catch (err) {
+      toast.error('Error: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSavingLearned(null);
+    }
+  };
+
   const fetchLead = async () => {
     try {
       const response = await axios.get(`${API}/leads/${phone}`);
@@ -341,6 +380,31 @@ export default function LeadDetail() {
                           minute: '2-digit'
                         }) : ''}
                       </div>
+                      {msg.from !== 'customer' && (
+                        <button
+                          type="button"
+                          onClick={() => saveLearned(index)}
+                          disabled={savingLearned === index}
+                          data-testid={`save-learned-${index}`}
+                          title="Guardar esta respuesta para que el bot la use con preguntas similares"
+                          style={{
+                            marginTop: 6,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: 'transparent',
+                            border: '1px dashed #94a3b8',
+                            color: '#475569',
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          {savingLearned === index ? 'Guardando...' : 'Enseñar al bot'}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

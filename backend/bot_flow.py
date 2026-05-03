@@ -1217,9 +1217,26 @@ class BotFlowManager:
             response += "📊 Contanos tus preferencias y te enviamos opciones dentro de tu presupuesto."
         
         else:
+            # Iter44: Auto-aprendizaje del bot — buscar respuesta validada por humanos
+            response = None
+            try:
+                from bot_learning_service import find_learned_answer
+                tid = getattr(lead, "tenant_id", "")
+                if tid:
+                    learned = await find_learned_answer(self.wa.db, tid, message)
+                    if learned:
+                        response = learned["answer"]
+                        logger.info(
+                            f"[learned] HIT phone={lead.phone} score={learned['score']} "
+                            f"src='{learned['learned_question'][:50]}'"
+                        )
+            except Exception as e:
+                logger.warning(f"[learned] check failed: {e}")
+
             # Iter43: Búsqueda semántica de catálogo si parece pregunta de producto
-            msg_lower = message.lower()
-            CATALOG_QUERY_HINTS = [
+            if not response:
+                msg_lower = message.lower()
+                CATALOG_QUERY_HINTS = [
                 "tienen", "tenes", "tenés", "manejan", "venden", "ofrecen",
                 "busco", "quiero", "necesito", "quisiera", "me interesa",
                 "tienen alguno", "hay algun", "hay algún", "qué producto",
@@ -1230,8 +1247,7 @@ class BotFlowManager:
             ]
             is_catalog_query = any(h in msg_lower for h in CATALOG_QUERY_HINTS)
 
-            response = None
-            if is_catalog_query:
+            if not response and is_catalog_query:
                 try:
                     db_ref = self.wa.db
                     products = await db_ref.products.find(

@@ -11,6 +11,7 @@ import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 import BrandingPanel from '../components/BrandingPanel';
 import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
 import BusinessProfileSection from '../components/BusinessProfileSection';
+import BotLearningPanel from '../components/BotLearningPanel';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -195,6 +196,9 @@ export default function Configuration() {
 
         {/* Business Profile - data del negocio que el bot usa para responder sin inventar */}
         <BusinessProfileSection />
+
+        {/* Cerebro del Bot - respuestas aprendidas de asesores humanos */}
+        <BotLearningPanel />
         
         <Card>
           <CardHeader>
