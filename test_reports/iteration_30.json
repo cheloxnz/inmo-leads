@@ -1,0 +1,43 @@
+{
+  "summary": "Iter45 (semantic embeddings + agent suggestions card) tested e2e. 10/10 unit tests + 5/5 live integration tests + 4/4 critical UI flows PASS. Card 'Sugerencias para responder' renders en LeadDetail.js con badge violeta 'IA semántica', botón Copiar funciona (toast + clipboard verificado), Maria (last msg agente) NO muestra card (negative test OK), 'Enseñar al bot' guarda y aparece en /config. Hallazgo: en preview DB no había leads en demo-inmobiliaria — los 'leads seedeados' del handoff no estaban persistidos. Creé /app/backend/scripts/seed_iter45_demo_leads.py (idempotente) para reseed Carlos+Maria; main agent debe correrlo en cualquier env donde se borre la DB.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/agent-suggestions", "issue": "Mi primer test live falló por confusión de contrato: el body usa la key 'message' (no 'draft_text'). Endpoint funciona OK; era issue del test, ya corregido en test_iter45_embeddings_live.py."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_embeddings.py",
+    "/app/backend/tests/test_iter45_embeddings_live.py",
+    "/app/test_reports/pytest/iter45_results.xml",
+    "/app/test_reports/pytest/iter45_live_results.xml",
+    "/app/backend/scripts/seed_iter45_demo_leads.py"
+  ],
+  "action_items": [
+    "Persistir el seed de demo leads. El handoff afirmaba que Carlos/Maria estaban seedeados pero la DB de preview no los tenía (0 leads en demo-inmobiliaria). Convertir scripts/seed_iter45_demo_leads.py en parte de demo_seed_service.py (o init_admin.py) para que sobreviva resets. Sin esto la card de Sugerencias no se puede demostrar.",
+    "Limpiar entradas TEST_xxxxxx que quedaron en learned_responses tras tests live (no las elimino para no bloquear retest, pero ensucian /config).",
+    "Considerar fijar fastembed==0.5.1 o usar add_custom_model para silenciar el UserWarning sobre mean-pooling vs CLS de paraphrase-multilingual-MiniLM-L12-v2 (cambio de comportamiento default; los thresholds actuales se calibraron con mean-pooling y funcionan, pero conviene documentarlo).",
+    "(Pre-existente) routers/bot_learning.py /test-match recibe body como dict crudo — reemplazar por Pydantic model para validación robusta."
+  ],
+  "critical_code_review_comments": [
+    "embeddings_service.py: lazy-load OK (TextEmbedding solo se instancia en primer uso) y cosine_similarity maneja edge cases (empty, dim mismatch, zero norm). Bien implementado.",
+    "bot_learning_service.find_agent_suggestions: re-rankea top-40 candidates por cosine — diseño correcto (recall amplio Jaccard → precision con embedding). Threshold 0.42 cosine para learned y 0.40 para history son razonables y verificados (paráfrasis 0.54 > 0.42 < unrelated).",
+    "save_learned_response: NO retorna el campo embedding al cliente (correcto, evita inflar payload con 384 floats). Buen pattern."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter45_embeddings_live.py (nuevo - 5 integration tests)",
+    "/app/backend/scripts/seed_iter45_demo_leads.py (nuevo - reseed demo leads para preview)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123!",
+  "seed_data_creation": "Creé 2 demo leads (Carlos Test 5491100000001 con last_msg=customer, Maria Test 5491100000002 con last_msg=agent) en demo-inmobiliaria via /app/backend/scripts/seed_iter45_demo_leads.py. learned_responses ya estaban (4 docs con embedding 384-d).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Si la DB se resetea, correr `python /app/backend/scripts/seed_iter45_demo_leads.py` antes de testear Sugerencias UI. Endpoint /api/agent-suggestions usa body key 'message' (NO 'draft_text'). Threshold cosine: learned≥0.42, history≥0.40. fastembed paraphrase-multilingual-MiniLM-L12-v2 384-d se carga lazy en 1er uso (~225MB descargados al HF cache). Verificada paráfrasis 'cuanto vale rentar el inmueble' → matchea 'cuanto sale el alquiler del depto' con match_method=embedding score=0.86.",
+  "rca of the issue": "No critical issues found. Bug originalmente reportado ('card no aparece') era falta de seed data — ya solucionado en este iter (seed script creado). Toda la feature de embeddings + UI funciona correctamente end-to-end."
+}

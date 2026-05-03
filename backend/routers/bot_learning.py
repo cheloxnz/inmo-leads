@@ -159,10 +159,11 @@ async def agent_suggestions(
     """Sugerencias para el asesor mientras escribe en un chat.
 
     Body: {message: str, lead_phone: str (opcional, para excluir el chat actual)}
-    Returns: {suggestions: [{answer, score, source, context}]}
+    Returns: {suggestions: [{answer, score, source, match_method, context}]}
 
     Combina `learned_responses` (alta confianza) + histórico de conversaciones
-    del mismo tenant (recall amplio). Score >= 0.40 para evitar ruido.
+    del mismo tenant (recall amplio). Score >= 0.40 (Jaccard) o >= 0.45
+    (cosine semántico) para evitar ruido.
     """
     from bot_learning_service import find_agent_suggestions
     msg = (body or {}).get("message", "").strip()
@@ -177,3 +178,54 @@ async def agent_suggestions(
         limit=int((body or {}).get("limit", 3)),
     )
     return {"suggestions": suggestions}
+
+
+@router.post("/bot-learning/backfill-embeddings")
+async def backfill_embeddings_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """Re-procesa learned_responses del tenant para asignarles embedding
+    semántico (384-d). Útil para entradas viejas guardadas antes de habilitar
+    embeddings. Idempotente: solo procesa entradas sin embedding."""
+    from bot_learning_service import backfill_embeddings
+    db = _get_db()
+    result = await backfill_embeddings(db, tenant_id=current_user.tenant_id)
+    return result
+
+
+@router.get("/bot-learning/embeddings-status")
+async def embeddings_status(
+    current_user: User = Depends(get_current_user),
+):
+    """Estado del modelo de embeddings + cobertura del tenant.
+
+    Retorna:
+      - available: bool (modelo cargado y listo)
+      - model: nombre del modelo
+      - dim: dimensión del vector
+      - tenant_coverage: cuántas learned_responses tienen embedding vs total
+    """
+    import embeddings_service as embed_svc
+    db = _get_db()
+    tid = current_user.tenant_id
+
+    # Forzar load del modelo si aún no se intentó
+    if not embed_svc.is_available():
+        await embed_svc.embed_text("ping")
+
+    total = await db.learned_responses.count_documents({"tenant_id": tid, "active": True})
+    with_emb = await db.learned_responses.count_documents({
+        "tenant_id": tid,
+        "active": True,
+        "embedding": {"$exists": True, "$ne": None},
+    })
+    return {
+        "available": embed_svc.is_available(),
+        "model": embed_svc.EMBEDDING_MODEL_NAME,
+        "dim": embed_svc.EMBEDDING_DIM,
+        "tenant_coverage": {
+            "total_active": total,
+            "with_embedding": with_emb,
+            "pending_backfill": total - with_emb,
+        },
+    }

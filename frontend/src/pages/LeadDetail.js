@@ -423,6 +423,18 @@ export default function LeadDetail() {
                         }}>
                           {sug.source === 'learned' ? '🧠 Enseñado al bot' : '💬 Tu respuesta previa'}
                           <span style={{ marginLeft: 6, opacity: 0.7, fontWeight: 400 }}>· {sug.score}</span>
+                          {sug.match_method === 'embedding' && (
+                            <span
+                              style={{
+                                marginLeft: 6, padding: '1px 6px',
+                                background: '#ede9fe', color: '#6d28d9',
+                                borderRadius: 4, fontSize: 9, letterSpacing: 0,
+                              }}
+                              title="Match semántico vía embeddings (detecta paráfrasis)"
+                            >
+                              IA semántica
+                            </span>
+                          )}
                         </span>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <Button

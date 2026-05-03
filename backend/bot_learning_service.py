@@ -134,15 +134,30 @@ async def find_learned_answer(
     tenant_id: str,
     user_message: str,
     threshold: float = 0.45,
+    embedding_threshold: float = 0.52,
 ) -> Optional[dict]:
     """Busca una respuesta aprendida para `user_message` en este tenant.
 
+    Estrategia de scoring (en orden de prioridad):
+      1. **Embeddings (semantic search)**: si la entrada tiene embedding y el
+         modelo está disponible, calcula cosine similarity con el query.
+         Threshold default 0.55 (paraphrase-MiniLM tiende a 0.5-0.7 para
+         paráfrasis claras). Detecta sinónimos, reordenamientos, etc.
+      2. **Jaccard fuzzy (fallback)**: para entradas SIN embedding (legacy)
+         o cuando el modelo no está disponible. Threshold 0.45.
+
+    Devuelve la mejor coincidencia normalizada a un único score 0-1, indicando
+    el método via `match_method` ("embedding" | "lexical").
+
     Returns:
-        dict con {answer, source_id, score, learned_question} si hay match,
-        None si no.
+        dict con {answer, source_id, score, learned_question, match_method}
+        si hay match, None si no.
     """
     if not tenant_id or not user_message:
         return None
+
+    import embeddings_service as embed_svc
+    query_vec = await embed_svc.embed_text(user_message)
 
     cursor = db.learned_responses.find(
         {"tenant_id": tenant_id, "active": True},
@@ -150,13 +165,26 @@ async def find_learned_answer(
     )
     best = None
     best_score = 0.0
+    best_method = "lexical"
     async for entry in cursor:
-        score = similarity_score(user_message, entry.get("question", ""))
+        entry_emb = entry.get("embedding")
+        if query_vec and entry_emb:
+            score = embed_svc.cosine_similarity(query_vec, entry_emb)
+            method = "embedding"
+            cutoff = embedding_threshold
+        else:
+            score = similarity_score(user_message, entry.get("question", ""))
+            method = "lexical"
+            cutoff = threshold
+        # Normalizamos: solo consideramos candidatos que pasaron su propio cutoff.
+        if score < cutoff:
+            continue
         if score > best_score:
             best_score = score
             best = entry
+            best_method = method
 
-    if not best or best_score < threshold:
+    if not best:
         return None
 
     # Increment used_count + last_used_at (best-effort, no bloqueamos al caller)
@@ -176,6 +204,7 @@ async def find_learned_answer(
         "source_id": best.get("id"),
         "score": round(best_score, 3),
         "learned_question": best.get("question", ""),
+        "match_method": best_method,
     }
 
 
@@ -189,8 +218,15 @@ async def save_learned_response(
     notes: str = "",
 ) -> dict:
     """Guarda una nueva learned response. Si ya existe una con la misma
-    question normalizada, actualiza la answer (overwrite)."""
+    question normalizada, actualiza la answer (overwrite). Computa también
+    el embedding semántico de la pregunta (best-effort: si falla, queda
+    None y el sistema sigue usando Jaccard para esa entrada)."""
     norm_q = _normalize(question)
+
+    # Compute embedding (best-effort)
+    import embeddings_service as embed_svc
+    embedding = await embed_svc.embed_text(question)
+
     existing = await db.learned_responses.find_one(
         {"tenant_id": tenant_id, "question_normalized": norm_q},
         {"_id": 0},
@@ -198,17 +234,21 @@ async def save_learned_response(
     now = datetime.now(timezone.utc).isoformat()
 
     if existing:
+        update_set = {
+            "answer": answer,
+            "updated_at": now,
+            "active": True,
+            "notes": notes or existing.get("notes", ""),
+        }
+        if embedding is not None:
+            update_set["embedding"] = embedding
+            update_set["embedding_model"] = embed_svc.EMBEDDING_MODEL_NAME
         await db.learned_responses.update_one(
             {"id": existing["id"]},
-            {"$set": {
-                "answer": answer,
-                "updated_at": now,
-                "active": True,
-                "notes": notes or existing.get("notes", ""),
-            }},
+            {"$set": update_set},
         )
         return await db.learned_responses.find_one(
-            {"id": existing["id"]}, {"_id": 0},
+            {"id": existing["id"]}, {"_id": 0, "embedding": 0},
         )
 
     doc = {
@@ -225,9 +265,12 @@ async def save_learned_response(
         "last_used_at": None,
         "created_at": now,
         "updated_at": now,
+        "embedding": embedding,  # None si el modelo no está disponible
+        "embedding_model": embed_svc.EMBEDDING_MODEL_NAME if embedding else None,
     }
     await db.learned_responses.insert_one(doc)
-    return {k: v for k, v in doc.items() if k != "_id"}
+    # Excluimos embedding de la respuesta (lista de 384 floats es ruidosa).
+    return {k: v for k, v in doc.items() if k not in ("_id", "embedding")}
 
 
 async def list_learned_responses(
@@ -239,9 +282,10 @@ async def list_learned_responses(
     query = {"tenant_id": tenant_id}
     if not include_inactive:
         query["active"] = True
-    return await db.learned_responses.find(query, {"_id": 0}).sort(
-        "used_count", -1
-    ).to_list(500)
+    return await db.learned_responses.find(
+        query,
+        {"_id": 0, "embedding": 0},  # Excluimos vector (384 floats) del listado UI
+    ).sort("used_count", -1).to_list(500)
 
 
 async def find_agent_suggestions(
@@ -257,24 +301,31 @@ async def find_agent_suggestions(
     Útil para sugerirle al asesor que está escribiendo: "respondiste algo
     parecido a Juan hace 3 días, ¿querés usar esa misma respuesta?".
 
-    Estrategia:
-    - Recorre las últimas N leads del tenant (excluye el actual).
-    - Para cada lead, busca pares (mensaje_cliente → siguiente_mensaje_asesor)
-      en `conversation_history`.
-    - Calcula similarity con el query y devuelve top K respuestas.
-    - Deduplica por respuesta normalizada (evita 3 sugerencias idénticas).
-
-    También merge-ea con `learned_responses` activas como fallback de mayor
-    confianza.
+    Estrategia híbrida:
+    1. **Learned responses** (alta confianza ya validada) → cosine si hay
+       embedding, Jaccard si no.
+    2. **Históricos de conversaciones reales** del tenant:
+       - Pre-filtra por Jaccard ligero (recall amplio, threshold 0.15).
+       - Toma top 40 candidatos.
+       - Si hay embeddings disponibles, los re-rankea por cosine similarity
+         (precisión: detecta paráfrasis). Threshold final 0.45 cosine.
+       - Si no, usa el score Jaccard tal cual con threshold 0.40.
+    - Deduplica por respuesta normalizada para no mostrar 3 sugerencias
+      idénticas.
     """
     if not tenant_id or not query.strip():
         return []
+
+    import embeddings_service as embed_svc
+    query_vec = await embed_svc.embed_text(query)
 
     suggestions = []
     seen_answers = set()
 
     # 1. Learned responses (alta confianza, ya validadas)
-    learned_match = await find_learned_answer(db, tenant_id, query, threshold=0.40)
+    learned_match = await find_learned_answer(
+        db, tenant_id, query, threshold=0.40, embedding_threshold=0.42,
+    )
     if learned_match:
         ans = (learned_match["answer"] or "").strip()
         if ans:
@@ -283,6 +334,7 @@ async def find_agent_suggestions(
                 "answer": ans,
                 "score": learned_match["score"],
                 "source": "learned",
+                "match_method": learned_match.get("match_method", "lexical"),
                 "context": f"Respuesta enseñada al bot: \"{learned_match['learned_question'][:60]}\"",
             })
 
@@ -297,7 +349,7 @@ async def find_agent_suggestions(
         {"_id": 0, "phone": 1, "name": 1, "conversation_history": 1},
     ).sort("last_message_at", -1).limit(100)
 
-    candidates = []
+    raw_candidates = []
     async for lead in cursor:
         history = lead.get("conversation_history") or []
         if len(history) < 2:
@@ -317,22 +369,74 @@ async def find_agent_suggestions(
             # Filtros de calidad: no sugerir respuestas muy cortas o muy largas
             if len(agent_msg) < 20 or len(agent_msg) > 600:
                 continue
-            score = similarity_score(query, cust_msg)
-            if score < 0.40:
+            jaccard = similarity_score(query, cust_msg)
+            # Pre-filtro lexical amplio (recall) — luego re-rankeamos
+            if jaccard < 0.15:
                 continue
-            candidates.append({
+            raw_candidates.append({
                 "answer": agent_msg,
-                "score": score,
+                "cust_msg": cust_msg,
+                "lead_label": lead.get("name") or lead.get("phone"),
+                "jaccard": jaccard,
+            })
+
+    # Top 40 por Jaccard para mantener acotado el batch de embeddings
+    raw_candidates.sort(key=lambda x: x["jaccard"], reverse=True)
+    raw_candidates = raw_candidates[:40]
+
+    # Re-ranking semántico con embeddings (si están disponibles)
+    final_candidates = []
+    if query_vec and raw_candidates:
+        cust_msgs = [c["cust_msg"] for c in raw_candidates]
+        cust_vecs = await embed_svc.embed_batch(cust_msgs)
+        for c, vec in zip(raw_candidates, cust_vecs):
+            if vec is None:
+                # Caer al Jaccard si no se pudo embed (raro)
+                if c["jaccard"] < 0.40:
+                    continue
+                final_candidates.append({
+                    "answer": c["answer"],
+                    "score": c["jaccard"],
+                    "source": "history",
+                    "match_method": "lexical",
+                    "context": (
+                        f"Le respondiste así a {c['lead_label']} "
+                        f"que preguntó: \"{c['cust_msg'][:60]}\""
+                    ),
+                })
+                continue
+            cos = embed_svc.cosine_similarity(query_vec, vec)
+            if cos < 0.40:
+                continue
+            final_candidates.append({
+                "answer": c["answer"],
+                "score": cos,
                 "source": "history",
+                "match_method": "embedding",
                 "context": (
-                    f"Le respondiste así a {lead.get('name') or lead.get('phone')} "
-                    f"que preguntó: \"{cust_msg[:60]}\""
+                    f"Le respondiste así a {c['lead_label']} "
+                    f"que preguntó: \"{c['cust_msg'][:60]}\""
+                ),
+            })
+    else:
+        # Sin embeddings: usar Jaccard tal cual
+        for c in raw_candidates:
+            if c["jaccard"] < 0.40:
+                continue
+            final_candidates.append({
+                "answer": c["answer"],
+                "score": c["jaccard"],
+                "source": "history",
+                "match_method": "lexical",
+                "context": (
+                    f"Le respondiste así a {c['lead_label']} "
+                    f"que preguntó: \"{c['cust_msg'][:60]}\""
                 ),
             })
 
     # Ordenar por score desc y deduplicar respuestas similares
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-    for c in candidates:
+    final_candidates.sort(key=lambda x: x["score"], reverse=True)
+    for c in final_candidates:
         if len(suggestions) >= limit:
             break
         norm_ans = _normalize(c["answer"])[:120]
@@ -342,3 +446,66 @@ async def find_agent_suggestions(
         suggestions.append({**c, "score": round(c["score"], 3)})
 
     return suggestions[:limit]
+
+
+async def backfill_embeddings(
+    db: AsyncIOMotorDatabase,
+    tenant_id: Optional[str] = None,
+    batch_size: int = 32,
+) -> dict:
+    """Computa embeddings para learned_responses que aún no los tienen.
+
+    Útil para migrar entradas guardadas antes de habilitar el sistema de
+    embeddings. Idempotente: solo procesa entradas con `embedding=None`.
+
+    Args:
+        tenant_id: si se pasa, restringe al tenant. None = todos.
+        batch_size: cantidad por lote para embed_batch (más rápido).
+
+    Returns:
+        {processed, skipped, failed, total_pending}
+    """
+    import embeddings_service as embed_svc
+
+    query = {
+        "$or": [
+            {"embedding": None},
+            {"embedding": {"$exists": False}},
+        ]
+    }
+    if tenant_id:
+        query["tenant_id"] = tenant_id
+
+    pending = await db.learned_responses.find(
+        query, {"_id": 0, "id": 1, "question": 1}
+    ).to_list(5000)
+
+    if not pending:
+        return {"processed": 0, "skipped": 0, "failed": 0, "total_pending": 0}
+
+    processed = 0
+    failed = 0
+
+    for i in range(0, len(pending), batch_size):
+        batch = pending[i : i + batch_size]
+        questions = [(p.get("question") or "") for p in batch]
+        vecs = await embed_svc.embed_batch(questions)
+        for entry, vec in zip(batch, vecs):
+            if vec is None:
+                failed += 1
+                continue
+            await db.learned_responses.update_one(
+                {"id": entry["id"]},
+                {"$set": {
+                    "embedding": vec,
+                    "embedding_model": embed_svc.EMBEDDING_MODEL_NAME,
+                }},
+            )
+            processed += 1
+
+    return {
+        "processed": processed,
+        "skipped": 0,
+        "failed": failed,
+        "total_pending": len(pending),
+    }
