@@ -148,3 +148,32 @@ async def test_learned(
         db, current_user.tenant_id, msg, threshold=threshold,
     )
     return {"matched": bool(match), "match": match}
+
+
+
+@router.post("/agent-suggestions")
+async def agent_suggestions(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Sugerencias para el asesor mientras escribe en un chat.
+
+    Body: {message: str, lead_phone: str (opcional, para excluir el chat actual)}
+    Returns: {suggestions: [{answer, score, source, context}]}
+
+    Combina `learned_responses` (alta confianza) + histórico de conversaciones
+    del mismo tenant (recall amplio). Score >= 0.40 para evitar ruido.
+    """
+    from bot_learning_service import find_agent_suggestions
+    msg = (body or {}).get("message", "").strip()
+    if not msg:
+        return {"suggestions": []}
+    db = _get_db()
+    suggestions = await find_agent_suggestions(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        query=msg,
+        exclude_lead_phone=(body or {}).get("lead_phone", ""),
+        limit=int((body or {}).get("limit", 3)),
+    )
+    return {"suggestions": suggestions}

@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import TagsManager from '../components/TagsManager';
 import AILeadSummary from '../components/AILeadSummary';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Lightbulb, Copy } from 'lucide-react';
 
 export default function LeadDetail() {
   const { phone } = useParams();
@@ -27,10 +27,44 @@ export default function LeadDetail() {
   const [saving, setSaving] = useState(false);
   
   const [savingLearned, setSavingLearned] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   useEffect(() => {
     fetchLead();
   }, [phone]);
+
+  // Cuando carga el lead, si el último mensaje es del cliente, pedimos sugerencias
+  useEffect(() => {
+    if (!lead?.conversation_history?.length) return;
+    const last = lead.conversation_history[lead.conversation_history.length - 1];
+    if (last?.from !== 'customer' || !last?.text) {
+      setSuggestions([]);
+      return;
+    }
+    fetchSuggestions(last.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.conversation_history?.length, lead?.phone]);
+
+  const fetchSuggestions = async (lastCustomerMessage) => {
+    setLoadingSuggestions(true);
+    try {
+      const res = await axios.post(`${API}/agent-suggestions`, {
+        message: lastCustomerMessage,
+        lead_phone: lead?.phone || '',
+      });
+      setSuggestions(res.data.suggestions || []);
+    } catch (err) {
+      console.error('agent-suggestions error:', err);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copiado — ya podés pegarlo en WhatsApp');
+  };
 
   /**
    * Guarda este mensaje del agente/bot como "respuesta válida" para que el bot
@@ -355,6 +389,66 @@ export default function LeadDetail() {
           </CardContent>
         </Card>
         
+        {/* Sugerencias para el asesor (basadas en últimas conversaciones) */}
+        {(loadingSuggestions || suggestions.length > 0) && (
+          <Card data-testid="agent-suggestions-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+            <CardHeader style={{ paddingBottom: 8 }}>
+              <CardTitle style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Lightbulb className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                Sugerencias para responder
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingSuggestions ? (
+                <div style={{ fontSize: 12, color: '#6b7280' }}>Buscando respuestas similares...</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {suggestions.map((sug, i) => (
+                    <div
+                      key={i}
+                      data-testid={`suggestion-${i}`}
+                      style={{
+                        padding: '10px 12px',
+                        background: sug.source === 'learned' ? '#f0fdf4' : '#fffbeb',
+                        border: `1px solid ${sug.source === 'learned' ? '#bbf7d0' : '#fde68a'}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', marginBottom: 4 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: sug.source === 'learned' ? '#15803d' : '#b45309',
+                        }}>
+                          {sug.source === 'learned' ? '🧠 Enseñado al bot' : '💬 Tu respuesta previa'}
+                          <span style={{ marginLeft: 6, opacity: 0.7, fontWeight: 400 }}>· {sug.score}</span>
+                        </span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyToClipboard(sug.answer)}
+                            data-testid={`copy-suggestion-${i}`}
+                            style={{ padding: '2px 8px', fontSize: 11, height: 24 }}
+                            title="Copiar al portapapeles"
+                          >
+                            <Copy className="w-3 h-3 mr-1" /> Copiar
+                          </Button>
+                        </div>
+                      </div>
+                      <div style={{ color: '#374151', whiteSpace: 'pre-wrap' }}>{sug.answer}</div>
+                      <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 6, fontStyle: 'italic' }}>
+                        {sug.context}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Historial de Conversación de WhatsApp */}
         <Card className="conversation-card" data-testid="conversation-history">
           <CardHeader>

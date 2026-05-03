@@ -76,18 +76,48 @@ def _tokens(text: str) -> set:
     return {_stem(t) for t in raw if len(t) >= 3 and t not in _STOPWORDS}
 
 
+def _fuzzy_overlap(set_a: set, set_b: set) -> tuple:
+    """Cuenta tokens que matchean exacto O por prefix (≥4 chars).
+
+    Ej: 'estacion' (de stem de 'estacionar') matchea con 'estacionamiento'
+    porque uno es prefijo del otro y ambos tienen ≥4 chars.
+
+    Retorna (count_match, total_unique) para calcular un Jaccard-fuzzy.
+    """
+    matched_b = set()
+    matches = 0
+    for a in set_a:
+        if a in set_b:
+            matches += 1
+            matched_b.add(a)
+            continue
+        # Buscar prefix match
+        for b in set_b:
+            if b in matched_b:
+                continue
+            if len(a) >= 4 and len(b) >= 4 and (a.startswith(b[:4]) or b.startswith(a[:4])):
+                matches += 1
+                matched_b.add(b)
+                break
+    total = len(set_a) + len(set_b) - matches
+    return matches, total
+
+
 def similarity_score(query: str, learned_question: str) -> float:
-    """Score 0.0-1.5: Jaccard con bonus por substring exacto."""
+    """Score 0.0-1.5: Jaccard-fuzzy con bonus por substring exacto.
+
+    El 'fuzzy' permite que tokens con prefijo común de 4+ chars matcheen
+    (captura familias morfológicas que el stemmer simple no atrapa, ej.
+    'estacion' ↔ 'estacionamiento').
+    """
     q_tokens = _tokens(query)
     l_tokens = _tokens(learned_question)
     if not q_tokens or not l_tokens:
         return 0.0
-    inter = q_tokens & l_tokens
-    union = q_tokens | l_tokens
-    jaccard = len(inter) / len(union) if union else 0.0
+    matches, total = _fuzzy_overlap(q_tokens, l_tokens)
+    jaccard = matches / total if total else 0.0
 
-    # Bonus si la learned_question (normalizada) está incluida dentro del
-    # query (o viceversa para queries cortos)
+    # Bonus si una pregunta (normalizada) está incluida en la otra
     nq = _normalize(query)
     nl = _normalize(learned_question)
     bonus = 0.0
@@ -212,3 +242,103 @@ async def list_learned_responses(
     return await db.learned_responses.find(query, {"_id": 0}).sort(
         "used_count", -1
     ).to_list(500)
+
+
+async def find_agent_suggestions(
+    db: AsyncIOMotorDatabase,
+    tenant_id: str,
+    query: str,
+    exclude_lead_phone: str = "",
+    limit: int = 3,
+) -> List[dict]:
+    """Busca respuestas que ASESORES escribieron en otras conversaciones
+    cerradas para preguntas similares al `query`.
+
+    Útil para sugerirle al asesor que está escribiendo: "respondiste algo
+    parecido a Juan hace 3 días, ¿querés usar esa misma respuesta?".
+
+    Estrategia:
+    - Recorre las últimas N leads del tenant (excluye el actual).
+    - Para cada lead, busca pares (mensaje_cliente → siguiente_mensaje_asesor)
+      en `conversation_history`.
+    - Calcula similarity con el query y devuelve top K respuestas.
+    - Deduplica por respuesta normalizada (evita 3 sugerencias idénticas).
+
+    También merge-ea con `learned_responses` activas como fallback de mayor
+    confianza.
+    """
+    if not tenant_id or not query.strip():
+        return []
+
+    suggestions = []
+    seen_answers = set()
+
+    # 1. Learned responses (alta confianza, ya validadas)
+    learned_match = await find_learned_answer(db, tenant_id, query, threshold=0.40)
+    if learned_match:
+        ans = (learned_match["answer"] or "").strip()
+        if ans:
+            seen_answers.add(_normalize(ans)[:120])
+            suggestions.append({
+                "answer": ans,
+                "score": learned_match["score"],
+                "source": "learned",
+                "context": f"Respuesta enseñada al bot: \"{learned_match['learned_question'][:60]}\"",
+            })
+
+    # 2. Históricos de conversaciones reales del tenant
+    lead_query = {"tenant_id": tenant_id, "conversation_history.0": {"$exists": True}}
+    if exclude_lead_phone:
+        lead_query["phone"] = {"$ne": exclude_lead_phone}
+
+    # Limitamos a 100 leads más recientes para que sea rápido
+    cursor = db.leads.find(
+        lead_query,
+        {"_id": 0, "phone": 1, "name": 1, "conversation_history": 1},
+    ).sort("last_message_at", -1).limit(100)
+
+    candidates = []
+    async for lead in cursor:
+        history = lead.get("conversation_history") or []
+        if len(history) < 2:
+            continue
+        # Buscar pares (customer → outbound)
+        for i in range(len(history) - 1):
+            cur = history[i]
+            nxt = history[i + 1]
+            if cur.get("from") != "customer":
+                continue
+            if nxt.get("from") == "customer":
+                continue
+            cust_msg = (cur.get("text") or "").strip()
+            agent_msg = (nxt.get("text") or "").strip()
+            if not cust_msg or not agent_msg:
+                continue
+            # Filtros de calidad: no sugerir respuestas muy cortas o muy largas
+            if len(agent_msg) < 20 or len(agent_msg) > 600:
+                continue
+            score = similarity_score(query, cust_msg)
+            if score < 0.40:
+                continue
+            candidates.append({
+                "answer": agent_msg,
+                "score": score,
+                "source": "history",
+                "context": (
+                    f"Le respondiste así a {lead.get('name') or lead.get('phone')} "
+                    f"que preguntó: \"{cust_msg[:60]}\""
+                ),
+            })
+
+    # Ordenar por score desc y deduplicar respuestas similares
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+    for c in candidates:
+        if len(suggestions) >= limit:
+            break
+        norm_ans = _normalize(c["answer"])[:120]
+        if norm_ans in seen_answers:
+            continue
+        seen_answers.add(norm_ans)
+        suggestions.append({**c, "score": round(c["score"], 3)})
+
+    return suggestions[:limit]
