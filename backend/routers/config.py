@@ -459,22 +459,32 @@ async def update_business_profile(
     current_user: User = Depends(require_admin),
 ):
     """Admin: upsert del profile. El bot va a usar esta info para responder
-    preguntas frecuentes sin inventar datos."""
-    from business_profile_service import upsert_business_profile
+    preguntas frecuentes sin inventar datos.
 
-    allowed = {
-        "business_name", "business_description", "industry",
-        "address", "city", "phone", "email", "website",
-        "google_maps_url", "business_hours",
-        "accepts_cash", "accepts_credit_card", "accepts_debit_card",
-        "accepts_transfer", "accepts_crypto", "accepts_mercadopago",
-        "payment_notes",
-        "offers_delivery", "delivery_zones", "delivery_cost",
-        "offers_pickup", "offers_in_person", "has_parking",
-        "return_policy", "warranty_policy", "appointment_required",
-        "custom_faqs", "not_offered", "bot_tone",
+    Validación: tipa el body con Pydantic BusinessProfile (campos opcionales,
+    validación de tipos primitivos). Si un campo viene con tipo inválido
+    (ej. accepts_cash='texto'), Pydantic lo rechaza con 422.
+    """
+    from business_profile_service import upsert_business_profile, BusinessProfile
+
+    # Forzar tenant_id desde el JWT (no se acepta del body)
+    body_clean = {k: v for k, v in (body or {}).items() if k != "tenant_id"}
+    body_clean["tenant_id"] = current_user.tenant_id
+
+    try:
+        validated = BusinessProfile(**body_clean)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Datos inválidos: {e}")
+
+    # Sólo persistimos los campos que vinieron en el request (evita pisar
+    # con defaults los campos que el form no mandó).
+    incoming_keys = set(body_clean.keys()) - {"tenant_id"}
+    data = {
+        k: getattr(validated, k)
+        for k in incoming_keys
+        if hasattr(validated, k)
     }
-    data = {k: v for k, v in body.items() if k in allowed}
+
     profile = await upsert_business_profile(_db, current_user.tenant_id, data)
     profile["exists"] = True
     return profile

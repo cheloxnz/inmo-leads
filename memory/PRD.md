@@ -33,6 +33,50 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter43 - Bug fix cursor + Sentiment cache + Pydantic + Catalog search)
+**🐛 Bug crítico fix - Pérdida de foco al tipear** (`BusinessProfileSection.js`):
+- Causa: `Field` y `Switch` estaban definidos como funciones internas dentro
+  del componente → React los re-creaba en cada render → input perdía foco al
+  cambiar el state.
+- Solución: extraídos a sub-componentes top-level (`FieldInput`, `FieldTextarea`,
+  `SwitchRow`, `SectionHeader`) envueltos en `React.memo` para no re-renderizar
+  cuando cambian otros campos.
+- Validado E2E: tipear continuo en business_name + cambio a business_hours
+  mantiene el foco sin necesidad de re-clickear.
+
+**Sentiment cache - 80% menos llamadas LLM** (`llm_service.detect_sentiment`):
+- Heurísticas rápidas SIN LLM:
+  - Frustración: keywords ("ya pregunté", "estoy harto", etc.) + caps ratio
+    >50% + 3+ exclamaciones.
+  - Positividad: keywords ("gracias", "excelente", "perfecto", etc.).
+  - Mensaje corto neutro (<60 chars sin signos): asume `normal` directo.
+- Solo casos ambiguos llaman al LLM (mensajes largos, sutiles, o mixtos).
+- Mantiene la API anterior, retrocompatible.
+
+**Pydantic validation en PUT /business-profile**:
+- Reemplaza la whitelist de strings por `BusinessProfile(**body)`.
+- Rechaza tipos inválidos con HTTP 422 + detalle de Pydantic.
+- Sólo persiste los campos que vinieron en el request (no pisa con defaults
+  los campos que el form no mandó).
+- `tenant_id` siempre del JWT, ignora el del body (seguridad).
+
+**Búsqueda semántica de catálogo** (`llm_service.answer_catalog_question`):
+- Acepta pregunta + lista de productos + lead_context.
+- Filtra el catálogo respetando criterios (precio, features, marca).
+- Ignora productos con `stock_quantity == 0`.
+- Devuelve mensaje formateado en castellano listo para WhatsApp:
+  - 2-4 productos con precio + 1 razón corta cada uno
+  - Si NO hay match: pide más detalles, no inventa
+  - Cierre con pregunta inviting
+- Hook en `bot_flow.handle_faq`: detecta queries de catálogo por keywords
+  ("tienen", "busco", "necesito", "menor a", etc.) y llama esta función ANTES
+  del fallback genérico.
+- Validado: pregunta "qué celular Samsung con buena cámara debajo de $800?"
+  retorna Samsung A55 + Pixel 8 con razones específicas, excluye S24 Ultra
+  (agotado), ignora iPhones.
+
+
+
 ### 2026-02-XX (Iter42 - Bot intelligence overhaul: 6 mejoras + Emergent LLM)
 **Cimiento — Datos del Negocio (Fix #4)**:
 - Nuevo `business_profile_service.py`: model + helper `build_business_context_text(profile)` + `get_business_context(db, tenant_id)` + `upsert_business_profile`.

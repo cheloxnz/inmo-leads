@@ -12,10 +12,79 @@ import { Save, Plus, X, Building2, Info } from 'lucide-react';
  * Panel donde el admin del tenant carga los DATOS DEL NEGOCIO que
  * el bot usa para responder preguntas sin inventar.
  *
- * El bot inyecta estos datos como contexto verificado en el system
- * prompt de cada respuesta del LLM. Si un campo no está acá, el bot
- * dice "no tengo esa info, te paso con un humano" en vez de inventar.
+ * NOTA TÉCNICA: Field y Switch están definidos FUERA del componente
+ * principal (no como sub-funciones internas) para evitar que React
+ * los re-cree en cada render — eso causaba pérdida de foco al tipear.
  */
+
+// ============================================================
+// Sub-componentes definidos fuera (críticos para el foco)
+// ============================================================
+
+const FieldInput = React.memo(function FieldInput({
+  field, label, placeholder, type = 'text', value, onChange, full = false,
+}) {
+  return (
+    <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>
+        {label}
+      </label>
+      <Input
+        type={type}
+        value={value || ''}
+        onChange={e => onChange(field, e.target.value)}
+        placeholder={placeholder}
+        data-testid={`bp-${field}`}
+      />
+    </div>
+  );
+});
+
+const FieldTextarea = React.memo(function FieldTextarea({
+  field, label, placeholder, value, onChange, full = false,
+}) {
+  return (
+    <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>
+        {label}
+      </label>
+      <Textarea
+        value={value || ''}
+        onChange={e => onChange(field, e.target.value)}
+        placeholder={placeholder}
+        rows={2}
+        data-testid={`bp-${field}`}
+      />
+    </div>
+  );
+});
+
+const SwitchRow = React.memo(function SwitchRow({ field, label, checked, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0', fontSize: 13 }}>
+      <input
+        type="checkbox"
+        checked={!!checked}
+        onChange={e => onChange(field, e.target.checked)}
+        data-testid={`bp-${field}`}
+        style={{ width: 18, height: 18 }}
+      />
+      <span>{label}</span>
+    </label>
+  );
+});
+
+const SectionHeader = ({ children }) => (
+  <h4 style={{
+    fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase',
+    letterSpacing: '0.05em', marginBottom: 8,
+  }}>{children}</h4>
+);
+
+// ============================================================
+// Componente principal
+// ============================================================
+
 export default function BusinessProfileSection() {
   const [data, setData] = useState({
     business_name: '', business_description: '', industry: '',
@@ -42,7 +111,8 @@ export default function BusinessProfileSection() {
   const fetchProfile = async () => {
     try {
       const res = await axios.get(`${API}/business-profile`);
-      setData(prev => ({ ...prev, ...res.data, exists: undefined, tenant_id: undefined }));
+      const { exists, tenant_id, ...rest } = res.data;
+      setData(prev => ({ ...prev, ...rest }));
     } catch (err) {
       console.error('Error fetching profile:', err);
     } finally {
@@ -50,7 +120,12 @@ export default function BusinessProfileSection() {
     }
   };
 
-  const set = (field, value) => setData(prev => ({ ...prev, [field]: value }));
+  // useCallback no es estrictamente necesario porque uso React.memo en hijos
+  // y la función se pasa solo a hijos memo. setData con función actualizadora
+  // evita la dependencia.
+  const handleChange = (field, value) => {
+    setData(prev => ({ ...prev, [field]: value }));
+  };
 
   const save = async () => {
     setSaving(true);
@@ -66,55 +141,20 @@ export default function BusinessProfileSection() {
 
   const addFaq = () => {
     if (!newFaq.question.trim() || !newFaq.answer.trim()) return;
-    set('custom_faqs', [...(data.custom_faqs || []), { ...newFaq }]);
+    setData(prev => ({ ...prev, custom_faqs: [...(prev.custom_faqs || []), { ...newFaq }] }));
     setNewFaq({ question: '', answer: '' });
   };
 
   const removeFaq = (idx) => {
-    set('custom_faqs', (data.custom_faqs || []).filter((_, i) => i !== idx));
+    setData(prev => ({
+      ...prev,
+      custom_faqs: (prev.custom_faqs || []).filter((_, i) => i !== idx),
+    }));
   };
 
   if (loading) {
     return <Card><CardContent style={{ padding: 20 }}>Cargando...</CardContent></Card>;
   }
-
-  const Switch = ({ field, label }) => (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0', fontSize: 13 }}>
-      <input
-        type="checkbox"
-        checked={!!data[field]}
-        onChange={e => set(field, e.target.checked)}
-        data-testid={`bp-${field}`}
-        style={{ width: 18, height: 18 }}
-      />
-      <span>{label}</span>
-    </label>
-  );
-
-  const Field = ({ field, label, placeholder, type = 'text', textarea = false, full = false }) => (
-    <div style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>
-        {label}
-      </label>
-      {textarea ? (
-        <Textarea
-          value={data[field] || ''}
-          onChange={e => set(field, e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          data-testid={`bp-${field}`}
-        />
-      ) : (
-        <Input
-          type={type}
-          value={data[field] || ''}
-          onChange={e => set(field, e.target.value)}
-          placeholder={placeholder}
-          data-testid={`bp-${field}`}
-        />
-      )}
-    </div>
-  );
 
   return (
     <Card data-testid="business-profile-section">
@@ -133,60 +173,60 @@ export default function BusinessProfileSection() {
         </div>
       </CardHeader>
       <CardContent>
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Identidad</h4>
+        <SectionHeader>Identidad</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
-          <Field field="business_name" label="Nombre del negocio" placeholder="Inmobiliaria López" />
-          <Field field="industry" label="Rubro / Industria" placeholder="Inmobiliaria, panadería, clínica..." />
-          <Field field="business_description" label="Descripción corta" placeholder="Vendemos y alquilamos propiedades en CABA desde 1995" textarea full />
+          <FieldInput field="business_name" label="Nombre del negocio" placeholder="Inmobiliaria López" value={data.business_name} onChange={handleChange} />
+          <FieldInput field="industry" label="Rubro / Industria" placeholder="Inmobiliaria, panadería, clínica..." value={data.industry} onChange={handleChange} />
+          <FieldTextarea field="business_description" label="Descripción corta" placeholder="Vendemos y alquilamos propiedades en CABA desde 1995" value={data.business_description} onChange={handleChange} full />
         </div>
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Ubicación y contacto</h4>
+        <SectionHeader>Ubicación y contacto</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
-          <Field field="address" label="Dirección" placeholder="Av. Corrientes 1234, Piso 5" />
-          <Field field="city" label="Ciudad" placeholder="CABA" />
-          <Field field="phone" label="Teléfono" placeholder="+54 9 11 1234-5678" />
-          <Field field="email" label="Email" placeholder="info@negocio.com" />
-          <Field field="website" label="Sitio web" placeholder="https://negocio.com" />
-          <Field field="google_maps_url" label="Google Maps URL" placeholder="https://maps.google.com/..." />
-          <Field field="business_hours" label="Horarios" placeholder="Lun-Vie 9-18, Sáb 10-14, Dom cerrado" full />
+          <FieldInput field="address" label="Dirección" placeholder="Av. Corrientes 1234, Piso 5" value={data.address} onChange={handleChange} />
+          <FieldInput field="city" label="Ciudad" placeholder="CABA" value={data.city} onChange={handleChange} />
+          <FieldInput field="phone" label="Teléfono" placeholder="+54 9 11 1234-5678" value={data.phone} onChange={handleChange} />
+          <FieldInput field="email" label="Email" placeholder="info@negocio.com" value={data.email} onChange={handleChange} />
+          <FieldInput field="website" label="Sitio web" placeholder="https://negocio.com" value={data.website} onChange={handleChange} />
+          <FieldInput field="google_maps_url" label="Google Maps URL" placeholder="https://maps.google.com/..." value={data.google_maps_url} onChange={handleChange} />
+          <FieldInput field="business_hours" label="Horarios" placeholder="Lun-Vie 9-18, Sáb 10-14, Dom cerrado" value={data.business_hours} onChange={handleChange} full />
         </div>
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Medios de pago</h4>
+        <SectionHeader>Medios de pago</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 12 }}>
-          <Switch field="accepts_cash" label="Efectivo" />
-          <Switch field="accepts_credit_card" label="Tarjeta de crédito" />
-          <Switch field="accepts_debit_card" label="Tarjeta de débito" />
-          <Switch field="accepts_transfer" label="Transferencia" />
-          <Switch field="accepts_mercadopago" label="Mercado Pago" />
-          <Switch field="accepts_crypto" label="Crypto" />
+          <SwitchRow field="accepts_cash" label="Efectivo" checked={data.accepts_cash} onChange={handleChange} />
+          <SwitchRow field="accepts_credit_card" label="Tarjeta de crédito" checked={data.accepts_credit_card} onChange={handleChange} />
+          <SwitchRow field="accepts_debit_card" label="Tarjeta de débito" checked={data.accepts_debit_card} onChange={handleChange} />
+          <SwitchRow field="accepts_transfer" label="Transferencia" checked={data.accepts_transfer} onChange={handleChange} />
+          <SwitchRow field="accepts_mercadopago" label="Mercado Pago" checked={data.accepts_mercadopago} onChange={handleChange} />
+          <SwitchRow field="accepts_crypto" label="Crypto" checked={data.accepts_crypto} onChange={handleChange} />
         </div>
         <div style={{ marginBottom: 20 }}>
-          <Field field="payment_notes" label="Notas de pago" placeholder="3 cuotas sin interés, descuento 10% pago en efectivo, etc." textarea full />
+          <FieldTextarea field="payment_notes" label="Notas de pago" placeholder="3 cuotas sin interés, descuento 10% pago en efectivo, etc." value={data.payment_notes} onChange={handleChange} full />
         </div>
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Modalidades de atención</h4>
+        <SectionHeader>Modalidades de atención</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginBottom: 14 }}>
-          <Switch field="offers_delivery" label="Hacemos delivery" />
-          <Switch field="offers_pickup" label="Retiro en local" />
-          <Switch field="offers_in_person" label="Atención presencial" />
-          <Switch field="has_parking" label="Tenemos estacionamiento" />
-          <Switch field="appointment_required" label="Se atiende con cita previa" />
+          <SwitchRow field="offers_delivery" label="Hacemos delivery" checked={data.offers_delivery} onChange={handleChange} />
+          <SwitchRow field="offers_pickup" label="Retiro en local" checked={data.offers_pickup} onChange={handleChange} />
+          <SwitchRow field="offers_in_person" label="Atención presencial" checked={data.offers_in_person} onChange={handleChange} />
+          <SwitchRow field="has_parking" label="Tenemos estacionamiento" checked={data.has_parking} onChange={handleChange} />
+          <SwitchRow field="appointment_required" label="Se atiende con cita previa" checked={data.appointment_required} onChange={handleChange} />
         </div>
         {data.offers_delivery && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
-            <Field field="delivery_zones" label="Zonas de delivery" placeholder="CABA y GBA Norte" />
-            <Field field="delivery_cost" label="Costo de envío" placeholder="$500 fijo o gratis sobre $5000" />
+            <FieldInput field="delivery_zones" label="Zonas de delivery" placeholder="CABA y GBA Norte" value={data.delivery_zones} onChange={handleChange} />
+            <FieldInput field="delivery_cost" label="Costo de envío" placeholder="$500 fijo o gratis sobre $5000" value={data.delivery_cost} onChange={handleChange} />
           </div>
         )}
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Políticas</h4>
+        <SectionHeader>Políticas</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
-          <Field field="return_policy" label="Cambios y devoluciones" placeholder="30 días con ticket" textarea />
-          <Field field="warranty_policy" label="Garantía" placeholder="6 meses, fallas de fábrica" textarea />
-          <Field field="not_offered" label="❗ NO ofrecemos / NO hacemos" placeholder="Ej: No hacemos envíos al exterior. No atendemos los domingos." textarea full />
+          <FieldTextarea field="return_policy" label="Cambios y devoluciones" placeholder="30 días con ticket" value={data.return_policy} onChange={handleChange} />
+          <FieldTextarea field="warranty_policy" label="Garantía" placeholder="6 meses, fallas de fábrica" value={data.warranty_policy} onChange={handleChange} />
+          <FieldTextarea field="not_offered" label="❗ NO ofrecemos / NO hacemos" placeholder="Ej: No hacemos envíos al exterior. No atendemos los domingos." value={data.not_offered} onChange={handleChange} full />
         </div>
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Preguntas frecuentes específicas</h4>
+        <SectionHeader>Preguntas frecuentes específicas</SectionHeader>
         <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
           Casos específicos del negocio que el bot debería saber responder con texto exacto.
         </p>
@@ -202,17 +242,27 @@ export default function BusinessProfileSection() {
           </div>
         ))}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'flex-start', marginBottom: 20 }}>
-          <Input placeholder="¿Pregunta?" value={newFaq.question} onChange={e => setNewFaq({...newFaq, question: e.target.value})} data-testid="bp-new-faq-q" />
-          <Input placeholder="Respuesta" value={newFaq.answer} onChange={e => setNewFaq({...newFaq, answer: e.target.value})} data-testid="bp-new-faq-a" />
+          <Input
+            placeholder="¿Pregunta?"
+            value={newFaq.question}
+            onChange={e => setNewFaq(prev => ({ ...prev, question: e.target.value }))}
+            data-testid="bp-new-faq-q"
+          />
+          <Input
+            placeholder="Respuesta"
+            value={newFaq.answer}
+            onChange={e => setNewFaq(prev => ({ ...prev, answer: e.target.value }))}
+            data-testid="bp-new-faq-a"
+          />
           <Button size="sm" variant="outline" onClick={addFaq} disabled={!newFaq.question.trim() || !newFaq.answer.trim()} data-testid="bp-add-faq">
             <Plus className="w-4 h-4" />
           </Button>
         </div>
 
-        <h4 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Tono del bot</h4>
+        <SectionHeader>Tono del bot</SectionHeader>
         <select
           value={data.bot_tone || 'neutro'}
-          onChange={e => set('bot_tone', e.target.value)}
+          onChange={e => handleChange('bot_tone', e.target.value)}
           data-testid="bp-bot_tone"
           style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 20 }}
         >

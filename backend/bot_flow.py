@@ -1217,44 +1217,81 @@ class BotFlowManager:
             response += "📊 Contanos tus preferencias y te enviamos opciones dentro de tu presupuesto."
         
         else:
-            # Usar GPT contextual con business_profile + memoria (Iter42)
-            try:
-                lead_context = {
-                    "name": lead.name,
-                    "intent": lead.intent.value if lead.intent else None,
-                    "zone": getattr(lead, "zone", None),
-                    "budget_text": getattr(lead, "budget_text", None),
-                    "property_type": (
-                        lead.property_type.value if getattr(lead, "property_type", None) else None
-                    ),
-                }
-                business_ctx = ""
-                bot_tone = "neutro"
-                try:
-                    from business_profile_service import build_business_context_text
-                    db_ref = self.wa.db
-                    profile = await db_ref.business_profiles.find_one(
-                        {"tenant_id": getattr(lead, "tenant_id", "")}, {"_id": 0},
-                    )
-                    if profile:
-                        business_ctx = build_business_context_text(profile)
-                        bot_tone = profile.get("bot_tone", "neutro")
-                except Exception as ce:
-                    logger.warning(f"[handle_faq] business_ctx load failed: {ce}")
+            # Iter43: Búsqueda semántica de catálogo si parece pregunta de producto
+            msg_lower = message.lower()
+            CATALOG_QUERY_HINTS = [
+                "tienen", "tenes", "tenés", "manejan", "venden", "ofrecen",
+                "busco", "quiero", "necesito", "quisiera", "me interesa",
+                "tienen alguno", "hay algun", "hay algún", "qué producto",
+                "que producto", "qué celular", "que celular", "qué modelo",
+                "qué dpto", "qué casa", "que casa", "qué auto", "que auto",
+                "menor a", "menor de", "más barato", "mas barato",
+                "menos de", "presupuesto",
+            ]
+            is_catalog_query = any(h in msg_lower for h in CATALOG_QUERY_HINTS)
 
-                response = await self.llm.generate_contextual_response(
-                    user_message=message,
-                    business_context=business_ctx,
-                    lead_context=lead_context,
-                    history=lead.conversation_history,
-                    bot_tone=bot_tone,
-                )
-                logger.info(f"GPT contextual response generated for {lead.phone}")
-            except Exception as e:
-                logger.error(f"Error generating contextual response: {e}")
-                response = (
-                    "🤔 No tengo esa info exacta. ¿Querés que te conecte con un asesor humano?"
-                )
+            response = None
+            if is_catalog_query:
+                try:
+                    db_ref = self.wa.db
+                    products = await db_ref.products.find(
+                        {"tenant_id": getattr(lead, "tenant_id", ""), "active": True},
+                        {"_id": 0},
+                    ).to_list(50)
+                    if products:
+                        catalog_response = await self.llm.answer_catalog_question(
+                            user_message=message,
+                            products=products,
+                            lead_context={
+                                "name": lead.name,
+                                "intent": lead.intent.value if lead.intent else None,
+                            },
+                        )
+                        if catalog_response:
+                            response = catalog_response
+                            logger.info(f"[catalog_search] hit for {lead.phone}: '{message[:60]}'")
+                except Exception as e:
+                    logger.warning(f"[catalog_search] failed: {e}")
+
+            if not response:
+                # Usar GPT contextual con business_profile + memoria (Iter42)
+                try:
+                    lead_context = {
+                        "name": lead.name,
+                        "intent": lead.intent.value if lead.intent else None,
+                        "zone": getattr(lead, "zone", None),
+                        "budget_text": getattr(lead, "budget_text", None),
+                        "property_type": (
+                            lead.property_type.value if getattr(lead, "property_type", None) else None
+                        ),
+                    }
+                    business_ctx = ""
+                    bot_tone = "neutro"
+                    try:
+                        from business_profile_service import build_business_context_text
+                        db_ref = self.wa.db
+                        profile = await db_ref.business_profiles.find_one(
+                            {"tenant_id": getattr(lead, "tenant_id", "")}, {"_id": 0},
+                        )
+                        if profile:
+                            business_ctx = build_business_context_text(profile)
+                            bot_tone = profile.get("bot_tone", "neutro")
+                    except Exception as ce:
+                        logger.warning(f"[handle_faq] business_ctx load failed: {ce}")
+
+                    response = await self.llm.generate_contextual_response(
+                        user_message=message,
+                        business_context=business_ctx,
+                        lead_context=lead_context,
+                        history=lead.conversation_history,
+                        bot_tone=bot_tone,
+                    )
+                    logger.info(f"GPT contextual response generated for {lead.phone}")
+                except Exception as e:
+                    logger.error(f"Error generating contextual response: {e}")
+                    response = (
+                        "🤔 No tengo esa info exacta. ¿Querés que te conecte con un asesor humano?"
+                    )
         
         self.wa.send_text_message(lead.phone, response)
     

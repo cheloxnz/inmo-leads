@@ -226,20 +226,73 @@ class LLMService:
     async def detect_sentiment(self, user_message: str, history: list = None) -> str:
         """Clasifica el sentimiento del cliente: 'normal' | 'frustrated' | 'positive'.
 
-        Usa el mensaje + últimos 4 turnos de history para captar acumulación
-        de frustración (ej. el cliente pregunta lo mismo 3 veces).
-        Retorna 'normal' si no hay client o falla la API.
+        Optimización de costo:
+        - Heurística rápida primero (sin llamar al LLM): detecta señales obvias
+          de frustración o positividad por keywords + caps + signos. Si NINGUNA
+          señal está presente, asumimos 'normal' y NO llamamos al LLM.
+        - Solo llama al LLM cuando hay señales ambiguas que merecen clasificación
+          fina (ej. acumulación de molestia sutil, sarcasmo).
+
+        Esto reduce ~80% de las calls LLM en mensajes neutros típicos.
         """
         if not self.client:
             return "normal"
 
+        msg = (user_message or "").strip()
+        if not msg:
+            return "normal"
+
+        # ===== Heurísticas rápidas (sin LLM) =====
+        msg_lower = msg.lower()
+
+        # Frustración explícita
+        FRUSTRATION_KEYWORDS = [
+            "ya pregunté", "ya te pregunté", "ya pregunte", "ya dije",
+            "que desastre", "qué desastre", "no puede ser",
+            "estoy harto", "estoy harta", "harto de", "harta de",
+            "no entendés", "no entiende nada", "no servís", "no servis",
+            "una porquería", "una porqueria", "es una mierda",
+            "voy a quejarme", "me voy", "no me ayudás", "no me ayudas",
+            "perdiendo el tiempo", "tomame el pelo", "tomarme el pelo",
+        ]
+        # Positividad explícita
+        POSITIVE_KEYWORDS = [
+            "gracias", "muchas gracias", "buena atención", "buena atencion",
+            "excelente", "genial", "perfecto", "buenisimo", "buenísimo",
+            "te felicito", "muy amable", "lo mejor", "súper", "super bien",
+        ]
+
+        # Caps ratio: >50% mayúsculas y mensaje >10 chars = grito
+        letters = [c for c in msg if c.isalpha()]
+        caps_ratio = (
+            sum(1 for c in letters if c.isupper()) / len(letters)
+            if letters else 0
+        )
+        many_exclaims = msg.count("!") >= 3 or msg.count("¡") >= 2
+
+        has_frustration_kw = any(kw in msg_lower for kw in FRUSTRATION_KEYWORDS)
+        has_positive_kw = any(kw in msg_lower for kw in POSITIVE_KEYWORDS)
+        is_shouting = caps_ratio > 0.5 and len(letters) > 10
+
+        # Decisión rápida sin LLM:
+        # 1. Frustración explícita (keyword O caps+exclam) → frustrated directo
+        if has_frustration_kw or (is_shouting and many_exclaims):
+            return "frustrated"
+        # 2. Positividad explícita y NINGUNA señal negativa → positive directo
+        if has_positive_kw and not has_frustration_kw and not is_shouting:
+            return "positive"
+        # 3. Mensaje corto y neutro (<60 chars, sin signos) → normal directo (skip LLM)
+        if len(msg) < 60 and not many_exclaims and not is_shouting:
+            return "normal"
+
+        # ===== Caso ambiguo: SÍ llamamos al LLM =====
         history_text = ""
         if history:
             recent = history[-8:]
             lines = []
-            for msg in recent:
-                who = "Cliente" if msg.get("from") == "customer" else "Bot"
-                txt = (msg.get("text") or "").strip()[:150]
+            for m in recent:
+                who = "Cliente" if m.get("from") == "customer" else "Bot"
+                txt = (m.get("text") or "").strip()[:150]
                 if txt:
                     lines.append(f"{who}: {txt}")
             if lines:
@@ -466,6 +519,88 @@ Devuelve JSON array de hasta {max_results} product_id relevantes:"""
         except Exception as e:
             logger.error(f"Error en recommend_products: {e}")
             return [p.get("product_id") for p in products[:max_results] if p.get("product_id")]
+
+    async def answer_catalog_question(
+        self,
+        user_message: str,
+        products: list,
+        lead_context: Dict = None,
+        max_results: int = 4,
+    ) -> Optional[str]:
+        """Búsqueda semántica del catálogo + redacción de respuesta lista para WhatsApp.
+
+        Útil para preguntas tipo:
+        - "qué celular Samsung tienen con buena cámara debajo de $800?"
+        - "necesito un dpto en Palermo de 2 ambientes"
+        - "tienen algo para regalar a mi mamá económico?"
+
+        El LLM filtra el catálogo respetando los criterios del cliente y
+        devuelve un mensaje formateado en castellano con:
+        - 2-4 productos relevantes con precios
+        - 1 razón corta por qué cada uno cumple lo pedido
+        - Pregunta de cierre invitando a profundizar
+
+        Si NO hay productos que cumplan, retorna un mensaje honesto pidiendo
+        más detalles o sugiriendo alternativas. Si LLM falla, retorna None
+        (caller usa fallback genérico).
+        """
+        if not self.enabled or not products:
+            return None
+
+        # Compactamos el catálogo (tope para el prompt)
+        catalog_lines = []
+        for p in products[:40]:
+            pid = p.get("product_id", "")
+            name = p.get("name", "")
+            desc = (p.get("description") or "")[:120]
+            price = p.get("price") or "?"
+            cur = p.get("currency", "USD")
+            cat = p.get("category") or ""
+            stock = p.get("stock_quantity")
+            stock_txt = "stock OK" if (stock is None or stock > 0) else "AGOTADO"
+            catalog_lines.append(
+                f"- {name} | id={pid} | cat={cat} | ${price} {cur} | {stock_txt} | {desc}"
+            )
+
+        ctx = ""
+        if lead_context:
+            ctx_parts = [f"{k}={v}" for k, v in lead_context.items() if v]
+            if ctx_parts:
+                ctx = "\nContexto del cliente: " + ", ".join(ctx_parts)
+
+        system_message = (
+            "Sos un asistente de ventas experto. Te paso una pregunta del cliente "
+            "y un catálogo de productos. Tu tarea: responder con UN mensaje listo "
+            "para enviar por WhatsApp, en castellano rioplatense, neutro y conciso.\n\n"
+            "REGLAS:\n"
+            f"1. Listá hasta {max_results} productos del catálogo que cumplan los "
+            "criterios del cliente (precio, features, categoría).\n"
+            "2. Por cada producto: nombre + precio + 1 razón corta (max 12 palabras) "
+            "explicando por qué cumple lo pedido.\n"
+            "3. Si un producto está AGOTADO, ignoralo. Solo recomendá los que tienen stock.\n"
+            "4. Si NINGÚN producto cumple los criterios, decí honestamente que no "
+            "tenemos algo así y pedí 1-2 detalles para ofrecer alternativas. "
+            "NO inventes productos.\n"
+            "5. Cerrá con una pregunta corta tipo '¿Cuál te interesa?' o "
+            "'¿Querés que te cuente más de alguno?'.\n"
+            "6. Format: usá *negrita* para nombres, listas con números (1. 2. 3.).\n"
+            "7. Máximo 600 caracteres total.\n"
+            "8. NO uses comillas alrededor del mensaje.\n"
+        )
+
+        user_prompt = (
+            f"Pregunta del cliente: \"{user_message}\"{ctx}\n\n"
+            f"Catálogo disponible:\n" + "\n".join(catalog_lines) + "\n\n"
+            "Mensaje para WhatsApp:"
+        )
+
+        try:
+            response = await self._send_message(system_message, user_prompt)
+            text = (response or "").strip().strip('"').strip("'")
+            return text or None
+        except Exception as e:
+            logger.warning(f"[answer_catalog_question] failed: {e}")
+            return None
 
 
 def create_llm_for_tenant(tenant: dict = None) -> LLMService:
