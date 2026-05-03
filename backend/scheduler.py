@@ -32,6 +32,7 @@ class ScheduledTasks:
         asyncio.create_task(self.send_weekly_digest_emails())
         asyncio.create_task(self.run_upsell_checks())
         asyncio.create_task(self.send_admin_weekly_report())
+        asyncio.create_task(self.run_whatsapp_health_checks())
 
     async def run_commission_expiry(self):
         """Cada 24h, marca como EXPIRED las commissions que cumplieron 365 dias."""
@@ -284,6 +285,59 @@ class ScheduledTasks:
                 except Exception as e:
                     logger.error(f"[Scheduler] admin report error: {e}")
             await asyncio.sleep(3600)
+
+    async def run_whatsapp_health_checks(self):
+        """Cada 12h re-chequea el estado de WhatsApp de todos los tenants con
+        credenciales configuradas y refresca `tenants.whatsapp_last_check`.
+
+        Detecta regresiones silenciosas: tokens expirados en Meta, quality
+        rating que bajó a YELLOW/RED, número que perdió la verificación.
+        Si un tenant pasa de OK a ERROR, loguea un WARN para que se pueda
+        alertar (y opcionalmente agregar notificación email en el futuro).
+
+        Override con WA_HEALTH_FORCE=1 para disparo manual al arrancar.
+        """
+        await asyncio.sleep(900)  # warmup 15 min post-start
+        from routers.config import _run_whatsapp_check
+        interval_hours = int(os.environ.get("WA_HEALTH_INTERVAL_HOURS", "12"))
+        while self.running:
+            force = os.environ.get("WA_HEALTH_FORCE") == "1"
+            try:
+                cursor = self.db.tenants.find(
+                    {
+                        "active": True,
+                        "whatsapp_phone_number_id": {"$nin": ["", None]},
+                        "whatsapp_access_token": {"$nin": ["", None]},
+                    },
+                    {"_id": 0, "tenant_id": 1, "whatsapp_last_check": 1},
+                )
+                checked = 0
+                regressions = 0
+                async for t in cursor:
+                    tid = t["tenant_id"]
+                    prev_ok = bool((t.get("whatsapp_last_check") or {}).get("ok"))
+                    try:
+                        result = await _run_whatsapp_check(tid)
+                        checked += 1
+                        # Detectar regresión: estaba OK y ahora no
+                        if prev_ok and not result.get("ok"):
+                            regressions += 1
+                            logger.warning(
+                                f"[wa_health_cron] REGRESSION tenant={tid} "
+                                f"status={result.get('status')} msg={result.get('message')}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[wa_health_cron] check failed tenant={tid}: {e}")
+                if checked > 0:
+                    logger.info(
+                        f"[wa_health_cron] run: checked={checked} regressions={regressions}"
+                    )
+                if force:
+                    os.environ["WA_HEALTH_FORCE"] = "0"
+                    break
+            except Exception as e:
+                logger.error(f"[Scheduler] whatsapp health cron error: {e}")
+            await asyncio.sleep(interval_hours * 3600)
 
     async def _send_admin_report(self) -> bool:
         """Arma stats cross-tenant + envía el email al SUPERADMIN_EMAIL."""

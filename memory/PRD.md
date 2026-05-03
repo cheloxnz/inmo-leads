@@ -33,6 +33,35 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter40 - WhatsApp Health Check Cron + Manual Trigger)
+- **Cron periódico** (`scheduler.py::run_whatsapp_health_checks`):
+  - Corre cada `WA_HEALTH_INTERVAL_HOURS` (default 12h) después de un
+    warmup de 15 min post-start.
+  - Recorre todos los tenants activos con `whatsapp_phone_number_id` +
+    `whatsapp_access_token` seteados y llama `_run_whatsapp_check(tid)`
+    (la misma función que usa el botón "Probar conexión").
+  - Detecta regresiones: si `prev.ok == true` y ahora es `false`,
+    loguea WARN con `[wa_health_cron] REGRESSION tenant={id} status=...`.
+  - Override con `WA_HEALTH_FORCE=1` para run single-shot al arrancar
+    (útil para smoke tests).
+- **Endpoint manual SuperAdmin** `POST /api/superadmin/whatsapp/health-check/run`:
+  - Dispara el re-check de todos los tenants en tiempo real (sin esperar cron).
+  - Retorna `{checked, regressions, items:[{tenant_id, ok, status, message}]}`.
+- **UI botón "Re-check WhatsApp"** en SuperAdmin toolbar:
+  - Al lado de "Nuevo Cliente". Dispara el endpoint anterior.
+  - Toast diferenciado: success si todo OK, warning con count de regresiones,
+    info si no hay tenants con WA configurado.
+  - Refresca el listado post-check (`onDone=fetchTenants`) así los badges
+    se actualizan al instante.
+  - data-testid: `sa-btn-wa-health-check`.
+- **Detección automática de**:
+  - Tokens que expiran solos en Meta (Meta invalida tokens sin previo aviso).
+  - Quality rating que baja a YELLOW/RED entre re-checks.
+  - Números que pierden la verificación (MIGRATED, PENDING, etc.).
+  - Permission denied cuando un tenant regenera su System User.
+
+
+
 ### 2026-02-XX (Iter39 - Auto WhatsApp health check + SuperAdmin badge)
 - **Refactor**: extraído el check de WhatsApp a `_run_whatsapp_check(tenant_id)`
   reusable + helper `_persist_check_result(tenant_id, result)`.

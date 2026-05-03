@@ -183,10 +183,13 @@ export default function SuperAdminPanel() {
             data-testid="sa-search"
           />
         </div>
-        <Button onClick={() => setShowCreate(!showCreate)} data-testid="sa-btn-create">
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Cliente
-        </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <WhatsAppHealthCheckButton onDone={fetchTenants} />
+          <Button onClick={() => setShowCreate(!showCreate)} data-testid="sa-btn-create">
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Create Form */}
@@ -335,6 +338,45 @@ function WhatsAppHealthBadge({ tenant, mini = false }) {
       <span>{label}</span>
       {ago && <span style={{ opacity: 0.7, fontWeight: 400 }}>· {ago}</span>}
     </span>
+  );
+}
+
+function WhatsAppHealthCheckButton({ onDone }) {
+  const [running, setRunning] = useState(false);
+  const run = async () => {
+    setRunning(true);
+    try {
+      const res = await axios.post(`${API}/superadmin/whatsapp/health-check/run`);
+      const { checked, regressions } = res.data;
+      if (checked === 0) {
+        toast.info('No hay tenants con WhatsApp configurado');
+      } else if (regressions > 0) {
+        toast.warning(
+          `WhatsApp re-check: ${checked} tenants revisados, ${regressions} con regresión`
+        );
+      } else {
+        toast.success(`WhatsApp re-check OK: ${checked} tenants revisados`);
+      }
+      if (onDone) onDone();
+    } catch (err) {
+      console.error('WA health check error:', err);
+      toast.error('Error ejecutando re-check');
+    } finally {
+      setRunning(false);
+    }
+  };
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={run}
+      disabled={running}
+      data-testid="sa-btn-wa-health-check"
+      title="Re-chequea el estado WhatsApp de todos los tenants con credenciales"
+    >
+      <Activity className="w-4 h-4 mr-2" />
+      {running ? 'Revisando...' : 'Re-check WhatsApp'}
+    </Button>
   );
 }
 

@@ -447,6 +447,57 @@ async def run_admin_report_now(
     return {"sent": ok}
 
 
+@router.post("/superadmin/whatsapp/health-check/run")
+async def run_whatsapp_health_check_now(
+    current_user: User = Depends(get_current_user),
+):
+    """SuperAdmin: re-chequea el estado WhatsApp de TODOS los tenants activos
+    con credenciales configuradas. Útil para refrescar la grilla sin esperar
+    el cron periódico.
+
+    Retorna: `{checked, regressions, items: [{tenant_id, status, message, ok}]}`.
+    """
+    _require_superadmin(current_user)
+    from routers.config import _run_whatsapp_check
+
+    items = []
+    regressions = 0
+    cursor = _db.tenants.find(
+        {
+            "active": True,
+            "whatsapp_phone_number_id": {"$nin": ["", None]},
+            "whatsapp_access_token": {"$nin": ["", None]},
+        },
+        {"_id": 0, "tenant_id": 1, "whatsapp_last_check": 1},
+    )
+    async for t in cursor:
+        tid = t["tenant_id"]
+        prev_ok = bool((t.get("whatsapp_last_check") or {}).get("ok"))
+        try:
+            result = await _run_whatsapp_check(tid)
+            if prev_ok and not result.get("ok"):
+                regressions += 1
+            items.append({
+                "tenant_id": tid,
+                "ok": result.get("ok"),
+                "status": result.get("status"),
+                "message": result.get("message"),
+            })
+        except Exception as e:
+            items.append({
+                "tenant_id": tid,
+                "ok": False,
+                "status": "api_error",
+                "message": f"check failed: {e}",
+            })
+
+    return {
+        "checked": len(items),
+        "regressions": regressions,
+        "items": items,
+    }
+
+
 # ============================================================
 # Reset demo data (P1 Quick Win)
 # ============================================================
