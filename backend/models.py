@@ -170,6 +170,8 @@ class Lead(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     notes: Optional[str] = None
     conversation_history: List[dict] = Field(default_factory=list)
+    # Memoria del bot: sentiment streak, flags efímeros, preferencias, etc.
+    metadata: dict = Field(default_factory=dict)
 
 class LeadCreate(BaseModel):
     phone: str

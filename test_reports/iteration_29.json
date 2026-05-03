@@ -1,0 +1,35 @@
+{
+  "summary": "Iter42 InmoBot bot improvements: tested GET/PUT /api/business-profile, build_business_context_text, LLM fallbacks (detect_sentiment + explain_substitute_value), catalog_service.build_substitute_message_async sync fallback, and regression of existing endpoints. 15/18 tests passed, 3 skipped (LLM online tests - OPENAI_API_KEY is EMPTY in /app/backend/.env).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A - config", "issue": "OPENAI_API_KEY está VACÍA en /app/backend/.env. llm_service queda deshabilitado (self.enabled=False). detect_sentiment y explain_substitute_value degradan a 'normal' / '' respectivamente (graceful) pero NINGUNA feature LLM nueva (sentiment handoff, contextual response, substitute reasoning) funcionará en runtime hasta que se configure. EMERGENT_LLM_KEY NO es leído por llm_service.py (solo lee OPENAI_API_KEY)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter42_business_profile.py",
+    "/app/test_reports/pytest/iter42_results.xml"
+  ],
+  "action_items": [
+    "Configurar OPENAI_API_KEY en backend/.env (actualmente vacío). Sin la key, las 6 mejoras del bot relacionadas con LLM (sentiment handoff, contextual response con business_context, substitute reasoning) NO se activan en el webhook real; sólo el hook #3 (empty_catalog) y el persist del business_profile funcionan sin LLM.",
+    "Considerar integrar EMERGENT_LLM_KEY en llm_service.py si ese es el mecanismo esperado (hoy solo lee OPENAI_API_KEY)."
+  ],
+  "critical_code_review_comments": [
+    "bot_flow.py línea 600: referencia a ScoringEngine.calculate_score que no está importado (from scoring import calculate_score en línea 6 importa función directa, no clase). Pre-existente pero puede romper calculate_and_offer_appointment en runtime. Confirmado con lint F821.",
+    "bot_flow.py hook sentiment (línea 64): llama detect_sentiment en CADA mensaje entrante → costo LLM duplicado por cada turno. Considerar cachear por N turnos o correr sólo si message_text contiene signals (mayúsculas, signos de exclamación, palabras como 'harto').",
+    "routers/config.py PUT /business-profile (línea 456): acepta body dict sin Pydantic validation. El whitelist funciona pero valores con tipos inválidos (ej. accepts_cash='texto') se persisten as-is. Recomiendo tipar con BusinessProfile model."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter42_business_profile.py"],
+  "success_rate": {"backend": "83%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (admin); admin@inmobot.com / Admin123! (superadmin)",
+  "seed_data_creation": "PUT /api/business-profile pobló demo-inmobiliaria con business_name='Demo Inmo Test', accepts_cash/credit_card, custom_faqs, bot_tone=casual.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_iter42_business_profile.py ya cubre endpoints + funciones puras + regression. Para validar el flow LLM real (sentiment + contextual response) se necesita setear OPENAI_API_KEY. UI /config renderiza BusinessProfileSection correctamente (keywords 'Negocio'/'Identidad'/'FAQs'/'Tono' presentes, input business_name detectado, sin errores console).",
+  "rca of the issue": "No issue - all tested. 3 LLM-dependent tests auto-skipped porque la OPENAI_API_KEY del backend está vacía; el código degrada graciosamente (return 'normal' / '')."
+}

@@ -10,6 +10,7 @@ import ReferralProgramSection from '../components/ReferralProgramSection';
 import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 import BrandingPanel from '../components/BrandingPanel';
 import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
+import BusinessProfileSection from '../components/BusinessProfileSection';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -191,6 +192,9 @@ export default function Configuration() {
 
         {/* WhatsApp Business config (per-tenant editable) */}
         <WhatsAppConfigSection />
+
+        {/* Business Profile - data del negocio que el bot usa para responder sin inventar */}
+        <BusinessProfileSection />
         
         <Card>
           <CardHeader>

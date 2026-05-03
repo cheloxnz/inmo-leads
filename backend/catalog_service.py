@@ -477,7 +477,10 @@ class CatalogService:
         out_of_stock_product: dict,
         substitutes: List[dict],
     ) -> str:
-        """Genera el mensaje de WhatsApp con copy del bonus 'disponibilidad'."""
+        """Genera el mensaje de WhatsApp con copy básico (sin reasoning del LLM).
+
+        Para usar reasoning enriquecido, llamar a `build_substitute_message_async`.
+        """
         name = out_of_stock_product.get("name", "ese producto")
         if not substitutes:
             return (
@@ -505,6 +508,77 @@ class CatalogService:
                 if alt.get("price") else ""
             )
             lines.append(f"*{i}. {alt['name']}*{price}")
+        lines.append("\n¿Cuál te interesa? Te cuento más en 30 segundos.")
+        return "\n".join(lines)
+
+    async def build_substitute_message_async(
+        self,
+        out_of_stock_product: dict,
+        substitutes: List[dict],
+        llm_service=None,
+        lead_context: dict = None,
+    ) -> str:
+        """Versión enriquecida: para cada alternativa pide al LLM una razón
+        concreta de venta (precio comparado, features, etc.).
+
+        Si `llm_service` es None o falla, cae al copy genérico de la versión sync.
+        """
+        name = out_of_stock_product.get("name", "ese producto")
+        if not substitutes:
+            return (
+                f"Justo *{name}* está agotado por ahora 😕. "
+                f"¿Querés que te avise cuando vuelva a estar disponible?"
+            )
+
+        # Sin LLM → fallback al copy básico
+        if llm_service is None or not getattr(llm_service, "enabled", True):
+            return self.build_substitute_message(out_of_stock_product, substitutes)
+
+        # Una alternativa: razón en el cuerpo
+        if len(substitutes) == 1:
+            alt = substitutes[0]
+            price = (
+                f" (${alt['price']} {alt.get('currency', 'USD')})"
+                if alt.get("price") else ""
+            )
+            try:
+                reason = await llm_service.explain_substitute_value(
+                    out_of_stock_product, alt, lead_context,
+                )
+            except Exception:
+                reason = ""
+            reason_line = (
+                reason or "tiene características muy parecidas y está disponible ahora"
+            )
+            return (
+                f"Justo *{name}* está agotado, pero tengo una alternativa 👇\n\n"
+                f"*{alt['name']}*{price}\n"
+                f"_{reason_line}_\n\n"
+                f"¿Te cuento más?"
+            )
+
+        # Múltiples alternativas: 1 razón por cada una (paralelizado)
+        import asyncio
+        async def _reason_for(alt):
+            try:
+                return await llm_service.explain_substitute_value(
+                    out_of_stock_product, alt, lead_context,
+                )
+            except Exception:
+                return ""
+        reasons = await asyncio.gather(*[_reason_for(a) for a in substitutes[:3]])
+
+        lines = [
+            f"Justo *{name}* está agotado, pero mirá estas alternativas 👇\n",
+        ]
+        for i, (alt, reason) in enumerate(zip(substitutes[:3], reasons), 1):
+            price = (
+                f" — ${alt['price']} {alt.get('currency', 'USD')}"
+                if alt.get("price") else ""
+            )
+            lines.append(f"*{i}. {alt['name']}*{price}")
+            if reason:
+                lines.append(f"   _{reason}_")
         lines.append("\n¿Cuál te interesa? Te cuento más en 30 segundos.")
         return "\n".join(lines)
 

@@ -51,7 +51,87 @@ class BotFlowManager:
         })
         
         logger.info(f"Processing message from {lead.phone}: '{message_text}' - Current stage: {lead.flow_stage}")
-        
+
+        # ============================================================
+        # Hooks pre-flow (Iter42 - mejoras del bot)
+        # ============================================================
+
+        # Hook 6: Sentiment + auto-handoff por frustración
+        # Si el cliente acumula frustración, escalamos antes de seguir
+        # con el flow rígido (evita doom-loops y queja peor).
+        if lead.flow_stage not in (FlowStage.HANDOFF, FlowStage.CONFIRMATION):
+            try:
+                sentiment = await self.llm.detect_sentiment(
+                    message_text, lead.conversation_history,
+                )
+                if sentiment == "frustrated":
+                    # Conté frustraciones consecutivas en metadata para no escalar
+                    # con el primer mensaje crispado (puede ser falso positivo)
+                    meta = getattr(lead, "metadata", {}) or {}
+                    streak = int(meta.get("frustration_streak", 0)) + 1
+                    meta["frustration_streak"] = streak
+                    meta["last_sentiment"] = sentiment
+                    lead.metadata = meta
+                    if streak >= 2:
+                        logger.warning(
+                            f"🔥 Frustration auto-handoff phone={lead.phone} streak={streak}"
+                        )
+                        ack = (
+                            f"Entiendo {lead.name or ''}, perdón por la espera 🙏\n\n"
+                            f"Te paso ya con un asesor humano que va a poder "
+                            f"resolverte esto rápido. En unos minutos te escriben."
+                        )
+                        self.wa.send_text_message(lead.phone, ack)
+                        await self.trigger_handoff(lead)
+                        lead.last_message_at = datetime.utcnow()
+                        await self.save_lead(lead, db)
+                        return lead
+                else:
+                    # reset del streak si volvió a la normalidad
+                    meta = getattr(lead, "metadata", {}) or {}
+                    if meta.get("frustration_streak"):
+                        meta["frustration_streak"] = 0
+                    meta["last_sentiment"] = sentiment
+                    lead.metadata = meta
+            except Exception as e:
+                logger.warning(f"[sentiment] check failed: {e}")
+
+        # Hook 3: Catálogo vacío en rubros donde el catálogo es esencial
+        # Si el tenant es ecommerce/restaurante/clinica y NO tiene productos,
+        # avisamos al cliente y derivamos sin spinear el flow.
+        try:
+            tenant_id = getattr(lead, "tenant_id", None)
+            if tenant_id:
+                tenant = await db.tenants.find_one(
+                    {"tenant_id": tenant_id},
+                    {"_id": 0, "template_id": 1},
+                )
+                template = (tenant or {}).get("template_id", "")
+                # Verticales catalog-dependent
+                if template in ("ecommerce", "restaurante", "clinica"):
+                    products_count = await db.products.count_documents({
+                        "tenant_id": tenant_id, "active": True,
+                    })
+                    if products_count == 0:
+                        # Saludamos una vez y derivamos
+                        meta = getattr(lead, "metadata", {}) or {}
+                        if not meta.get("empty_catalog_warned"):
+                            response = (
+                                "¡Hola! 👋 Gracias por escribir.\n\n"
+                                "Por ahora estamos actualizando nuestro catálogo. "
+                                "Un asesor humano te va a contactar en breve para "
+                                "ayudarte personalmente."
+                            )
+                            self.wa.send_text_message(lead.phone, response)
+                            meta["empty_catalog_warned"] = True
+                            lead.metadata = meta
+                            await self.trigger_handoff(lead)
+                            lead.last_message_at = datetime.utcnow()
+                            await self.save_lead(lead, db)
+                            return lead
+        except Exception as e:
+            logger.warning(f"[empty_catalog_check] failed: {e}")
+
         # PRIMERO: Procesar estados de flujo activos (tienen prioridad)
         
         # Respuestas a recordatorio de cita
@@ -1137,28 +1217,44 @@ class BotFlowManager:
             response += "📊 Contanos tus preferencias y te enviamos opciones dentro de tu presupuesto."
         
         else:
-            # Usar GPT para respuestas inteligentes
+            # Usar GPT contextual con business_profile + memoria (Iter42)
             try:
                 lead_context = {
-                    "phone": lead.phone,
                     "name": lead.name,
                     "intent": lead.intent.value if lead.intent else None,
-                    "zone": lead.zone,
-                    "budget_text": lead.budget_text,
-                    "property_type": lead.property_type.value if lead.property_type else None
+                    "zone": getattr(lead, "zone", None),
+                    "budget_text": getattr(lead, "budget_text", None),
+                    "property_type": (
+                        lead.property_type.value if getattr(lead, "property_type", None) else None
+                    ),
                 }
-                response = await self.llm.generate_smart_response(message, lead_context)
-                logger.info(f"GPT response generated for {lead.phone}")
+                business_ctx = ""
+                bot_tone = "neutro"
+                try:
+                    from business_profile_service import build_business_context_text
+                    db_ref = self.wa.db
+                    profile = await db_ref.business_profiles.find_one(
+                        {"tenant_id": getattr(lead, "tenant_id", "")}, {"_id": 0},
+                    )
+                    if profile:
+                        business_ctx = build_business_context_text(profile)
+                        bot_tone = profile.get("bot_tone", "neutro")
+                except Exception as ce:
+                    logger.warning(f"[handle_faq] business_ctx load failed: {ce}")
+
+                response = await self.llm.generate_contextual_response(
+                    user_message=message,
+                    business_context=business_ctx,
+                    lead_context=lead_context,
+                    history=lead.conversation_history,
+                    bot_tone=bot_tone,
+                )
+                logger.info(f"GPT contextual response generated for {lead.phone}")
             except Exception as e:
-                logger.error(f"Error generating GPT response: {e}")
-                response = "🤔 No encontré información sobre eso.\n\n"
-                response += "Podés preguntarme sobre:\n"
-                response += "• 📍 Dirección\n"
-                response += "• 🕐 Horarios\n"
-                response += "• 💳 Formas de pago\n"
-                response += "• 📋 Requisitos\n"
-                response += "• 📞 Contacto\n\n"
-                response += "O si preferís, un asesor puede ayudarte. ¿Querés que te contacte uno?"
+                logger.error(f"Error generating contextual response: {e}")
+                response = (
+                    "🤔 No tengo esa info exacta. ¿Querés que te conecte con un asesor humano?"
+                )
         
         self.wa.send_text_message(lead.phone, response)
     
@@ -1189,23 +1285,42 @@ class BotFlowManager:
             await self.handle_faq(lead, message)
             return
         
-        # Usar GPT para respuestas inteligentes
+        # Usar GPT contextual con business_profile + memoria (Iter42)
         try:
             lead_context = {
-                "phone": lead.phone,
                 "name": lead.name,
                 "intent": lead.intent.value if lead.intent else None,
-                "zone": lead.zone,
-                "budget_text": lead.budget_text,
-                "property_type": lead.property_type.value if lead.property_type else None
+                "zone": getattr(lead, "zone", None),
+                "budget_text": getattr(lead, "budget_text", None),
+                "property_type": (
+                    lead.property_type.value if getattr(lead, "property_type", None) else None
+                ),
             }
-            response = await self.llm.generate_smart_response(message, lead_context)
-            logger.info(f"GPT consulting response for {lead.phone}")
-            
+            business_ctx = ""
+            bot_tone = "neutro"
+            try:
+                from business_profile_service import build_business_context_text
+                profile = await self.wa.db.business_profiles.find_one(
+                    {"tenant_id": getattr(lead, "tenant_id", "")}, {"_id": 0},
+                )
+                if profile:
+                    business_ctx = build_business_context_text(profile)
+                    bot_tone = profile.get("bot_tone", "neutro")
+            except Exception as ce:
+                logger.warning(f"[consulting] business_ctx load failed: {ce}")
+            response = await self.llm.generate_contextual_response(
+                user_message=message,
+                business_context=business_ctx,
+                lead_context=lead_context,
+                history=lead.conversation_history,
+                bot_tone=bot_tone,
+            )
+            logger.info(f"GPT contextual consulting response for {lead.phone}")
+
             # Agregar opciones al final (solo si no es muy larga la respuesta)
             if len(response) < 500:
                 response += "\n\n¿Hay algo más en lo que pueda ayudarte?"
-            
+
         except Exception as e:
             logger.error(f"Error in consulting GPT: {e}")
             response = "Disculpá, no pude procesar tu consulta. ¿Querés que te conecte con un asesor?"

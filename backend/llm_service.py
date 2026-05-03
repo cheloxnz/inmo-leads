@@ -90,7 +90,7 @@ class LLMService:
         context_info = ""
         if lead_context:
             context_parts = [f"- {k}: {v}" for k, v in lead_context.items() if v]
-            context_info = f"\nInformacion del cliente:\n" + "\n".join(context_parts)
+            context_info = "\nInformacion del cliente:\n" + "\n".join(context_parts)
 
         system_message = f"""Eres un asistente virtual profesional.
         Tu rol es ayudar a clientes con sus consultas de forma amable y concisa.
@@ -105,6 +105,175 @@ class LLMService:
 
         response = await self._send_message(system_message, user_message)
         return response.strip()
+
+    async def generate_contextual_response(
+        self,
+        user_message: str,
+        business_context: str = "",
+        lead_context: Dict = None,
+        history: list = None,
+        bot_tone: str = "neutro",
+    ) -> str:
+        """Respuesta del bot enriquecida con DATOS VERIFICADOS del negocio +
+        memoria de la conversación + tono configurable.
+
+        - business_context: texto pre-armado por business_profile_service
+        - lead_context: dict con name, intent, zone, budget, etc.
+        - history: lista de últimos N mensajes [{from, text}] para continuidad
+        - bot_tone: neutro|casual|formal|vendedor
+        """
+        tone_map = {
+            "casual": "tono casual y cercano, como charlando con un amigo",
+            "formal": "tono formal, serio y respetuoso (usted)",
+            "vendedor": "tono entusiasta y vendedor, destaca beneficios",
+            "neutro": "tono profesional, amable y conciso",
+        }
+        tone = tone_map.get((bot_tone or "neutro").lower(), tone_map["neutro"])
+
+        lead_info = ""
+        if lead_context:
+            parts = [f"- {k}: {v}" for k, v in lead_context.items() if v]
+            if parts:
+                lead_info = "\n=== INFO DEL CLIENTE ===\n" + "\n".join(parts) + "\n"
+
+        history_text = ""
+        if history:
+            recent = history[-6:]  # últimos 3 turnos
+            lines = []
+            for msg in recent:
+                who = "Cliente" if msg.get("from") == "customer" else "Bot"
+                txt = (msg.get("text") or "").strip()
+                if txt:
+                    lines.append(f"{who}: {txt[:200]}")
+            if lines:
+                history_text = "\n=== HISTORIAL RECIENTE ===\n" + "\n".join(lines) + "\n"
+
+        system_message = (
+            f"Sos un asistente virtual del negocio. Hablás en español rioplatense, {tone}.\n\n"
+            f"{business_context}"
+            f"{lead_info}"
+            f"{history_text}"
+            "\nREGLAS ESTRICTAS:\n"
+            "1. Responde MAX 3-4 oraciones, sin floreo.\n"
+            "2. Si la respuesta está en INFO DEL NEGOCIO, usala literalmente.\n"
+            "3. Si NO está, decí: 'No tengo esa info exacta, te paso con un humano'.\n"
+            "4. NO INVENTES horarios, precios, políticas, productos, ubicaciones.\n"
+            "5. Si pregunta por algo listado en 'NO ofrecemos', decí claramente que no.\n"
+            "6. Si hay historial, mantené coherencia (no preguntes algo ya respondido).\n"
+        )
+
+        response = await self._send_message(system_message, user_message)
+        return response.strip()
+
+    async def detect_sentiment(self, user_message: str, history: list = None) -> str:
+        """Clasifica el sentimiento del cliente: 'normal' | 'frustrated' | 'positive'.
+
+        Usa el mensaje + últimos 4 turnos de history para captar acumulación
+        de frustración (ej. el cliente pregunta lo mismo 3 veces).
+        Retorna 'normal' si no hay client o falla la API.
+        """
+        if not self.client:
+            return "normal"
+
+        history_text = ""
+        if history:
+            recent = history[-8:]
+            lines = []
+            for msg in recent:
+                who = "Cliente" if msg.get("from") == "customer" else "Bot"
+                txt = (msg.get("text") or "").strip()[:150]
+                if txt:
+                    lines.append(f"{who}: {txt}")
+            if lines:
+                history_text = "\nHistorial reciente:\n" + "\n".join(lines)
+
+        system_message = (
+            "Sos un clasificador de sentimiento de clientes en chats de WhatsApp. "
+            "Tu tarea: clasificar el último mensaje del cliente en UNA de tres categorías:\n"
+            "- 'frustrated': el cliente está molesto, enojado, repite preguntas, "
+            "usa mayúsculas agresivas, dice 'ya pregunté', insulta, amenaza con irse, "
+            "o muestra impaciencia evidente.\n"
+            "- 'positive': el cliente está contento, agradece, expresa entusiasmo "
+            "o satisfacción.\n"
+            "- 'normal': cualquier otro caso (consulta neutra, pregunta informativa, etc.).\n"
+            f"{history_text}\n"
+            "Responde SOLO con una palabra: frustrated, positive o normal."
+        )
+
+        try:
+            resp = await self._send_message(system_message, user_message)
+            label = (resp or "normal").strip().lower().split()[0]
+            if label in ("frustrated", "positive", "normal"):
+                return label
+            return "normal"
+        except Exception as e:
+            logger.warning(f"[detect_sentiment] failed: {e}")
+            return "normal"
+
+    async def explain_substitute_value(
+        self,
+        original_product: dict,
+        alternative_product: dict,
+        lead_context: Dict = None,
+    ) -> str:
+        """Genera 1 razón concreta de venta para una alternativa.
+
+        Compara features entre el producto pedido (agotado) y la alternativa,
+        considerando el perfil del lead. Retorna 1 frase corta tipo:
+        - 'Mismo barrio, $20.000 más barato y 1 ambiente extra'
+        - 'Tecnología más nueva (M3 vs M2), $100 más caro pero 30% más rápido'
+        - '40% más barato y entregamos hoy mismo'
+
+        Si falla la API, retorna string vacío (caller usa fallback genérico).
+        """
+        if not self.client:
+            return ""
+
+        def _fmt(p: dict) -> str:
+            name = p.get("name", "")
+            price = p.get("price")
+            cur = p.get("currency", "USD")
+            cat = p.get("category", "")
+            desc = (p.get("description") or "")[:200]
+            attrs = []
+            if price:
+                attrs.append(f"${price} {cur}")
+            if cat:
+                attrs.append(f"categoría: {cat}")
+            if desc:
+                attrs.append(f"desc: {desc}")
+            return f"{name} ({'; '.join(attrs)})"
+
+        lead_info = ""
+        if lead_context:
+            parts = [f"{k}={v}" for k, v in lead_context.items() if v]
+            if parts:
+                lead_info = "\nPerfil del cliente: " + ", ".join(parts)
+
+        system_message = (
+            "Sos un vendedor experto. Te paso un producto AGOTADO que pidió un "
+            "cliente y una ALTERNATIVA disponible. Tu tarea: escribir UNA SOLA "
+            "frase corta (máximo 18 palabras) explicando por qué la alternativa "
+            "es buena para ESTE cliente, comparando precio, features o categoría.\n\n"
+            "REGLAS:\n"
+            "1. Frase concreta, no genérica. Si los precios son distintos, mencionalos.\n"
+            "2. Si hay features en la descripción, citalas.\n"
+            "3. NO uses comillas ni emojis. Castellano rioplatense neutro.\n"
+            "4. Si no podés comparar, decí: 'tiene características similares y está disponible ahora'."
+        )
+        user_message = (
+            f"Producto agotado: {_fmt(original_product)}\n"
+            f"Alternativa disponible: {_fmt(alternative_product)}{lead_info}\n\n"
+            "Tu frase:"
+        )
+
+        try:
+            resp = await self._send_message(system_message, user_message)
+            line = (resp or "").strip().strip('"').strip("'")
+            return line[:200] if line else ""
+        except Exception as e:
+            logger.warning(f"[explain_substitute_value] failed: {e}")
+            return ""
 
     async def parse_free_text_response(self, user_message: str, context: str) -> Dict:
         """Parsea respuestas en lenguaje libre"""

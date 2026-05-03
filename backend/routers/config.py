@@ -432,3 +432,49 @@ async def reset_flow_config(current_user: User = Depends(require_admin)):
         {"$unset": unset},
     )
     return {"message": "Flujo reseteado al template base"}
+
+
+
+# ============================================================
+# Business Profile (Iter42 - bot fix #4)
+# ============================================================
+
+@router.get("/business-profile")
+async def get_business_profile(current_user: User = Depends(require_admin)):
+    """Admin: trae el profile del negocio para esta cuenta. Si no existe,
+    devuelve un dict vacío con el tenant_id (para que el form arranque
+    en blanco sin errores)."""
+    profile = await _db.business_profiles.find_one(
+        {"tenant_id": current_user.tenant_id}, {"_id": 0}
+    )
+    if not profile:
+        return {"tenant_id": current_user.tenant_id, "exists": False}
+    profile["exists"] = True
+    return profile
+
+
+@router.put("/business-profile")
+async def update_business_profile(
+    body: dict,
+    current_user: User = Depends(require_admin),
+):
+    """Admin: upsert del profile. El bot va a usar esta info para responder
+    preguntas frecuentes sin inventar datos."""
+    from business_profile_service import upsert_business_profile
+
+    allowed = {
+        "business_name", "business_description", "industry",
+        "address", "city", "phone", "email", "website",
+        "google_maps_url", "business_hours",
+        "accepts_cash", "accepts_credit_card", "accepts_debit_card",
+        "accepts_transfer", "accepts_crypto", "accepts_mercadopago",
+        "payment_notes",
+        "offers_delivery", "delivery_zones", "delivery_cost",
+        "offers_pickup", "offers_in_person", "has_parking",
+        "return_policy", "warranty_policy", "appointment_required",
+        "custom_faqs", "not_offered", "bot_tone",
+    }
+    data = {k: v for k, v in body.items() if k in allowed}
+    profile = await upsert_business_profile(_db, current_user.tenant_id, data)
+    profile["exists"] = True
+    return profile
