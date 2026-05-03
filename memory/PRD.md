@@ -33,7 +33,73 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
-### 2026-02-XX (Iter45 - Embeddings semánticos en Bot Learning + UI Sugerencias verificada)
+### 2026-02-XX (Iter46 - Coaching Proactivo al asesor)
+**Feature**: cuando el asesor ya respondió a un cliente, detectar si existen
+3+ leads recientes (últimos 30 días) con preguntas **semánticamente
+similares** y **sin respuesta enseñada al bot**. Mostrar una tarjeta
+sugiriendo "Enseñá esta respuesta al bot" — cierra el loop human-in-the-loop
+sin esperar que el asesor se acuerde de guardar manualmente.
+
+**Backend `bot_learning_service.find_coaching_opportunity`**:
+- Check preliminar: ¿existe ya una learned_response que matchee esta
+  pregunta? (cosine ≥ 0.52). Si sí → `recommendation="already_taught"`.
+- Scan leads últimos 30 días (máx 80, ordenados por `last_message_at` desc),
+  extrae mensajes `from='customer'`, pre-filtra por Jaccard ≥ 0.10 (recall
+  amplio).
+- Embed top-40 candidatos en batch + cosine vs query. Threshold 0.45
+  (más laxo que suggestions para priorizar recall en el coaching).
+- **Cuenta leads únicos distintos** (lo que importa es la demanda agregada).
+- Deduplicación por clustering (cosine ≥ 0.85) **sólo para las 3 muestras
+  visuales** mostradas al asesor, no para el conteo.
+- Returns `{already_taught, similar_pending_count, sample_questions:
+  [{question, lead_name, days_ago, score}], recommendation, reason}`.
+
+**Endpoint**: `POST /api/bot-learning/coaching-opportunity` body:
+`{customer_question, exclude_lead_phone?, days?, min_count?}`.
+
+**Frontend `LeadDetail.js`**:
+- `useEffect` ahora decide entre 2 renders mutuamente excluyentes:
+  - Si último mensaje es del cliente → card "Sugerencias para responder"
+  - Si último mensaje es del agente y hay pregunta del cliente antes →
+    fetch coaching-opportunity y, si `recommendation="teach"` y count ≥ 3,
+    renderiza card "Coaching proactivo".
+- Card visual (violeta, `data-testid="coaching-opportunity-card"`):
+  - Badge violeta con count "N consultas similares".
+  - Preview de la pregunta + top-3 ejemplos de preguntas similares
+    (autor + días atrás + score).
+  - Bloque ámbar con la respuesta del asesor que se va a enseñar.
+  - Botón gradient violeta "Enseñar al bot" → POST /api/bot-learning →
+    persiste el par (customer_q, agent_a) con nota explicativa
+    "Coaching proactivo: N consulta(s) similar(es) sin respuesta del bot".
+  - Botón "Ahora no" → dismisses card (no persiste).
+- data-testids: `coaching-opportunity-card`, `coaching-count-badge`,
+  `coaching-sample-{i}`, `btn-teach-from-coaching`, `btn-dismiss-coaching`.
+
+**Tests** `test_iter45_embeddings.py` ahora 14/14 PASS (+4 nuevos de coaching):
+- `teach_when_demand_and_not_yet_taught`: 4 leads con preguntas sobre
+  mascotas → count ≥ 3 + recommendation="teach".
+- `already_taught_when_learned_response_matches`: si hay learned_response
+  semánticamente cercano → `already_taught=True` aunque haya demanda.
+- `not_enough_when_low_demand`: 1 lead similar → `not_enough`.
+- `excludes_current_lead`: no cuenta el propio lead (por `lead_phone`).
+- Testing agent E2E: 14/14 unit + 6/6 backend live + 4/4 UI flows, **100%
+  backend + 100% frontend**.
+
+**Archivos**:
+- ~`bot_learning_service.py` (+170 líneas: find_coaching_opportunity)
+- ~`routers/bot_learning.py` (+40 líneas: endpoint)
+- ~`pages/LeadDetail.js` (+90 líneas: fetchCoachingOpportunity, teachFromCoaching, JSX tarjeta)
+- ~`tests/test_iter45_embeddings.py` (+4 tests; FakeDB soporta ahora
+  dotted paths tipo `conversation_history.0.$exists` y `$gte` para timestamps)
+
+**Thresholds**:
+- coaching similarity: 0.45 cosine (recall > precisión)
+- already_taught: 0.52 cosine (reutiliza find_learned_answer)
+- min_count_to_recommend: 3 leads únicos (configurable)
+
+
+
+
 **Backend** — `embeddings_service.py` (nuevo, 110 líneas):
 - Singleton lazy-loaded de `fastembed.TextEmbedding` con modelo
   `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384-dim,
