@@ -309,29 +309,52 @@ class ScheduledTasks:
                         "whatsapp_phone_number_id": {"$nin": ["", None]},
                         "whatsapp_access_token": {"$nin": ["", None]},
                     },
-                    {"_id": 0, "tenant_id": 1, "whatsapp_last_check": 1},
+                    {"_id": 0, "tenant_id": 1, "name": 1, "business_name": 1,
+                     "subscription_plan": 1, "whatsapp_last_check": 1},
                 )
                 checked = 0
-                regressions = 0
+                regressions_detail = []
                 async for t in cursor:
                     tid = t["tenant_id"]
                     prev_ok = bool((t.get("whatsapp_last_check") or {}).get("ok"))
                     try:
                         result = await _run_whatsapp_check(tid)
                         checked += 1
-                        # Detectar regresión: estaba OK y ahora no
                         if prev_ok and not result.get("ok"):
-                            regressions += 1
                             logger.warning(
                                 f"[wa_health_cron] REGRESSION tenant={tid} "
                                 f"status={result.get('status')} msg={result.get('message')}"
                             )
+                            regressions_detail.append({
+                                "tenant_id": tid,
+                                "business_name": t.get("business_name") or t.get("name") or tid,
+                                "plan": t.get("subscription_plan", ""),
+                                "prev_status": "ok",
+                                "new_status": result.get("status"),
+                                "new_message": result.get("message"),
+                            })
                     except Exception as e:
                         logger.warning(f"[wa_health_cron] check failed tenant={tid}: {e}")
                 if checked > 0:
                     logger.info(
-                        f"[wa_health_cron] run: checked={checked} regressions={regressions}"
+                        f"[wa_health_cron] run: checked={checked} "
+                        f"regressions={len(regressions_detail)}"
                     )
+                # Notificar al SUPERADMIN si hay al menos 1 regresión
+                if regressions_detail:
+                    target = os.environ.get("SUPERADMIN_EMAIL")
+                    if target:
+                        try:
+                            await self.email.send_whatsapp_regression_alert(
+                                to_email=target,
+                                regressions=regressions_detail,
+                            )
+                            logger.info(
+                                f"[wa_health_cron] regression email sent to {target} "
+                                f"({len(regressions_detail)} tenants)"
+                            )
+                        except Exception as e:
+                            logger.error(f"[wa_health_cron] regression email failed: {e}")
                 if force:
                     os.environ["WA_HEALTH_FORCE"] = "0"
                     break

@@ -33,6 +33,22 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter41 - WhatsApp Regression Email Alerts)
+- **Email** `send_whatsapp_regression_alert` (`email_service.py`):
+  - HTML con tabla de tenants regresados, badge rojo con status nuevo,
+    explicación de causas típicas (token expirado, low quality, unverified, etc.),
+    CTA al panel SuperAdmin con UTM tags.
+  - Plain text fallback.
+  - Validación: retorna False si `to_email` o `regressions` están vacíos.
+- **Hook en cron** `run_whatsapp_health_checks`:
+  - Cuando `prev_ok=true && now.ok=false` se acumula en `regressions_detail`
+    con `{tenant_id, business_name, plan, prev_status, new_status, new_message}`.
+  - Al final del run, si hay ≥1 regresión, envía UN email único al
+    `SUPERADMIN_EMAIL` con todas las regresiones agrupadas (no spam).
+- **Nuevo `EmailType.WHATSAPP_HEALTH_REGRESSION`** en models.
+
+
+
 ### 2026-02-XX (Iter40 - WhatsApp Health Check Cron + Manual Trigger)
 - **Cron periódico** (`scheduler.py::run_whatsapp_health_checks`):
   - Corre cada `WA_HEALTH_INTERVAL_HOURS` (default 12h) después de un

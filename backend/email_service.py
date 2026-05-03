@@ -1239,3 +1239,107 @@ InmoBot AI - Sistema de Calificación Automática
             email_type=EmailType.WEEKLY_DIGEST,
         )
 
+    async def send_whatsapp_regression_alert(
+        self,
+        to_email: str,
+        regressions: list,
+    ) -> bool:
+        """Alerta al SUPERADMIN cuando el cron de health-check detecta uno o más
+        tenants que pasaron de OK → NOT OK desde la última corrida.
+
+        regressions: [{tenant_id, business_name, plan, prev_status, new_status,
+                       new_message, checked_at}]
+        """
+        if not to_email or not regressions:
+            return False
+
+        app_url_env = os.environ.get("APP_URL")
+        if not app_url_env:
+            logger.warning("[wa_regression] APP_URL no configurado en .env")
+        app_url = (app_url_env or "https://app.inmobot.com").rstrip("/")
+        utm = "utm_source=admin_alert&utm_medium=email&utm_campaign=wa_regression"
+        sa_url = f"{app_url}/superadmin?{utm}"
+
+        n = len(regressions)
+        subject = (
+            f"🚨 [InmoBot] {n} tenant{'s' if n != 1 else ''} con WhatsApp roto detectado"
+        )
+
+        text_lines = [
+            f"Detectamos {n} regresión(es) de WhatsApp en el último re-check del cron:\n"
+        ]
+        for r in regressions:
+            text_lines.append(
+                f"• {r.get('business_name', r.get('tenant_id'))} "
+                f"({r.get('plan', '?')}) — {r.get('new_status', '?')}\n"
+                f"  Antes: OK · Ahora: {r.get('new_message', '')}\n"
+            )
+        text_lines.append(f"\nPanel SuperAdmin: {sa_url}\n")
+        text_body = "\n".join(text_lines)
+
+        rows_html = ""
+        for r in regressions:
+            rows_html += f"""
+              <tr>
+                <td style='padding:8px 12px; border-bottom:1px solid #f3f4f6;'>
+                  <strong>{r.get('business_name', r.get('tenant_id'))}</strong>
+                  <div style='font-size:11px; color:#6b7280;'>{r.get('tenant_id')} · plan {r.get('plan', '?')}</div>
+                </td>
+                <td style='padding:8px 12px; border-bottom:1px solid #f3f4f6; font-size:12px;'>
+                  <span style='background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:8px; font-weight:600;'>
+                    {r.get('new_status', '?')}
+                  </span>
+                  <div style='margin-top:4px; color:#374151;'>{(r.get('new_message') or '')[:140]}</div>
+                </td>
+              </tr>
+            """
+
+        html_body = f"""<!DOCTYPE html>
+<html><head><meta charset='utf-8'><style>
+  body {{ font-family:-apple-system,Arial,sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:0; }}
+  .container {{ max-width:620px; margin:24px auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08); }}
+  .header {{ background:linear-gradient(135deg,#dc2626 0%,#991b1b 100%); color:#fff; padding:24px; }}
+  .header h1 {{ margin:0; font-size:18px; font-weight:700; }}
+  .header p {{ margin:6px 0 0; font-size:13px; opacity:0.9; }}
+  .body {{ padding:22px 26px; font-size:14px; line-height:1.6; color:#374151; }}
+  table {{ width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }}
+  th {{ background:#f9fafb; text-align:left; padding:8px 12px; border-bottom:1px solid #e5e7eb; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#6b7280; }}
+  .cta {{ display:inline-block; background:#4f46e5; color:#fff !important; padding:12px 24px; border-radius:10px; text-decoration:none; font-weight:600; font-size:14px; margin-top:14px; }}
+  .footer {{ padding:16px 26px; color:#6b7280; font-size:11px; border-top:1px solid #f3f4f6; }}
+</style></head>
+<body><div class='container'>
+  <div class='header'>
+    <h1>🚨 WhatsApp regression detectada</h1>
+    <p>{n} tenant{'s' if n != 1 else ''} pasaron de OK a ERROR en el último re-check.</p>
+  </div>
+  <div class='body'>
+    <p>El cron periódico encontró tenants que estaban funcionando bien y ahora reportan errores. Causas típicas:</p>
+    <ul style='font-size:13px; margin:6px 0 16px 18px; padding:0; color:#374151;'>
+      <li><strong>invalid_token</strong>: el token expiró o fue revocado en Meta</li>
+      <li><strong>low_quality</strong>: el número cayó a quality rating ROJO (riesgo de suspensión)</li>
+      <li><strong>unverified_number</strong>: el número perdió la verificación en Meta</li>
+      <li><strong>permission_denied</strong>: cambió el System User del Business Account</li>
+    </ul>
+    <table>
+      <thead><tr><th>Tenant</th><th>Estado nuevo</th></tr></thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    <div style='text-align:center;'>
+      <a href='{sa_url}' class='cta' data-testid='wa-regression-cta'>Abrir panel SuperAdmin →</a>
+    </div>
+  </div>
+  <div class='footer'>
+    Alerta automática del cron de health-check (cada {os.environ.get('WA_HEALTH_INTERVAL_HOURS', '12')}h).
+    Sólo se envía cuando hay al menos 1 regresión nueva.
+  </div>
+</div></body></html>"""
+
+        return await self.send_email(
+            to_emails=[to_email],
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            email_type=EmailType.WHATSAPP_HEALTH_REGRESSION,
+        )
+
+

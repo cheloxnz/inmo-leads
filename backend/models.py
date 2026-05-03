@@ -80,6 +80,7 @@ class EmailType(str, Enum):
     WELCOME_TENANT = "welcome_tenant"
     UPSELL_UNMET_DEMAND = "upsell_unmet_demand"
     WAITLIST_THRESHOLD_ALERT = "waitlist_threshold_alert"
+    WHATSAPP_HEALTH_REGRESSION = "whatsapp_health_regression"
     TEST = "test"
 
 
