@@ -1307,6 +1307,7 @@ from routers.commissions import router as commissions_router
 from routers.founder import router as founder_router
 from routers.bot_learning import router as bot_learning_router, init_router as init_bot_learning
 from routers.calendar import router as calendar_router, init_router as init_calendar
+from routers.bootstrap import router as bootstrap_router, init_router as init_bootstrap
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1334,6 +1335,8 @@ app.include_router(bot_learning_router, prefix="/api")
 init_bot_learning(db)
 app.include_router(calendar_router, prefix="/api")
 init_calendar(db)
+app.include_router(bootstrap_router, prefix="/api")
+init_bootstrap(db)
 
 # ---------------- Security hardening ----------------
 from security import setup_security_middleware, validate_cors_origins
