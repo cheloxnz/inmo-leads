@@ -77,10 +77,27 @@ class GenericFlowEngine:
             if config.get("custom_labels"):
                 template["labels"] = config["custom_labels"]
 
-        # Replace {business_name} placeholder
-        bname = tenant.get("business_name", "")
-        if bname:
-            template["welcome_message"] = template["welcome_message"].replace("{business_name}", bname)
+        # Replace {business_name} placeholder en TODOS los mensajes del template.
+        # Si el tenant no configuró business_name, usamos `name` o un default
+        # neutral para evitar que el cliente vea "{business_name}" literal.
+        bname = (
+            tenant.get("business_name")
+            or tenant.get("name")
+            or "nuestro equipo"
+        )
+
+        def _replace(s):
+            return s.replace("{business_name}", bname) if isinstance(s, str) else s
+
+        for key in ["welcome_message", "appointment_message", "completion_message"]:
+            if template.get(key):
+                template[key] = _replace(template[key])
+
+        # FAQ y otros pueden ser dicts/listas
+        if isinstance(template.get("faq"), list):
+            template["faq"] = [
+                {**q, "answer": _replace(q.get("answer", ""))} for q in template["faq"]
+            ]
 
         return template
 
