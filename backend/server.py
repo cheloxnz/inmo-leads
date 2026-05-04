@@ -311,8 +311,10 @@ async def root():
 
 
 @api_router.get("/webhook")
+@api_router.get("/whatsapp/webhook")
 async def verify_webhook(request: Request):
-    """Verificación de webhook de WhatsApp (multi-tenant)"""
+    """Verificación de webhook de WhatsApp (multi-tenant).
+    Aliasado en /webhook y /whatsapp/webhook para flexibilidad."""
     params = dict(request.query_params)
     hub_mode = params.get("hub.mode")
     hub_challenge = params.get("hub.challenge")
@@ -349,6 +351,7 @@ async def debug_token():
 
 
 @api_router.post("/webhook")
+@api_router.post("/whatsapp/webhook")
 async def receive_webhook(
     request: Request,
     x_hub_signature_256: Optional[str] = Header(None)
