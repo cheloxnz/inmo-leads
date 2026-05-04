@@ -33,6 +33,78 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter47 - Dashboard "Oportunidades de coaching" + API keys live)
+**Feature**: vista global en `/config` que agrupa por similitud semántica
+(cosine ≥ 0.75) todas las preguntas recientes de clientes que el bot NO sabe
+responder y las ordena por volumen. El admin puede enseñar una respuesta por
+cluster y el bot cubre automáticamente a todos los leads similares (y los
+futuros).
+
+**Backend `bot_learning_service.discover_coaching_opportunities`**:
+- Escanea hasta 500 preguntas de clientes de los últimos N días.
+- Para cada pregunta: embed → chequear vs learned_responses existentes
+  (cosine ≥ 0.52). Las cubiertas se suman a `already_covered`.
+- Las no cubiertas se clusterizan con algoritmo greedy contra el centroide
+  del primer miembro (cosine ≥ 0.75 para pertenecer).
+- Filtra clusters de tamaño `< min_cluster_size` (default 2).
+- Para cada cluster devuelve `{canonical_question, cluster_size,
+  sample_questions[5], last_seen_days_ago, first_seen_days_ago}`.
+- Cuenta leads únicos por `lead_phone` (no infla el número con repeticiones).
+
+**Endpoint**: `GET /api/bot-learning/coaching-opportunities?days=30&min_cluster_size=2`.
+
+**Frontend `CoachingOpportunitiesPanel.js`** (nuevo, 350 líneas):
+- Montado en `/config` debajo del BotLearningPanel existente.
+- 4 stat boxes: preguntas totales / ya cubiertas / sin cubrir / clusters.
+- Selector de ventana temporal (7/30/60/90 días) + botón refresh.
+- Cada cluster es una card colapsable con:
+  - Header: canonical_question + count + badge volumen + botón "Enseñar".
+  - Expand: lista de hasta 5 sample_questions con autor + "hace Xd".
+  - Click "Enseñar" → dialog modal con textarea para la respuesta →
+    POST `/api/bot-learning` con notes explicativas + toast de éxito +
+    auto-refresh del panel (cluster desaparece porque ya matchea).
+- Empty state si no hay clusters pendientes ("¡Buenas noticias! No hay temas
+  sin cubrir").
+- data-testids: `coaching-opportunities-panel`, `opps-total-badge`,
+  `opps-days-select`, `opps-refresh-btn`, `opps-stats`, `cluster-{idx}`,
+  `cluster-{idx}-badge`, `cluster-{idx}-teach-btn`, `cluster-{idx}-sample-{i}`,
+  `teach-dialog`, `teach-answer-input`, `teach-submit-btn`.
+
+**API Keys live configuradas** (`backend/.env`):
+- `STRIPE_API_KEY` = sk_live_* (validada vía `stripe.Account.retrieve()`
+  → `charges_enabled=True`, `country=US`).
+- `STRIPE_PUBLISHABLE_KEY` = pk_live_* (no usada todavía; para futuro uso
+  con Stripe Elements frontend).
+- `OPENAI_API_KEY` = sk-proj-* (validada vía chat.completions).
+- **Fix**: `load_dotenv(ROOT_DIR / '.env', override=True)` en `server.py`.
+  El entorno Emergent setea `STRIPE_API_KEY=sk_test_emergent` a nivel OS
+  que estaba pisando el valor real del .env; con `override=True` el .env
+  manda.
+
+**Dominio de producción**: `inmobot-ia.com` (anotado — requiere Step 11:
+configurar DNS + deployment en Emergent con este hostname).
+
+**Tests** `test_iter45_embeddings.py` ahora 18/18 PASS (+4 nuevos):
+- `discover_clusters_uncovered_questions_by_topic`: 8 leads → 2 temas → se
+  detectan clusters ordenados por volumen.
+- `discover_excludes_already_taught_topics`: learned_response sobre mascotas
+  → esas preguntas se suman a already_covered, no aparecen como clusters.
+- `discover_empty_when_no_conversations`: tenant sin leads → `clusters=[]`.
+- `discover_respects_min_cluster_size`: 2 preguntas solitarias (distintos
+  temas) → 0 clusters con min_cluster_size=2.
+- Testing agent E2E: **100% backend + 100% frontend** (9 backend + 14 UI flows).
+
+**Archivos**:
+- ~`bot_learning_service.py` (+195 líneas: discover_coaching_opportunities)
+- ~`routers/bot_learning.py` (+20 líneas: endpoint)
+- +`components/CoachingOpportunitiesPanel.js` (350 líneas: dashboard completo)
+- ~`pages/Configuration.js` (+2 líneas: import + mount)
+- ~`backend/.env` (Stripe live + OpenAI live)
+- ~`backend/server.py` (override=True en load_dotenv)
+- ~`tests/test_iter45_embeddings.py` (+4 tests)
+
+
+
 ### 2026-02-XX (Iter46 - Coaching Proactivo al asesor)
 **Feature**: cuando el asesor ya respondió a un cliente, detectar si existen
 3+ leads recientes (últimos 30 días) con preguntas **semánticamente
