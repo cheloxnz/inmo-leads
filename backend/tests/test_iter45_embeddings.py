@@ -409,3 +409,97 @@ async def test_coaching_excludes_current_lead():
     # Solo contamos "+401" y "+402" — excluimos "+CURRENT"
     assert res["similar_pending_count"] <= 2
     assert all(s["lead_name"] != "Me" for s in res["sample_questions"])
+
+
+# --- Tests para discover_coaching_opportunities ---
+
+from bot_learning_service import discover_coaching_opportunities
+
+
+@pytest.mark.asyncio
+async def test_discover_clusters_uncovered_questions_by_topic():
+    """Con 5 leads sobre mascotas (no cubierto) + 3 sobre horarios, debe detectar
+    2 clusters ordenados por volumen."""
+    db = FakeDB()
+    tenant = "td1"
+    # 5 leads sobre mascotas
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+501", "A", "Aceptan mascotas en el depto?", "Sí", 1),
+        _mk_lead(tenant, "+502", "B", "Puedo llevar mi perro al departamento?", "Sí", 1),
+        _mk_lead(tenant, "+503", "C", "Se permiten gatos en la propiedad?", "Sí", 2),
+        _mk_lead(tenant, "+504", "D", "El depto permite mascotas chicas?", "Sí", 3),
+        _mk_lead(tenant, "+505", "E", "Admiten perros pequeños?", "Sí", 4),
+        # 3 leads sobre horarios
+        _mk_lead(tenant, "+506", "F", "A que hora atienden los sabados?", "10 a 16", 1),
+        _mk_lead(tenant, "+507", "G", "Tienen atencion los fines de semana?", "Sábados 10-16", 2),
+        _mk_lead(tenant, "+508", "H", "Que horario tienen los sabados?", "10 a 16hs", 3),
+    ])
+    res = await discover_coaching_opportunities(db, tenant, days=30, min_cluster_size=2)
+    assert res["model_available"] is True
+    assert res["total_customer_questions"] == 8
+    assert res["already_covered"] == 0
+    assert res["uncovered"] == 8
+    clusters = res["clusters"]
+    assert len(clusters) >= 1, res
+    # El primer cluster debe ser el más grande (mascotas con 5 leads)
+    assert clusters[0]["cluster_size"] >= 2
+    # Cada cluster tiene shape correcta
+    for c in clusters:
+        assert "canonical_question" in c
+        assert "sample_questions" in c
+        assert len(c["sample_questions"]) <= 5
+
+
+@pytest.mark.asyncio
+async def test_discover_excludes_already_taught_topics():
+    """Si hay learned_response para un tema, las preguntas de ese tema no deben
+    salir como oportunidades."""
+    db = FakeDB()
+    tenant = "td2"
+    await save_learned_response(
+        db=db, tenant_id=tenant,
+        question="Aceptan mascotas en el depto?",
+        answer="Sí, mascotas pequeñas de hasta 10kg.",
+    )
+    db.leads.docs.extend([
+        # Estas 3 preguntas sobre mascotas YA están cubiertas
+        _mk_lead(tenant, "+601", "A", "Aceptan gatos en el depto?", "Sí", 1),
+        _mk_lead(tenant, "+602", "B", "El depto acepta perros?", "Sí", 1),
+        _mk_lead(tenant, "+603", "C", "Puedo tener mi mascota en el departamento?", "Sí", 2),
+        # Estas 3 sobre horarios NO están cubiertas → deberían clusterizar
+        _mk_lead(tenant, "+604", "D", "A que hora atienden los sabados?", "10-16", 1),
+        _mk_lead(tenant, "+605", "E", "Tienen atencion los fines de semana?", "Sí", 2),
+        _mk_lead(tenant, "+606", "F", "Que horarios tienen los sabados por la tarde?", "10-16", 3),
+    ])
+    res = await discover_coaching_opportunities(db, tenant, days=30, min_cluster_size=2)
+    assert res["model_available"] is True
+    assert res["total_customer_questions"] == 6
+    assert res["already_covered"] >= 2, f"mascotas debería contar como cubierto: {res}"
+    # Los clusters no deben contener la palabra mascota/gato/perro como canonical
+    for c in res["clusters"]:
+        low = c["canonical_question"].lower()
+        assert "mascot" not in low and "gato" not in low and "perro" not in low, c
+
+
+@pytest.mark.asyncio
+async def test_discover_empty_when_no_conversations():
+    db = FakeDB()
+    res = await discover_coaching_opportunities(db, "empty-tenant", days=30)
+    assert res["model_available"] is True
+    assert res["total_customer_questions"] == 0
+    assert res["clusters"] == []
+
+
+@pytest.mark.asyncio
+async def test_discover_respects_min_cluster_size():
+    """Un solo lead por tema NO debe aparecer como cluster si min_cluster_size=2."""
+    db = FakeDB()
+    tenant = "td4"
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+701", "A", "Puedo pagar en dolares?", "Sí", 1),  # solitario
+        _mk_lead(tenant, "+702", "B", "Como es el proceso de alquiler?", "Simple", 1),  # solitario
+    ])
+    res = await discover_coaching_opportunities(db, tenant, days=30, min_cluster_size=2)
+    # Con min_cluster_size=2 y preguntas únicas, no hay clusters
+    assert len(res["clusters"]) == 0
+

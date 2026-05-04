@@ -33,7 +33,7 @@ from scheduled_messages import ScheduledMessagesService, BroadcastService
 from resend_service import send_welcome_email
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / '.env', override=True)
 
 # Initialize structured logging FIRST (so Sentry init logs are JSON too)
 from logging_config import setup_logging, RequestLoggingMiddleware

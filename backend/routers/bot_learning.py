@@ -219,6 +219,29 @@ async def embeddings_status(
 
 
 
+@router.get("/bot-learning/coaching-opportunities")
+async def coaching_opportunities_dashboard(
+    days: int = 30,
+    min_cluster_size: int = 2,
+    current_user: User = Depends(get_current_user),
+):
+    """Dashboard global de oportunidades de coaching para el tenant.
+
+    Devuelve clusters semánticos de preguntas frecuentes que el bot NO puede
+    responder (no hay learned_response que las cubra), ordenados por volumen.
+    Pensado para la vista /config → Oportunidades, donde el admin enseña
+    respuestas en bulk.
+    """
+    from bot_learning_service import discover_coaching_opportunities
+    db = _get_db()
+    return await discover_coaching_opportunities(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        days=max(1, min(days, 365)),
+        min_cluster_size=max(1, min(min_cluster_size, 50)),
+    )
+
+
 @router.post("/bot-learning/coaching-opportunity")
 async def coaching_opportunity(
     body: dict,

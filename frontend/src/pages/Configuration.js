@@ -12,6 +12,7 @@ import BrandingPanel from '../components/BrandingPanel';
 import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
 import BusinessProfileSection from '../components/BusinessProfileSection';
 import BotLearningPanel from '../components/BotLearningPanel';
+import CoachingOpportunitiesPanel from '../components/CoachingOpportunitiesPanel';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -199,6 +200,9 @@ export default function Configuration() {
 
         {/* Cerebro del Bot - respuestas aprendidas de asesores humanos */}
         <BotLearningPanel />
+
+        {/* Oportunidades de coaching - clusters semánticos de preguntas sin cubrir */}
+        <CoachingOpportunitiesPanel />
         
         <Card>
           <CardHeader>

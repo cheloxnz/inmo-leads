@@ -1,0 +1,37 @@
+{
+  "summary": "Iter47 'Coaching opportunities dashboard' tested e2e. Backend: 9/9 PASS + 1 SKIP (only 1 cluster present so sort-by-size assertion skipped). Endpoint GET /api/bot-learning/coaching-opportunities?days=30&min_cluster_size=2 returns correct shape {model_available=true, total_customer_questions=15, already_covered=10, uncovered=5, clusters[1]}. Cluster mascotas: canonical_question='El depto permite mascotas chicas?', cluster_size=2, sample_questions=2 (Ana Ruiz, Juli Gonzales), last_seen_days_ago/first_seen_days_ago present. Frontend: 14/14 critical UI flows PASS en /config: panel data-testid='coaching-opportunities-panel' renders, opps-stats con 4 StatBoxes correctos, cluster-0 con badge='2', expand muestra cluster-0-sample-0 y sample-1, click teach-btn abre teach-dialog con teach-answer-input y teach-submit-btn (disabled cuando vacío), opps-days-select cambia ventana y recarga. Stripe live key (sk_live_*) verificada vía GET /api/plans → 200 sin 'Invalid API Key'. OPENAI_API_KEY (sk-proj-*) live presente. Regresión iter45/46 OK: /api/bot-learning, /api/agent-suggestions, /api/bot-learning/coaching-opportunity siguen funcionando.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter47_coaching_dashboard.py",
+    "/app/test_reports/pytest/iter47_results.xml"
+  ],
+  "action_items": [
+    "(opcional, pre-existente desde iter31) En demo-inmobiliaria quedaron entradas TEST_ y un learned_response sobre mascotas de iter46 que NO cubre completamente la pregunta 'El depto permite mascotas chicas?' (cosine < 0.52), por eso aparece como cluster nuevo. Si el demo está bien así (mostrar 1 cluster de mascotas para enseñar), no requiere acción. Si se quiere demostrar 'enseñar y desaparece', el botón Enseñar funciona — verificado en iter46.",
+    "(producción) Configurar STRIPE_WEBHOOK_SECRET cuando se deployee a producción; no aplicable en preview."
+  ],
+  "critical_code_review_comments": [
+    "discover_coaching_opportunities (bot_learning_service.py:710-918): pipeline correcto — embed batch → filtrar covered (cosine≥0.52 vs learned_responses) → clustering greedy (cosine≥0.75 contra centroide=primer miembro) → sort por cluster_size desc → max 20 clusters. Bien estructurado. Nota arquitectural: el centroide es estático (primer miembro) en vez de mean-vector — funciona para clusters pequeños/coherentes pero podría dar 'cluster drift' con muchos miembros heterogéneos; aceptable para el uso actual.",
+    "Dedup intra-lead via (phone, normalize(text)[:80]) previene inflar conteos. cluster_size se calcula con unique_phones (correcto, evita inflar por mismo lead repitiendo).",
+    "Frontend CoachingOpportunitiesPanel.js: useEffect con [days] dispara fetch al cambiar selector — correcto. submitTeach tras éxito llama fetchOpportunities() Y onTaught() (callback opcional) → permite refrescar BotLearningPanel hermano. Buen pattern.",
+    "Threshold cluster=0.75 es razonable (paráfrasis evidente, no temas relacionados). Threshold cover=0.52 mantiene consistencia con find_learned_answer (iter45). Bien calibrado.",
+    "Router clamp days∈[1,365] y min_cluster_size∈[1,50] evita abuso/queries lentas. Bien."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter47_coaching_dashboard.py (nuevo - 10 tests integrando iter47 + Stripe live + regresión iter45/46, reusable como suite de regresión)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant demo-inmobiliaria)",
+  "seed_data_creation": "No creé seeds nuevos. NO submití el teach dialog desde el dashboard para no dejar otro learned_response en la DB; el flow submit→toast→close→refresh ya fue validado en iter46. La validación del campo input + disabled-submit + dialog open/close/cancel sí fue ejercida.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter47 dashboard global está 100% funcional. Endpoint: GET /api/bot-learning/coaching-opportunities?days=30&min_cluster_size=2. Defaults: cluster_threshold=0.75, max_clusters=20, max_questions=500. Demo-inmobiliaria muestra 1 cluster de mascotas (Ana Ruiz + Juli Gonzales). Stripe key es sk_live_* (REAL — no hagas checkout). Si la DB se resetea, correr seed scripts (init_admin.py + seed_iter45_demo_leads.py + demo_seed_service si existe). Test file reusable: /app/backend/tests/test_iter47_coaching_dashboard.py (también valida regresión iter45/46).",
+  "rca of the issue": "No issues found. Feature works end-to-end: backend embeddings + greedy clustering (cosine≥0.75) + filtrado por learned_responses (cosine≥0.52) + UI dashboard con stats + cluster cards + expand + teach dialog. Stripe/OpenAI live keys correctamente cargadas via load_dotenv(override=True)."
+}

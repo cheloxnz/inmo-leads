@@ -704,3 +704,215 @@ async def find_coaching_opportunity(
         "recommendation": recommendation,
         "reason": reason,
     }
+
+
+
+async def discover_coaching_opportunities(
+    db: AsyncIOMotorDatabase,
+    tenant_id: str,
+    days: int = 30,
+    min_cluster_size: int = 2,
+    cluster_threshold: float = 0.75,
+    max_questions: int = 500,
+    max_clusters: int = 20,
+) -> dict:
+    """Dashboard global: descubre TODAS las oportunidades de coaching del tenant
+    en una sola llamada. Escanea preguntas de clientes, filtra las cubiertas
+    por learned_responses existentes, y clusteriza las restantes por similitud
+    semántica. Devuelve clusters ordenados por volumen.
+
+    Útil para la vista "/config → Oportunidades de coaching" donde el admin
+    ve en bulk qué temas no cubre el bot y puede enseñar respuestas una tras
+    otra sin tener que abrir lead por lead.
+
+    Returns:
+      {
+        model_available: bool,
+        total_customer_questions: int,
+        already_covered: int,
+        uncovered: int,
+        clusters: [{
+          canonical_question: str,        # la pregunta más representativa
+          cluster_size: int,              # cuántos leads únicos
+          sample_questions: [             # hasta 5 ejemplos
+            {question, lead_name, lead_phone, days_ago, timestamp}
+          ],
+          last_seen_days_ago: int,
+          first_seen_days_ago: int,
+        }]
+      }
+    """
+    import embeddings_service as embed_svc
+
+    # Forzar load del modelo
+    probe = await embed_svc.embed_text("ping")
+    if probe is None:
+        return {
+            "model_available": False,
+            "total_customer_questions": 0,
+            "already_covered": 0,
+            "uncovered": 0,
+            "clusters": [],
+            "error": "Modelo de embeddings no disponible",
+        }
+
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    # 1. Recolectar preguntas de clientes de los últimos N días
+    lead_query = {
+        "tenant_id": tenant_id,
+        "conversation_history.0": {"$exists": True},
+        "last_message_at": {"$gte": cutoff_date},
+    }
+    cursor = db.leads.find(
+        lead_query,
+        {"_id": 0, "phone": 1, "name": 1, "conversation_history": 1, "last_message_at": 1},
+    ).sort("last_message_at", -1).limit(500)
+
+    raw_questions = []
+    seen_phone_texts = set()  # dedup mismo lead con misma pregunta repetida
+    async for lead in cursor:
+        history = lead.get("conversation_history") or []
+        for msg in history:
+            if msg.get("from") != "customer":
+                continue
+            text = (msg.get("text") or "").strip()
+            if len(text) < 8 or len(text) > 400:
+                continue
+            # Dedup intra-lead
+            dedup_key = (lead.get("phone", ""), _normalize(text)[:80])
+            if dedup_key in seen_phone_texts:
+                continue
+            seen_phone_texts.add(dedup_key)
+            raw_questions.append({
+                "text": text,
+                "lead_name": lead.get("name") or lead.get("phone"),
+                "lead_phone": lead.get("phone"),
+                "timestamp": msg.get("timestamp") or lead.get("last_message_at") or "",
+            })
+            if len(raw_questions) >= max_questions:
+                break
+        if len(raw_questions) >= max_questions:
+            break
+
+    total = len(raw_questions)
+    if total == 0:
+        return {
+            "model_available": True,
+            "total_customer_questions": 0,
+            "already_covered": 0,
+            "uncovered": 0,
+            "clusters": [],
+        }
+
+    # 2. Precargar learned_responses CON embedding del tenant
+    learned = await db.learned_responses.find(
+        {"tenant_id": tenant_id, "active": True,
+         "embedding": {"$exists": True, "$ne": None}},
+        {"_id": 0, "id": 1, "question": 1, "embedding": 1},
+    ).to_list(500)
+
+    # 3. Embed todas las preguntas en batch
+    texts = [q["text"] for q in raw_questions]
+    vecs = await embed_svc.embed_batch(texts)
+
+    # 4. Filtrar las ya cubiertas por learned_responses (cosine ≥ 0.52)
+    uncovered = []
+    already_covered = 0
+    for q, v in zip(raw_questions, vecs):
+        if v is None:
+            continue
+        is_covered = False
+        for lr in learned:
+            if embed_svc.cosine_similarity(v, lr["embedding"]) >= 0.52:
+                is_covered = True
+                break
+        if is_covered:
+            already_covered += 1
+        else:
+            uncovered.append({**q, "vec": v})
+
+    if not uncovered:
+        return {
+            "model_available": True,
+            "total_customer_questions": total,
+            "already_covered": already_covered,
+            "uncovered": 0,
+            "clusters": [],
+        }
+
+    # 5. Clustering greedy: recorre preguntas, asigna a cluster existente si
+    #    cosine ≥ threshold contra el "centroide" (el primer elemento), sino
+    #    crea cluster nuevo.
+    clusters: List[dict] = []
+    for q in uncovered:
+        assigned = False
+        for c in clusters:
+            if embed_svc.cosine_similarity(q["vec"], c["centroid_vec"]) >= cluster_threshold:
+                c["members"].append(q)
+                assigned = True
+                break
+        if not assigned:
+            clusters.append({"centroid_vec": q["vec"], "members": [q]})
+
+    # 6. Filtrar clusters chicos, ordenar por volumen desc
+    now = datetime.now(timezone.utc)
+
+    def _days_ago(ts: str) -> int:
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return max(0, (now - dt).days)
+        except Exception:
+            return 0
+
+    result_clusters = []
+    for c in clusters:
+        # Leads únicos dentro del cluster
+        unique_phones = {m["lead_phone"] for m in c["members"] if m.get("lead_phone")}
+        cluster_size = len(unique_phones) if unique_phones else len(c["members"])
+        if cluster_size < min_cluster_size:
+            continue
+
+        # Elegimos la "canonical question" como la más corta y clara del cluster
+        # (usualmente la más representativa: ni demasiado larga ni muy corta)
+        sorted_members = sorted(c["members"], key=lambda m: abs(len(m["text"]) - 40))
+        canonical = sorted_members[0]["text"]
+
+        samples = []
+        seen_texts = set()
+        for m in c["members"]:
+            norm = _normalize(m["text"])[:60]
+            if norm in seen_texts:
+                continue
+            seen_texts.add(norm)
+            samples.append({
+                "question": m["text"],
+                "lead_name": m["lead_name"],
+                "lead_phone": m["lead_phone"],
+                "days_ago": _days_ago(m["timestamp"]),
+                "timestamp": m["timestamp"],
+            })
+            if len(samples) >= 5:
+                break
+
+        days_ago_list = [_days_ago(m["timestamp"]) for m in c["members"]]
+        result_clusters.append({
+            "canonical_question": canonical,
+            "cluster_size": cluster_size,
+            "sample_questions": samples,
+            "last_seen_days_ago": min(days_ago_list) if days_ago_list else 0,
+            "first_seen_days_ago": max(days_ago_list) if days_ago_list else 0,
+        })
+
+    result_clusters.sort(key=lambda x: x["cluster_size"], reverse=True)
+    result_clusters = result_clusters[:max_clusters]
+
+    return {
+        "model_available": True,
+        "total_customer_questions": total,
+        "already_covered": already_covered,
+        "uncovered": len(uncovered),
+        "clusters": result_clusters,
+    }
