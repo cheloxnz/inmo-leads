@@ -33,6 +33,43 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter48 - Rising/Decaying trend badges en coaching clusters)
+**Feature**: cada cluster del dashboard ahora expone **tendencia** (rising /
+stable / decaying) calculada como ratio entre preguntas recientes (últ. 7d)
+y baseline (8-14d atrás). Los clusters `rising` saltan al primer puesto
+porque su `priority_score = cluster_size × 2.0`.
+
+**Backend** (`discover_coaching_opportunities`): cada cluster agrega 5 campos:
+- `trend: "rising"|"stable"|"decaying"`
+  - rising: `growth_rate ≥ 2.0` Y `recent_count ≥ 2` (también cuando
+    baseline=0 y recent≥2, o sea "tema emergente").
+  - decaying: `recent_count=0` con baseline>0, o `growth_rate < 0.5`.
+  - stable: el resto.
+- `recent_count`: preguntas en últimos 7 días del cluster.
+- `baseline_count`: preguntas entre 8-14 días atrás.
+- `growth_rate`: recent/baseline (null cuando baseline=0 pero recent≥2).
+- `priority_score`: `cluster_size × trend_boost` (2.0 rising, 1.0 stable,
+  0.6 decaying). El listado se ordena por este score (antes: por size puro).
+
+**Frontend** (`CoachingOpportunitiesPanel.ClusterCard`):
+- Badge naranja `"En crecimiento"` con ícono Flame cuando `trend="rising"`
+  (tooltip: "X consulta(s) en los últimos 7d vs Y la semana previa").
+- Texto gris itálica `"En baja"` con ícono TrendingDown cuando `decaying`.
+- Stable: sin badge de tendencia (solo leads count + última vez).
+- data-testids: `cluster-{idx}-trend-rising` / `cluster-{idx}-trend-decaying`.
+
+**Tests** `test_iter45_embeddings.py` 19/19 PASS (+1 nuevo
+`test_discover_detects_rising_trend`: seedea 4 leads recientes + 3 leads de
+8-14 días atrás; verifica rising y decaying detectados + rising es el
+primer cluster). Testing agent E2E: **100% backend + 100% frontend**.
+
+**Archivos**:
+- ~`bot_learning_service.py` (+40 líneas: trend calculation + priority sort)
+- ~`components/CoachingOpportunitiesPanel.js` (+40 líneas: badges rising/decaying)
+- ~`tests/test_iter45_embeddings.py` (+1 test)
+
+
+
 ### 2026-02-XX (Iter47 - Dashboard "Oportunidades de coaching" + API keys live)
 **Feature**: vista global en `/config` que agrupa por similitud semántica
 (cosine ≥ 0.75) todas las preguntas recientes de clientes que el bot NO sabe
