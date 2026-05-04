@@ -37,6 +37,7 @@ class BotFlowManager:
     
     async def process_message(self, lead: Lead, message_text: str, db) -> Lead:
         """Procesa mensaje según el estado del flujo"""
+        self.db = db  # Guardamos ref para que sub-métodos (sync gcal, etc.) accedan
         
         # Detectar urgencia en el mensaje
         if self.detect_urgency(message_text):
@@ -814,9 +815,50 @@ class BotFlowManager:
         
         self.wa.send_text_message(lead.phone, response)
         lead.flow_stage = FlowStage.COMPLETED
-        
+
+        # Sincronizar con Google Calendar si el tenant tiene la integración
+        await self._sync_appointment_to_gcal(lead)
+
         if ScoringEngine.should_handoff_to_human(lead):
             await self.trigger_handoff(lead)
+
+    async def _sync_appointment_to_gcal(self, lead: Lead):
+        """Crea un evento en Google Calendar del tenant si está conectado.
+        Best-effort: no bloquea el flujo del bot si falla."""
+        try:
+            tenant_id = getattr(lead, "tenant_id", None)
+            if not tenant_id or not lead.appointment_datetime:
+                return
+            import google_calendar_service as gcal
+            from datetime import timedelta as _td
+            db = self.db if hasattr(self, "db") else None
+            if db is None:
+                return
+            cal = await gcal.get_tenant_calendar(db, tenant_id)
+            if not cal:
+                return  # tenant no conectó Calendar
+            start = lead.appointment_datetime
+            end = start + _td(hours=1)
+            summary = f"{lead.appointment_type or 'Cita'} — {lead.name or lead.phone}"
+            description = (
+                f"Lead: {lead.name or 'Sin nombre'}\n"
+                f"Teléfono: {lead.phone}\n"
+                f"Intención: {getattr(lead, 'intent', '') or '-'}\n"
+                f"Agendado automáticamente por InmoBot."
+            )
+            ev = await gcal.create_event(
+                db=db,
+                tenant_id=tenant_id,
+                summary=summary,
+                start_iso=start.isoformat(),
+                end_iso=end.isoformat(),
+                description=description,
+            )
+            if ev and ev.get("id"):
+                lead.gcal_event_id = ev["id"]
+                logger.info(f"[gcal] evento creado {ev['id']} para {lead.phone}")
+        except Exception as e:
+            logger.warning(f"[gcal] sync appointment failed: {e}")
     
     async def trigger_handoff(self, lead: Lead):
         """Dispara notificación a asesor humano"""

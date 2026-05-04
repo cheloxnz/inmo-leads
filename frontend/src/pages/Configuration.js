@@ -13,6 +13,7 @@ import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
 import BusinessProfileSection from '../components/BusinessProfileSection';
 import BotLearningPanel from '../components/BotLearningPanel';
 import CoachingOpportunitiesPanel from '../components/CoachingOpportunitiesPanel';
+import GoogleCalendarSection from '../components/GoogleCalendarSection';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
@@ -203,6 +204,9 @@ export default function Configuration() {
 
         {/* Oportunidades de coaching - clusters semánticos de preguntas sin cubrir */}
         <CoachingOpportunitiesPanel />
+
+        {/* Google Calendar - integración OAuth per-tenant */}
+        <GoogleCalendarSection />
         
         <Card>
           <CardHeader>

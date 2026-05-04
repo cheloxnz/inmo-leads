@@ -157,6 +157,7 @@ class Lead(BaseModel):
     appointment_type: Optional[str] = None
     appointment_datetime: Optional[datetime] = None
     appointment_reminder_sent: bool = False
+    gcal_event_id: Optional[str] = None  # id del evento en Google Calendar del tenant
     is_urgent: bool = False
     tags: List[str] = []
     assigned_agent: Optional[str] = None
