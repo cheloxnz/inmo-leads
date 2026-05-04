@@ -353,7 +353,7 @@ Este lead lleva 3 días sin actividad. Considera enviarle un mensaje por WhatsAp
             f"Tu crédito activo este mes: -${active_credit_capped_usd:.0f} ({active_count} referidos activos).\n"
             f"Se descontará automáticamente en tu próxima factura.\n\n"
             f"Compartí tu link de referido para sumar más:\n"
-            f"https://inmobot-preview.preview.emergentagent.com/signup\n\n"
+            f"{os.environ.get('APP_URL', 'https://inmobot-ia.com').rstrip('/')}/signup\n\n"
             f"InmoBot AI"
         )
         html_body = f"""<!DOCTYPE html>

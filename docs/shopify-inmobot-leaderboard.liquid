@@ -14,7 +14,7 @@
   - Ajustá la paleta de colores a tu brand
 {%- endcomment -%}
 
-<div class="inmobot-proof" id="inmobot-proof-widget" data-inmobot-api="{{ settings.inmobot_api_url | default: 'https://inmobot-preview.preview.emergentagent.com' }}">
+<div class="inmobot-proof" id="inmobot-proof-widget" data-inmobot-api="{{ settings.inmobot_api_url | default: 'https://inmobot-ia.com' }}">
   <div class="inmobot-proof-wrap">
     <div class="inmobot-proof-badge">
       <span class="inmobot-proof-pulse"></span>
@@ -211,7 +211,7 @@
 (function() {
   var el = document.getElementById('inmobot-proof-widget');
   if (!el) return;
-  var API = el.getAttribute('data-inmobot-api') || 'https://inmobot-preview.preview.emergentagent.com';
+  var API = el.getAttribute('data-inmobot-api') || 'https://inmobot-ia.com';
 
   function formatNum(n) {
     return Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });

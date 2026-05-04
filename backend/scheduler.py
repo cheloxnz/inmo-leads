@@ -57,7 +57,8 @@ class ScheduledTasks:
         from routers.coach import _trial_days_left
         BASE_URL = (
             __import__("os").environ.get("PUBLIC_BASE_URL")
-            or "https://inmobot-preview.preview.emergentagent.com"
+            or __import__("os").environ.get("APP_URL")
+            or "https://inmobot-ia.com"
         )
         WARN_BUCKETS = {3, 1, 0}
         HALFWAY_DAY = 4  # día 3 del trial (de 7) = 4 días left
