@@ -53,6 +53,14 @@ class BotFlowManager:
         
         logger.info(f"Processing message from {lead.phone}: '{message_text}' - Current stage: {lead.flow_stage}")
 
+        # Hook: selección de alternativa de horario (post detección de conflicto Gcal)
+        if "opcion_alt_" in message_text.lower():
+            handled = await self._handle_alternative_slot_choice(lead, message_text)
+            if handled:
+                lead.last_message_at = datetime.utcnow()
+                await self.save_lead(lead, db)
+                return lead
+
         # ============================================================
         # Hooks pre-flow (Iter42 - mejoras del bot)
         # ============================================================
@@ -807,7 +815,15 @@ class BotFlowManager:
             appointment_date = appointment_date.replace(hour=15, minute=0, second=0, microsecond=0)
         else:
             appointment_date = appointment_date.replace(hour=18, minute=0, second=0, microsecond=0)
-        
+
+        # ¿El slot está libre en Google Calendar? Si está ocupado, ofrecer alternativas.
+        availability = await self._check_slot_availability(lead, appointment_date)
+        if availability and availability.get("connected") and not availability.get("available"):
+            alternatives = availability.get("alternatives", [])[:3]
+            if alternatives:
+                await self._offer_alternative_slots(lead, appointment_date, alternatives)
+                return  # Esperamos que el cliente elija una alternativa
+
         lead.appointment_datetime = appointment_date
         lead.notes = None  # Limpiar notes temporal
         
@@ -821,6 +837,53 @@ class BotFlowManager:
 
         if ScoringEngine.should_handoff_to_human(lead):
             await self.trigger_handoff(lead)
+
+    async def _handle_alternative_slot_choice(self, lead: Lead, message_text: str) -> bool:
+        """Parsea 'opcion_alt_YYYYMMDDHHMM' y confirma la cita en ese horario.
+        Retorna True si manejó el mensaje."""
+        import re as _re
+        m = _re.search(r'opcion_alt_(\d{12})', message_text.lower())
+        if not m:
+            return False
+        try:
+            token = m.group(1)
+            chosen = datetime.strptime(token, '%Y%m%d%H%M')
+        except Exception:
+            logger.warning(f"[gcal] token inválido en alt slot: {message_text}")
+            return False
+
+        # Sanity check: confirmar que la opción elegida estaba en la lista ofrecida
+        pending = (lead.metadata or {}).get("pending_alternative_slots", [])
+        if pending:
+            from datetime import datetime as _dt
+            valid = False
+            for iso in pending:
+                try:
+                    if _dt.fromisoformat(iso.replace("Z", "+00:00")).replace(tzinfo=None) == chosen:
+                        valid = True
+                        break
+                except Exception:
+                    continue
+            if not valid:
+                logger.warning(f"[gcal] slot elegido no estaba en pending: {chosen}")
+
+        # Limpiamos el pending y confirmamos
+        meta = lead.metadata or {}
+        meta.pop("pending_alternative_slots", None)
+        lead.metadata = meta
+
+        lead.appointment_datetime = chosen
+        lead.flow_stage = FlowStage.COMPLETED
+        response = (
+            f"¡Perfecto! ✅\n\nTu {lead.appointment_type or 'cita'} quedó agendada para:\n"
+            f"{chosen.strftime('%d/%m/%Y a las %H:%M')}\n\n"
+            f"Un asesor se va a comunicar con vos para confirmar. ¡Gracias! 🙌"
+        )
+        self.wa.send_text_message(lead.phone, response)
+        await self._sync_appointment_to_gcal(lead)
+        if ScoringEngine.should_handoff_to_human(lead):
+            await self.trigger_handoff(lead)
+        return True
 
     async def _sync_appointment_to_gcal(self, lead: Lead):
         """Crea un evento en Google Calendar del tenant si está conectado.
@@ -859,6 +922,67 @@ class BotFlowManager:
                 logger.info(f"[gcal] evento creado {ev['id']} para {lead.phone}")
         except Exception as e:
             logger.warning(f"[gcal] sync appointment failed: {e}")
+
+    async def _check_slot_availability(self, lead: Lead, slot_dt: datetime):
+        """Chequea si el slot está libre en Google Calendar del tenant.
+        Devuelve dict o None si no se pudo chequear (se asume libre)."""
+        try:
+            tenant_id = getattr(lead, "tenant_id", None)
+            db = self.db if hasattr(self, "db") else None
+            if not tenant_id or db is None:
+                return None
+            import google_calendar_service as gcal
+            return await gcal.check_availability(
+                db=db, tenant_id=tenant_id,
+                preferred_start=slot_dt, duration_minutes=60,
+            )
+        except Exception as e:
+            logger.warning(f"[gcal] availability check failed: {e}")
+            return None
+
+    async def _offer_alternative_slots(
+        self, lead: Lead, busy_slot: datetime, alternatives: list
+    ):
+        """Propone al lead 3 horarios libres vía botones interactivos.
+        Codificamos cada alternativa como opcion_alt_YYYYMMDDHHMM para parsear en
+        el siguiente mensaje entrante."""
+        from datetime import datetime as _dt
+
+        alt_dts = []
+        for iso in alternatives[:3]:
+            try:
+                alt_dts.append(_dt.fromisoformat(iso.replace("Z", "+00:00")))
+            except Exception:
+                continue
+        if not alt_dts:
+            return
+
+        lead.flow_stage = FlowStage.SCHEDULING
+        # Guardamos la lista en metadata para reparsear cuando llegue la respuesta
+        lead.metadata = lead.metadata or {}
+        lead.metadata["pending_alternative_slots"] = [dt.isoformat() for dt in alt_dts]
+
+        busy_label = busy_slot.strftime("%d/%m a las %H:%M")
+        response = (
+            f"Ups, el {busy_label} ya tengo otra cita agendada. 😕\n\n"
+            f"Te propongo 3 horarios alternativos cerca:"
+        )
+
+        dias_semana = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+        buttons = []
+        for dt in alt_dts:
+            label = f"{dias_semana[dt.weekday()]} {dt.strftime('%d/%m %H:%M')}"
+            if len(label) > 20:
+                label = label[:20]
+            token = dt.strftime("%Y%m%d%H%M")
+            buttons.append({
+                "type": "reply",
+                "reply": {"id": f"opcion_alt_{token}", "title": label},
+            })
+
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        logger.info(f"[gcal] ofrecidas {len(alt_dts)} alternativas a lead {lead.phone}")
+
     
     async def trigger_handoff(self, lead: Lead):
         """Dispara notificación a asesor humano"""

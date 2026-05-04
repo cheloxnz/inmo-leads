@@ -179,6 +179,37 @@ async def delete_event_endpoint(
     return {"deleted": True}
 
 
+@router.post("/calendar/availability")
+async def check_availability_endpoint(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Chequea si un slot está libre en el Calendar del tenant + sugiere
+    alternativas si está ocupado.
+
+    Body: {
+      start_iso: str,            # "2026-05-10T15:00:00-03:00"
+      duration_minutes: int = 60
+    }
+    Returns: {connected, available, preferred_start, preferred_end, alternatives: [iso]}
+    """
+    from datetime import datetime
+    start_iso = (body or {}).get("start_iso")
+    duration = int((body or {}).get("duration_minutes", 60))
+    if not start_iso:
+        raise HTTPException(status_code=400, detail="start_iso requerido")
+    try:
+        preferred = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="start_iso inválido (use ISO 8601)")
+    return await gcal.check_availability(
+        db=_db(),
+        tenant_id=current_user.tenant_id,
+        preferred_start=preferred,
+        duration_minutes=duration,
+    )
+
+
 @router.post("/calendar/disconnect")
 async def disconnect_endpoint(current_user: User = Depends(require_admin)):
     ok = await gcal.disconnect_tenant(_db(), current_user.tenant_id)

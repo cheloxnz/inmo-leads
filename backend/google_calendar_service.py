@@ -245,6 +245,203 @@ async def list_upcoming_events(db, tenant_id: str, max_results: int = 20) -> lis
         return []
 
 
+async def list_events_in_range(db, tenant_id: str, time_min: datetime, time_max: datetime) -> list:
+    """Lista eventos entre time_min y time_max (útil para chequeo de disponibilidad)."""
+    creds = await get_valid_credentials(db, tenant_id)
+    if not creds:
+        return []
+    try:
+        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        result = service.events().list(
+            calendarId="primary",
+            timeMin=time_min.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            timeMax=time_max.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        return result.get("items", [])
+    except HttpError as e:
+        logger.warning(f"[google_cal] list events in range failed: {e}")
+        return []
+
+
+# ---- Availability helpers (puros, testables sin DB) ----
+
+def _parse_event_datetime(event: dict, key: str) -> Optional[datetime]:
+    """Extrae start o end de un evento de Calendar como datetime UTC-aware.
+    Maneja tanto `dateTime` (timed events) como `date` (all-day)."""
+    block = event.get(key, {})
+    dt_str = block.get("dateTime") or block.get("date")
+    if not dt_str:
+        return None
+    try:
+        # date "2026-05-10" → se interpreta como 00:00 UTC (all-day)
+        if "T" not in dt_str:
+            dt = datetime.fromisoformat(dt_str + "T00:00:00+00:00")
+        else:
+            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+def is_slot_busy(events: list, slot_start: datetime, slot_end: datetime) -> bool:
+    """Verifica si [slot_start, slot_end) se solapa con algún evento existente.
+
+    Regla de solapamiento: dos intervalos [a,b) y [c,d) se solapan si a<d AND c<b.
+    """
+    if slot_start.tzinfo is None:
+        slot_start = slot_start.replace(tzinfo=timezone.utc)
+    if slot_end.tzinfo is None:
+        slot_end = slot_end.replace(tzinfo=timezone.utc)
+    for ev in events:
+        ev_start = _parse_event_datetime(ev, "start")
+        ev_end = _parse_event_datetime(ev, "end")
+        if not ev_start or not ev_end:
+            continue
+        # Ignoramos eventos que el user marcó como transparent (libre)
+        if ev.get("transparency") == "transparent":
+            continue
+        if slot_start < ev_end and ev_start < slot_end:
+            return True
+    return False
+
+
+def find_alternative_slots(
+    events: list,
+    preferred_start: datetime,
+    duration_minutes: int = 60,
+    business_hours: tuple = (9, 19),  # [9:00, 19:00)
+    slot_step_minutes: int = 60,
+    max_days_ahead: int = 7,
+    max_alternatives: int = 3,
+    skip_sundays: bool = True,
+) -> list:
+    """Busca slots libres alternativos cercanos al `preferred_start`.
+
+    Estrategia:
+    - Expande en "ondas" desde la hora preferida: mismo día mismo horario,
+      mismo día pasada/siguiente hora, día siguiente, etc.
+    - Filtra por horario laboral + skip domingos.
+    - Devuelve hasta `max_alternatives` datetimes (aware UTC).
+
+    Los slots están alineados al `slot_step_minutes` (default 1 hora).
+    """
+    if preferred_start.tzinfo is None:
+        preferred_start = preferred_start.replace(tzinfo=timezone.utc)
+
+    duration = timedelta(minutes=duration_minutes)
+    step = timedelta(minutes=slot_step_minutes)
+    start_hour, end_hour = business_hours
+
+    def _is_valid_time(dt: datetime) -> bool:
+        if skip_sundays and dt.weekday() == 6:
+            return False
+        hour_decimal = dt.hour + dt.minute / 60.0
+        if hour_decimal < start_hour or hour_decimal + duration_minutes / 60.0 > end_hour:
+            return False
+        return True
+
+    # Round preferred_start al step más cercano
+    minutes = (preferred_start.minute // slot_step_minutes) * slot_step_minutes
+    base = preferred_start.replace(minute=minutes, second=0, microsecond=0)
+
+    # Generamos candidatos en orden de preferencia (más cercano al deseado primero)
+    candidates = []
+    for day_offset in range(max_days_ahead):
+        day = base + timedelta(days=day_offset)
+        # Probamos todas las horas del día laboral, ordenadas por cercanía al horario preferido
+        target_hour = preferred_start.hour
+        for offset in [0, 1, -1, 2, -2, 3, -3]:
+            hour = target_hour + offset
+            if hour < start_hour or hour >= end_hour:
+                continue
+            slot = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+            # No proponer slots en el pasado o exactamente el preferido
+            if slot <= preferred_start and day_offset == 0:
+                continue
+            if not _is_valid_time(slot):
+                continue
+            candidates.append(slot)
+
+    # Dedup y chequeo de disponibilidad
+    seen = set()
+    alternatives = []
+    for slot in candidates:
+        key = slot.isoformat()
+        if key in seen:
+            continue
+        seen.add(key)
+        if not is_slot_busy(events, slot, slot + duration):
+            alternatives.append(slot)
+            if len(alternatives) >= max_alternatives:
+                break
+
+    return alternatives
+
+
+async def check_availability(
+    db,
+    tenant_id: str,
+    preferred_start: datetime,
+    duration_minutes: int = 60,
+    business_hours: tuple = (9, 19),
+) -> dict:
+    """Chequea si `preferred_start` está libre en el Calendar del tenant.
+
+    Returns:
+      {
+        "connected": bool,         # el tenant tiene Calendar conectado
+        "available": bool,         # el slot preferido está libre
+        "preferred_start": str,    # iso
+        "preferred_end": str,
+        "alternatives": [str]      # hasta 3 iso datetimes alternativos si ocupado
+      }
+    """
+    if preferred_start.tzinfo is None:
+        preferred_start = preferred_start.replace(tzinfo=timezone.utc)
+    duration = timedelta(minutes=duration_minutes)
+    slot_end = preferred_start + duration
+
+    cal = await get_tenant_calendar(db, tenant_id)
+    if not cal:
+        # Sin integración → asumimos libre (flujo normal del bot)
+        return {
+            "connected": False,
+            "available": True,
+            "preferred_start": preferred_start.isoformat(),
+            "preferred_end": slot_end.isoformat(),
+            "alternatives": [],
+        }
+
+    # Traemos eventos de ±7 días alrededor del slot preferido (suficiente para alternativas)
+    events = await list_events_in_range(
+        db, tenant_id,
+        preferred_start - timedelta(hours=1),
+        preferred_start + timedelta(days=7),
+    )
+    busy = is_slot_busy(events, preferred_start, slot_end)
+    alternatives = []
+    if busy:
+        slots = find_alternative_slots(
+            events,
+            preferred_start,
+            duration_minutes=duration_minutes,
+            business_hours=business_hours,
+        )
+        alternatives = [s.isoformat() for s in slots]
+
+    return {
+        "connected": True,
+        "available": not busy,
+        "preferred_start": preferred_start.isoformat(),
+        "preferred_end": slot_end.isoformat(),
+        "alternatives": alternatives,
+    }
+
+
 async def create_event(
     db,
     tenant_id: str,
