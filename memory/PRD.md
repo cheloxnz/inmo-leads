@@ -33,6 +33,66 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter50 - Detectar disponibilidad antes de agendar)
+**Feature**: antes de confirmar una cita en WhatsApp, el bot chequea si ese
+slot está libre en el Google Calendar del tenant. Si está ocupado, propone
+3 horarios alternativos cercanos vía botones interactivos. El cliente elige
+uno, el bot confirma y sincroniza con Calendar. Evita double-booking.
+
+**Backend** (`google_calendar_service.py`):
+- `list_events_in_range(db, tenant_id, time_min, time_max)`: wrapper para
+  `events.list()` de Calendar API con time window.
+- `is_slot_busy(events, slot_start, slot_end) -> bool`: función pura que
+  detecta solapamiento entre [a,b) y [c,d). Ignora eventos con
+  `transparency="transparent"` (marcados "Libre" en Calendar).
+- `find_alternative_slots(events, preferred_start, duration, business_hours,
+  slot_step, max_days_ahead, max_alternatives, skip_sundays)`: busca slots
+  libres ordenados por cercanía horaria al preferido (first same-day mismo
+  horario ±1h, ±2h, luego día siguiente, etc.). Filtra por horario laboral
+  (default 9-19) y excluye domingos.
+- `_parse_event_datetime(event, key)`: maneja tanto `dateTime` (timed) como
+  `date` (all-day) del Calendar API.
+- `check_availability(db, tenant_id, preferred_start, duration_minutes) ->
+  {connected, available, preferred_start, preferred_end, alternatives[]}`:
+  wrapper async que encapsula el flow completo. Si el tenant NO tiene
+  Calendar conectado, retorna `connected=false, available=true` (el bot
+  sigue su flow normal).
+
+**Endpoint** `POST /api/calendar/availability` body `{start_iso,
+duration_minutes=60}`: para debugging + futura UI de reserva manual.
+
+**Integración bot flow** (`bot_flow.py`):
+- `schedule_appointment` ahora llama a `_check_slot_availability(lead, dt)`
+  antes de confirmar. Si el tenant tiene Calendar conectado Y el slot está
+  ocupado → llama a `_offer_alternative_slots(lead, dt, alternatives)` que
+  envía 3 botones interactivos con labels tipo "mié 13/05 14:00" (token id
+  `opcion_alt_YYYYMMDDHHMM`).
+- Nuevo handler al inicio de `process_message`: si el mensaje contiene
+  `opcion_alt_*`, `_handle_alternative_slot_choice` parsea el token, valida
+  que estuviera en la lista `metadata.pending_alternative_slots` que se
+  guardó al ofrecer, y confirma la cita en ese horario + sincroniza con
+  Calendar (evento creado).
+- Si el tenant NO tiene Calendar conectado, el chequeo retorna `connected=
+  false` y el bot sigue su flow tradicional sin romper nada (backward-compat).
+
+**Tests**:
+- `test_iter50_availability.py` (11 tests unitarios PASS): overlap detection,
+  adjacent-but-not-overlapping, transparent events ignorados, all-day events,
+  business hours, skip sundays, closeness preference, max_alternatives.
+- Testing agent agregó 6 tests integrados live (auth, input validation,
+  response time <500ms, connected=false path).
+- Regresión completa iter45+iter49+iter50: **46/46 PASS**, 100% backend.
+
+**Archivos**:
+- ~`backend/google_calendar_service.py` (+160 líneas: helpers + endpoint
+  async)
+- ~`backend/routers/calendar.py` (+35 líneas: POST /availability)
+- ~`backend/bot_flow.py` (+95 líneas: _check_slot_availability,
+  _offer_alternative_slots, _handle_alternative_slot_choice)
+- +`backend/tests/test_iter50_availability.py` (11 tests)
+
+
+
 ### 2026-02-XX (Iter49 - Google Calendar OAuth per-tenant)
 **Feature**: cada inmobiliaria conecta su propio Google Calendar con 1 click.
 Cuando el bot confirma una cita vía WhatsApp, el evento se crea
