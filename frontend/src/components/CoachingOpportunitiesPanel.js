@@ -11,7 +11,7 @@ import {
 import { toast } from 'sonner';
 import {
   GraduationCap, TrendingUp, Users, Calendar, Sparkles,
-  ChevronDown, ChevronRight, AlertCircle, RefreshCw,
+  ChevronDown, ChevronRight, AlertCircle, RefreshCw, Flame, TrendingDown,
 } from 'lucide-react';
 
 /**
@@ -329,6 +329,34 @@ function ClusterCard({ idx, cluster, expanded, onToggle, onTeach }) {
               <Calendar className="w-3 h-3" />
               última hace {cluster.last_seen_days_ago}d
             </span>
+            {cluster.trend === 'rising' && (
+              <span
+                data-testid={`cluster-${idx}-trend-rising`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  color: '#c2410c', fontWeight: 600,
+                  background: '#fff7ed', padding: '2px 8px', borderRadius: 999,
+                  border: '1px solid #fed7aa',
+                }}
+                title={`Crecimiento: ${cluster.recent_count} consulta(s) en los últimos 7d vs ${cluster.baseline_count} la semana previa`}
+              >
+                <Flame className="w-3 h-3" />
+                En crecimiento
+              </span>
+            )}
+            {cluster.trend === 'decaying' && (
+              <span
+                data-testid={`cluster-${idx}-trend-decaying`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  color: '#6b7280', fontStyle: 'italic',
+                }}
+                title={`Demanda en baja: ${cluster.recent_count} recientes vs ${cluster.baseline_count} previos`}
+              >
+                <TrendingDown className="w-3 h-3" />
+                En baja
+              </span>
+            )}
           </div>
         </div>
         <span

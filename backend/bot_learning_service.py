@@ -898,15 +898,51 @@ async def discover_coaching_opportunities(
                 break
 
         days_ago_list = [_days_ago(m["timestamp"]) for m in c["members"]]
+
+        # Tendencia: comparar recientes (últ 7d) vs baseline (8-14d atrás).
+        # "rising"  = growth_rate >= 2.0 (al menos el doble)
+        # "stable"  = entre 0.5 y 2.0
+        # "decaying"= growth_rate < 0.5 (la demanda se está apagando)
+        # Si baseline=0 y recent>=2, es "rising" también (tema emergente).
+        recent_count = sum(1 for d in days_ago_list if d <= 7)
+        baseline_count = sum(1 for d in days_ago_list if 8 <= d <= 14)
+        if baseline_count > 0:
+            growth_rate = recent_count / baseline_count
+        elif recent_count >= 2:
+            growth_rate = float("inf")
+        else:
+            growth_rate = 0.0
+
+        if growth_rate >= 2.0 and recent_count >= 2:
+            trend = "rising"
+        elif recent_count == 0 and baseline_count > 0:
+            trend = "decaying"
+        elif growth_rate < 0.5 and baseline_count > 0:
+            trend = "decaying"
+        else:
+            trend = "stable"
+
+        # Score de prioridad: volumen × boost por tendencia (rising pesa 2x).
+        trend_boost = 2.0 if trend == "rising" else (0.6 if trend == "decaying" else 1.0)
+        priority_score = cluster_size * trend_boost
+
         result_clusters.append({
             "canonical_question": canonical,
             "cluster_size": cluster_size,
             "sample_questions": samples,
             "last_seen_days_ago": min(days_ago_list) if days_ago_list else 0,
             "first_seen_days_ago": max(days_ago_list) if days_ago_list else 0,
+            "trend": trend,
+            "recent_count": recent_count,
+            "baseline_count": baseline_count,
+            "growth_rate": (
+                round(growth_rate, 2) if growth_rate != float("inf") else None
+            ),
+            "priority_score": round(priority_score, 2),
         })
 
-    result_clusters.sort(key=lambda x: x["cluster_size"], reverse=True)
+    # Ordenamos por priority_score desc (rising primero, después volumen puro).
+    result_clusters.sort(key=lambda x: x["priority_score"], reverse=True)
     result_clusters = result_clusters[:max_clusters]
 
     return {

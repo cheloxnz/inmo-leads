@@ -1,0 +1,34 @@
+{
+  "summary": "Iter48 'Rising/Decaying trend badges en clusters de coaching' tested e2e. Backend unit tests iter45_embeddings: 19/19 PASS (incluye test_discover_detects_rising_trend NUEVO). Regresión iter47_coaching_dashboard: 9/9 PASS + 1 skip. Live endpoint GET /api/bot-learning/coaching-opportunities?days=30&min_cluster_size=2 con demo@inmobot.com devuelve cluster 'mascotas' con los 5 campos nuevos: trend='rising', recent_count=2, baseline_count=0, growth_rate=null (tema emergente → baseline=0 y recent>=2, correcto), priority_score=4.0 (=cluster_size 2 × boost 2.0 por rising). UI en /config: data-testid='cluster-0-trend-rising' renderiza badge naranja con icono Flame y texto 'En crecimiento' (color rgb(194,65,12)=#c2410c sobre fondo rgb(255,247,237)=#fff7ed, border #fed7aa). cluster-0-trend-decaying NO aparece en cluster rising (correcto). El badge de volumen (cluster-0-badge='2') sigue intacto. Stats panel sigue correcto: Preguntas totales=15, Cubiertas=10, Sin cubrir=5, Clusters=1. Sort por priority_score desc funcionando.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_embeddings.py",
+    "/app/backend/tests/test_iter47_coaching_dashboard.py",
+    "/app/test_reports/pytest/iter48_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "bot_learning_service.py:907-941 trend calculation: lógica clara — recent=últ 7d, baseline=8-14d. Thresholds: rising=(growth>=2.0 Y recent>=2) O (baseline=0 Y recent>=2); decaying=(recent=0 Y baseline>0) O (growth<0.5 Y baseline>0); stable=el resto. growth_rate=inf cuando baseline=0 y recent>=2 → se serializa como null en JSON (correcto, evita ±Infinity inválido en JSON).",
+    "priority_score = cluster_size × trend_boost (rising=2.0, stable=1.0, decaying=0.6). Ordenamiento por priority_score desc asegura que rising salte al top incluso si tiene menos leads que un stable. Bien implementado.",
+    "CoachingOpportunitiesPanel.js:332-359 ClusterCard renderiza badges condicionalmente (trend === 'rising' O 'decaying'); cuando trend='stable' o null, no renderiza nada — backwards-compat OK con clientes viejos o valores undefined. Iconos lucide-react Flame (rising) y TrendingDown (decaying) bien elegidos semánticamente.",
+    "El title attribute del badge contiene tooltip útil (recent vs baseline counts) — buen UX para que el usuario entienda por qué se marcó rising/decaying.",
+    "Nota: con baseline=0 y recent>=2 se asigna growth_rate=inf internamente pero se serializa como null. Frontend no muestra growth_rate directamente, solo usa trend, así que no hay bug visual. Si en el futuro se quisiera mostrar el growth rate numérico, handlear null sería necesario (hoy no aplica).",
+    "Demo-inmobiliaria solo tiene 1 cluster (mascotas) en ventana de 30d, por lo que el comportamiento 'rising salta al primer puesto por encima de un stable más grande' no se puede validar con datos live — pero SÍ está cubierto por test_discover_detects_rising_trend (unit test con 4 leads mascotas rising + 3 estacionamiento decaying, assert clusters[0]['trend']=='rising')."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "demo@inmobot.com / Demo123! (tenant demo-inmobiliaria)",
+  "seed_data_creation": "No se creó seed nuevo. Demo actual tiene 1 cluster mascotas con trend=rising (suficiente para validar el path rising). El path decaying quedó cubierto por unit test test_discover_detects_rising_trend (FakeDB con tema 'estacionamiento' de 10-12 días atrás). Si querés ver decaying en vivo, se puede seedear un lead con timestamp hace 12 días sobre un tema aislado (no crítico — unit test ya lo valida).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter48 funciona end-to-end. Endpoint añade 5 campos por cluster: trend ('rising'|'stable'|'decaying'), recent_count (últ 7d), baseline_count (8-14d), growth_rate (float|null), priority_score (float). Sort por priority_score desc (rising boost 2x, decaying 0.6x). UI badges: data-testid='cluster-{idx}-trend-rising' (naranja + Flame) y 'cluster-{idx}-trend-decaying' (gris + TrendingDown), no se muestra badge si trend='stable'. Demo live: 1 cluster mascotas rising (recent=2, baseline=0, priority=4.0). Tests: /app/backend/tests/test_iter45_embeddings.py (19 incluyendo test_discover_detects_rising_trend) y /app/backend/tests/test_iter47_coaching_dashboard.py (regresión).",
+  "rca of the issue": "No issues found. Feature iter48 funciona correctamente. Sumario numérico: 19/19 tests iter45 + 9/9 tests iter47 (1 skip no-blocker) = 28 tests PASS. UI validada con Playwright: badge 'En crecimiento' visible con estilos correctos."
+}

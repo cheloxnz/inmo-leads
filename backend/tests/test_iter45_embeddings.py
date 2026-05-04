@@ -503,3 +503,40 @@ async def test_discover_respects_min_cluster_size():
     # Con min_cluster_size=2 y preguntas únicas, no hay clusters
     assert len(res["clusters"]) == 0
 
+
+@pytest.mark.asyncio
+async def test_discover_detects_rising_trend():
+    """Un cluster con más preguntas en los últimos 7 días que en la semana
+    previa debe marcarse como 'rising' y saltar al primer puesto."""
+    db = FakeDB()
+    tenant = "td5"
+    # 4 preguntas sobre un tema NUEVO en la última semana (rising)
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+801", "A", "Aceptan mascotas en el depto?", "Sí", 0),
+        _mk_lead(tenant, "+802", "B", "Puedo llevar mi perro al departamento?", "Sí", 1),
+        _mk_lead(tenant, "+803", "C", "Se permiten gatos?", "Sí", 2),
+        _mk_lead(tenant, "+804", "D", "El depto acepta mascotas chicas?", "Sí", 3),
+    ])
+    # Un tema viejo con demanda en la semana 8-14 días pero nada reciente (decaying)
+    db.leads.docs.extend([
+        _mk_lead(tenant, "+805", "E", "Tienen estacionamiento disponible?", "Sí", 10),
+        _mk_lead(tenant, "+806", "F", "Hay cochera en el edificio?", "Sí", 11),
+        _mk_lead(tenant, "+807", "G", "Cuentan con parking?", "Sí", 12),
+    ])
+    res = await discover_coaching_opportunities(db, tenant, days=30, min_cluster_size=2)
+    clusters = res["clusters"]
+    assert len(clusters) >= 2, res
+
+    # El cluster de mascotas debe estar marcado rising y estar PRIMERO
+    # (priority_score boost × 2).
+    rising = [c for c in clusters if c["trend"] == "rising"]
+    decaying = [c for c in clusters if c["trend"] == "decaying"]
+    assert len(rising) >= 1, f"esperaba al menos 1 cluster rising: {clusters}"
+    assert len(decaying) >= 1, f"esperaba al menos 1 cluster decaying: {clusters}"
+    assert clusters[0]["trend"] == "rising"
+    # recent_count >= 2 para los rising
+    assert rising[0]["recent_count"] >= 2
+    # priority_score presente y numérico
+    assert "priority_score" in clusters[0]
+
+
