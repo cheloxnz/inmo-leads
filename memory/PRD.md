@@ -33,6 +33,79 @@ Plataforma SaaS para automatización de inmobiliarias con bot de WhatsApp, IA y 
 ---
 
 
+### 2026-02-XX (Iter49 - Google Calendar OAuth per-tenant)
+**Feature**: cada inmobiliaria conecta su propio Google Calendar con 1 click.
+Cuando el bot confirma una cita vía WhatsApp, el evento se crea
+automáticamente en el calendario con invite al cliente. Admin del tenant
+puede desconectar en cualquier momento.
+
+**Backend** (`google_calendar_service.py` + `routers/calendar.py`):
+- OAuth flow completo (code flow con state CSRF-token one-shot, TTL 10 min):
+  - `GET /api/oauth/calendar/start` (admin-only): genera state en
+    `oauth_states` collection y devuelve `authorization_url`.
+  - `GET /api/oauth/calendar/callback` (público): consume state, intercambia
+    code→tokens, hace lookup de user email, persiste tokens en
+    `tenants.google_calendar = {access_token, refresh_token, expires_at,
+    connected_email, connected_at}`. Redirige a `/config?calendar=connected`
+    o `?calendar=error&reason=X`.
+  - Scopes: `calendar.events`, `calendar.readonly`, `userinfo.email`, `openid`.
+- `get_valid_credentials(tenant_id)` auto-refresca el access_token si expiró
+  (usa el refresh_token almacenado) y persiste el nuevo token.
+- CRUD events: `list_upcoming_events`, `create_event`, `delete_event`.
+- `POST /api/calendar/disconnect` (admin-only): unset `google_calendar` del tenant.
+- `GET /api/calendar/status`: `{configured, connected, connected_email, connected_at}`.
+
+**Integración bot flow** (`bot_flow.py`):
+- Método `_sync_appointment_to_gcal(lead)` invocado al confirmar cita
+  (`schedule_appointment`). Best-effort: try/except, no rompe el flujo si
+  Calendar falla. Si se crea el evento, guarda `lead.gcal_event_id`.
+- Nuevo campo `Lead.gcal_event_id: Optional[str]` (models.py).
+
+**Frontend** (`GoogleCalendarSection.js`):
+- Montado en `/config` debajo del dashboard de coaching.
+- Estado inicial: badge gris "No conectado" + botón azul Google
+  "Conectar Google Calendar" → redirect al URL de consent.
+- Conectado: badge verde con ícono + email de la cuenta + botones
+  "Refrescar"/"Desconectar" + lista de próximos 5 eventos (summary,
+  start/end formateados en es-AR, link a Google Calendar).
+- Manejo de retorno del callback: lee `?calendar=connected|error` en
+  query params → toast apropiado + limpieza del query string.
+- data-testids: `google-calendar-section`, `gcal-status-connected|disconnected`,
+  `gcal-connect-btn`, `gcal-connected-email`, `gcal-refresh-btn`,
+  `gcal-disconnect-btn`, `gcal-no-events`, `gcal-event-{id}`.
+
+**Credenciales** (`backend/.env`):
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` configuradas (proyecto Google
+  Cloud "InmoBot Web").
+- `GOOGLE_OAUTH_REDIRECT_URI=https://inmobot-preview.preview.emergentagent.com/api/oauth/calendar/callback`.
+  Para producción habrá que agregar `https://inmobot-ia.com/...` tanto en
+  Google Cloud Console como en esta var (después del deploy).
+
+**Tests**:
+- Testing agent creó `test_iter49_google_calendar.py` (10/10 PASS) que cubre
+  status, oauth start (auth + admin-only), callback missing_params/invalid_state/access_denied,
+  events sin conexión (400), disconnect idempotente.
+- Regresión iter45 embeddings: 19/19 PASS. Total acumulado: 29/29 backend.
+- Testing agent E2E: **100% backend + 100% frontend**.
+
+**Deps**: `google-auth==2.49.0`, `google-auth-oauthlib==1.2.4`,
+`google-api-python-client==2.188.0`.
+
+**Archivos**:
+- +`backend/google_calendar_service.py` (250 líneas)
+- +`backend/routers/calendar.py` (170 líneas)
+- ~`backend/server.py` (+3 líneas: registro del router)
+- ~`backend/bot_flow.py` (+50 líneas: _sync_appointment_to_gcal + self.db
+  en process_message)
+- ~`backend/models.py` (+1 campo: gcal_event_id)
+- +`frontend/src/components/GoogleCalendarSection.js` (280 líneas)
+- ~`frontend/src/pages/Configuration.js` (+2 líneas: import + mount)
+- ~`backend/.env` (+3 env vars)
+- +`backend/tests/test_iter49_google_calendar.py` (10 tests creados por
+  testing agent)
+
+
+
 ### 2026-02-XX (Iter48 - Rising/Decaying trend badges en coaching clusters)
 **Feature**: cada cluster del dashboard ahora expone **tendencia** (rising /
 stable / decaying) calculada como ratio entre preguntas recientes (últ. 7d)
