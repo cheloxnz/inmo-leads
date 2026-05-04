@@ -3,25 +3,17 @@ Embeddings Service
 ==================
 
 Convierte textos cortos (preguntas, mensajes) en vectores numéricos densos
-de 384 dimensiones usando un modelo multilingüe (Spanish-friendly) ejecutado
-localmente vía ONNX Runtime (fastembed). Permite búsqueda semántica por
-similitud coseno: detecta paráfrasis, sinónimos y preguntas reformuladas que
-los algoritmos lexicográficos (Jaccard) no atrapan.
+de 1536 dimensiones usando OpenAI `text-embedding-3-small`.
 
-Modelo: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-- 384 dims
-- ~225 MB (descarga única, on-demand al primer uso)
-- Soporta 50+ idiomas (incluido español, italiano, portugués)
-- ONNX runtime: CPU only, ~25ms por texto en hardware típico
+Por qué OpenAI y no un modelo local:
+- Cero overhead de RAM (en producción serverless con poca RAM, fastembed
+  causaba OOM en cold start).
+- Cero descarga al startup (~225 MB) → no más timeout 520 en Cloudflare.
+- Calidad superior: 1536 dims vs 384, mejor multilingual.
+- Costo: $0.02 por 1M tokens ≈ insignificante para nuestro volumen.
 
-Diseño:
-- Singleton lazy-loaded: el modelo NO se carga al import, sino al primer
-  embed_text(). Esto permite que la app arranque rápido aunque el modelo
-  no esté descargado todavía.
-- Encoding/cosine se delega a `asyncio.to_thread` para no bloquear el event
-  loop de FastAPI.
-- Si la inicialización falla (sin internet, disco lleno, etc.), `is_available()`
-  retorna False y el caller hace fallback al algoritmo Jaccard tradicional.
+Si la API falla (sin internet, key inválida, rate limit), `is_available()`
+retorna False y el caller hace fallback al algoritmo Jaccard tradicional.
 """
 import asyncio
 import logging
@@ -33,86 +25,88 @@ logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL_NAME = os.environ.get(
     "EMBEDDING_MODEL_NAME",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "text-embedding-3-small",
 )
-EMBEDDING_DIM = 384
+EMBEDDING_DIM = int(os.environ.get("EMBEDDING_DIM", "1536"))
 
-_model = None
-_model_load_attempted = False
-_model_load_error: Optional[str] = None
-_model_lock = asyncio.Lock()
+_client = None
+_client_load_error: Optional[str] = None
+_client_lock = asyncio.Lock()
 
 
-async def _ensure_model():
-    """Lazy-load del modelo en el primer uso. Idempotente, thread-safe."""
-    global _model, _model_load_attempted, _model_load_error
-    if _model is not None:
-        return _model
-    async with _model_lock:
-        if _model is not None:
-            return _model
-        if _model_load_attempted and _model_load_error:
-            return None  # Falló antes, no reintentar en cada call
-        _model_load_attempted = True
+async def _ensure_client():
+    """Lazy-init del cliente OpenAI. Idempotente."""
+    global _client, _client_load_error
+    if _client is not None:
+        return _client
+    if _client_load_error:
+        return None
+    async with _client_lock:
+        if _client is not None:
+            return _client
         try:
-            def _load():
-                from fastembed import TextEmbedding
-                return TextEmbedding(model_name=EMBEDDING_MODEL_NAME)
-            _model = await asyncio.to_thread(_load)
-            logger.info(f"[embeddings] modelo cargado: {EMBEDDING_MODEL_NAME}")
-            return _model
+            from openai import AsyncOpenAI
+            api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                _client_load_error = "OPENAI_API_KEY no configurada"
+                logger.warning(f"[embeddings] {_client_load_error}. Fallback a Jaccard.")
+                return None
+            _client = AsyncOpenAI(api_key=api_key)
+            logger.info(f"[embeddings] cliente OpenAI listo, modelo {EMBEDDING_MODEL_NAME}")
+            return _client
         except Exception as e:
-            _model_load_error = str(e)
-            logger.warning(f"[embeddings] no se pudo cargar modelo: {e}. Fallback a Jaccard.")
+            _client_load_error = str(e)
+            logger.warning(f"[embeddings] no se pudo inicializar OpenAI: {e}. Fallback a Jaccard.")
             return None
 
 
 def is_available() -> bool:
-    """Retorna True si el modelo se cargó correctamente alguna vez."""
-    return _model is not None
+    """Retorna True si el cliente está inicializado."""
+    return _client is not None
 
 
 async def embed_text(text: str) -> Optional[List[float]]:
-    """Devuelve un vector de 384 floats para `text`, o None si el modelo no
-    está disponible o el input es vacío."""
+    """Devuelve un vector de embeddings para `text`, o None si no se pudo."""
     if not text or not text.strip():
         return None
-    model = await _ensure_model()
-    if model is None:
+    client = await _ensure_client()
+    if client is None:
         return None
     try:
-        def _run():
-            # fastembed.embed() retorna un generator de np.ndarray
-            vecs = list(model.embed([text.strip()]))
-            return vecs[0].tolist() if vecs else None
-        return await asyncio.to_thread(_run)
+        resp = await client.embeddings.create(
+            model=EMBEDDING_MODEL_NAME,
+            input=text.strip(),
+        )
+        return resp.data[0].embedding
     except Exception as e:
         logger.warning(f"[embeddings] embed_text fallo: {e}")
         return None
 
 
 async def embed_batch(texts: List[str]) -> List[Optional[List[float]]]:
-    """Embed batch (más eficiente que llamar embed_text N veces).
+    """Embed batch en una sola llamada API.
 
     Devuelve una lista del mismo largo que `texts`. Posiciones con texto
-    vacío o errores devuelven None en esa posición.
+    vacío devuelven None. Si la API falla, todas devuelven None y el caller
+    cae al algoritmo Jaccard.
     """
     if not texts:
         return []
-    model = await _ensure_model()
-    if model is None:
+    client = await _ensure_client()
+    if client is None:
         return [None] * len(texts)
 
-    # Filtramos vacíos pero conservamos índices originales
     valid_idx = [i for i, t in enumerate(texts) if t and t.strip()]
     valid_texts = [texts[i].strip() for i in valid_idx]
     if not valid_texts:
         return [None] * len(texts)
 
     try:
-        def _run():
-            return [v.tolist() for v in model.embed(valid_texts)]
-        valid_vecs = await asyncio.to_thread(_run)
+        resp = await client.embeddings.create(
+            model=EMBEDDING_MODEL_NAME,
+            input=valid_texts,
+        )
+        valid_vecs = [d.embedding for d in resp.data]
     except Exception as e:
         logger.warning(f"[embeddings] embed_batch fallo: {e}")
         return [None] * len(texts)
@@ -124,8 +118,7 @@ async def embed_batch(texts: List[str]) -> List[Optional[List[float]]]:
 
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:
-    """Cosine similarity entre dos vectores. Devuelve 0.0 si alguno es vacío
-    o si las dimensiones no coinciden."""
+    """Cosine similarity entre dos vectores."""
     if not a or not b:
         return 0.0
     if len(a) != len(b):

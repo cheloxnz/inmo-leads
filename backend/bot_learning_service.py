@@ -134,7 +134,7 @@ async def find_learned_answer(
     tenant_id: str,
     user_message: str,
     threshold: float = 0.45,
-    embedding_threshold: float = 0.52,
+    embedding_threshold: float = 0.50,
 ) -> Optional[dict]:
     """Busca una respuesta aprendida para `user_message` en este tenant.
 

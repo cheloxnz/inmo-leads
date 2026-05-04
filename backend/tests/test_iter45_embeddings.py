@@ -13,8 +13,10 @@ import sys
 from datetime import datetime, timezone
 
 import pytest
+from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 import embeddings_service as es
 from bot_learning_service import (
@@ -30,7 +32,7 @@ async def test_embedding_service_loads_model():
     """El modelo se carga en el primer uso."""
     vec = await es.embed_text("hola mundo")
     assert vec is not None, "El modelo de embeddings no cargó"
-    assert len(vec) == es.EMBEDDING_DIM == 384
+    assert len(vec) == es.EMBEDDING_DIM
     assert es.is_available() is True
 
 
@@ -44,9 +46,9 @@ async def test_embedding_empty_input_returns_none():
 async def test_embed_batch_preserves_order_and_handles_empty():
     res = await es.embed_batch(["uno", "", "tres"])
     assert len(res) == 3
-    assert res[0] is not None and len(res[0]) == 384
+    assert res[0] is not None and len(res[0]) == es.EMBEDDING_DIM
     assert res[1] is None  # vacío
-    assert res[2] is not None and len(res[2]) == 384
+    assert res[2] is not None and len(res[2]) == es.EMBEDDING_DIM
 
 
 @pytest.mark.asyncio
@@ -204,7 +206,7 @@ async def test_save_learned_response_includes_embedding():
     assert "embedding" not in res
     saved = await db.learned_responses.find_one({"id": res["id"]})
     assert saved.get("embedding") is not None
-    assert len(saved["embedding"]) == 384
+    assert len(saved["embedding"]) == es.EMBEDDING_DIM
     assert saved.get("embedding_model")
 
 
@@ -265,7 +267,7 @@ async def test_backfill_embeddings():
     for doc_id in ["legacy1", "legacy2"]:
         d = await db.learned_responses.find_one({"id": doc_id})
         assert d.get("embedding") is not None
-        assert len(d["embedding"]) == 384
+        assert len(d["embedding"]) == es.EMBEDDING_DIM
 
     # Re-correr backfill: nada para procesar (idempotente)
     res2 = await backfill_embeddings(db, tenant_id="t4")
