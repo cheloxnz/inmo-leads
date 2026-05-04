@@ -598,3 +598,62 @@ async def seed_demo_data_endpoint(
         force=body.force,
     )
     return result
+
+
+
+class ResetUserPasswordBody(BaseModel):
+    email: str
+    new_password: str
+
+
+@router.post("/superadmin/users/reset-password")
+async def reset_user_password(
+    body: ResetUserPasswordBody,
+    current_user: User = Depends(get_current_user),
+):
+    """Resetea la contraseña de cualquier usuario (admin/asesor) por email.
+    Útil para reactivar la cuenta demo o recuperar acceso después de un deploy.
+
+    Body: {email, new_password}
+    """
+    _require_superadmin(current_user)
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password debe tener al menos 8 caracteres")
+
+    from auth import get_password_hash
+    db = _db
+    user_doc = await db.agents.find_one({"email": body.email}, {"_id": 0, "email": 1, "tenant_id": 1, "role": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail=f"Usuario no encontrado: {body.email}")
+
+    await db.agents.update_one(
+        {"email": body.email},
+        {"$set": {"password_hash": get_password_hash(body.new_password)}},
+    )
+    return {
+        "ok": True,
+        "email": body.email,
+        "tenant_id": user_doc.get("tenant_id"),
+        "role": user_doc.get("role"),
+    }
+
+
+@router.get("/superadmin/users")
+async def list_users(
+    tenant_id: str = "",
+    current_user: User = Depends(get_current_user),
+):
+    """Lista usuarios (asesores/admins) — útil para diagnosticar problemas de
+    login en producción.
+
+    Query: ?tenant_id=demo-inmobiliaria (opcional)
+    """
+    _require_superadmin(current_user)
+    db = _db
+    query = {}
+    if tenant_id:
+        query["tenant_id"] = tenant_id
+    users = await db.agents.find(
+        query, {"_id": 0, "password_hash": 0},
+    ).limit(200).to_list(200)
+    return {"count": len(users), "users": users}

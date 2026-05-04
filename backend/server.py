@@ -120,6 +120,19 @@ async def lifespan(_app):
         logger.warning(f"No se pudieron crear indices unique: {e}")
 
     await scheduler.start()
+
+    # Pre-warm del modelo de embeddings en background (no bloquea startup).
+    # Evita el timeout 520 de Cloudflare la primera vez que un user llama
+    # a /coaching-opportunities (la carga del modelo tarda ~3-5s la 1era vez).
+    async def _warmup_embeddings():
+        try:
+            import embeddings_service as _embed
+            await _embed.embed_text("warmup")
+            logger.info("[startup] modelo de embeddings pre-cargado OK")
+        except Exception as e:
+            logger.warning(f"[startup] embeddings warmup falló: {e}")
+
+    asyncio.create_task(_warmup_embeddings())
     yield
     # Shutdown
     logger.info("Deteniendo tareas programadas...")
