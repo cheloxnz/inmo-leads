@@ -386,11 +386,56 @@ class GenericFlowEngine:
         self._add_bot_message(lead, completion_msg)
 
     async def _handle_completed(self, lead, message_text, template, db):
-        """Lead que ya completó el flujo vuelve a escribir"""
+        """Lead que ya completó el flujo vuelve a escribir.
+        Procesa los botones 'nueva_consulta' / 'ver_info' o consultas libres."""
         labels = template.get("labels", {})
         agent_label = labels.get("agent", "asesor")
+        msg_id = (message_text or "").strip().lower()
 
-        response = f"Hola {lead.name or ''}! Un {agent_label} ya esta al tanto de tu consulta.\n\nHay algo mas en lo que pueda ayudarte?"
+        # Botón "Nueva consulta" → reset del flow
+        if msg_id == "nueva_consulta":
+            lead.flow_stage = "welcome"
+            lead.current_step_index = 0
+            await self._handle_welcome(lead, template, db)
+            return
+
+        # Botón "Info de contacto" → mandar FAQ con datos de la empresa
+        if msg_id == "ver_info":
+            faq = template.get("faq", {}) or {}
+            tenant = await db.tenants.find_one({"tenant_id": lead.tenant_id}, {"_id": 0}) if lead.tenant_id else None
+            bname = (tenant.get("business_name") if tenant else None) or "nuestro equipo"
+
+            lines = [f"📍 *Info de contacto - {bname}*", ""]
+            if faq.get("direccion"):
+                lines.append(f"📌 Dirección: {faq['direccion']}")
+            if faq.get("horarios"):
+                lines.append(f"🕐 Horarios: {faq['horarios']}")
+            if faq.get("telefono"):
+                lines.append(f"📞 Teléfono: {faq['telefono']}")
+            if faq.get("email"):
+                lines.append(f"✉️ Email: {faq['email']}")
+            if tenant and tenant.get("website"):
+                lines.append(f"🌐 Web: {tenant['website']}")
+            if len(lines) == 2:
+                lines.append("Pronto un asesor se contactará con vos. ¡Gracias!")
+
+            response = "\n".join(lines)
+            self.wa.send_text_message(lead.phone, response)
+            self._add_bot_message(lead, response)
+            return
+
+        # Texto libre / consulta nueva en estado completed → handoff con IA
+        if self.llm and self.llm.enabled:
+            ai_response = await self.llm.generate_smart_response(
+                message_text,
+                {"name": lead.name, "intent": lead.intent}
+            )
+            self.wa.send_text_message(lead.phone, ai_response)
+            self._add_bot_message(lead, ai_response)
+            return
+
+        # Fallback: reofrecer el menú
+        response = f"¡Hola {lead.name or ''}! 👋 Un {agent_label} ya está al tanto de tu consulta.\n\n¿Hay algo más en lo que pueda ayudarte?"
         buttons = [
             {"type": "reply", "reply": {"id": "nueva_consulta", "title": "Nueva consulta"}},
             {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}

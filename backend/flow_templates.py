@@ -365,22 +365,22 @@ TEMPLATES = {
         "id": "servicios",
         "name": "Servicios Generales",
         "description": "Bot generico para empresas de servicios: presupuestos, consultas, agendar",
-        "welcome_message": "Hola! Soy el asistente virtual de {business_name}. En que puedo ayudarte?",
+        "welcome_message": "👋 ¡Hola! Soy el asistente virtual de *{business_name}*. ¿En qué puedo ayudarte hoy? 😊",
         "welcome_buttons": [
-            {"id": "intent_presupuesto", "title": "Pedir presupuesto"},
-            {"id": "intent_consulta", "title": "Hacer consulta"},
-            {"id": "intent_agendar", "title": "Agendar reunion"}
+            {"id": "intent_presupuesto", "title": "💰 Presupuesto"},
+            {"id": "intent_consulta", "title": "💬 Consulta"},
+            {"id": "intent_agendar", "title": "📅 Agendar"}
         ],
         "intents": ["presupuesto", "consulta", "agendar", "reclamo"],
         "flow_steps": [
             {
                 "id": "intent",
-                "question": "En que podemos ayudarte?",
+                "question": "¿En qué podemos ayudarte? 🤔",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "intent_presupuesto", "title": "Pedir presupuesto"},
-                    {"id": "intent_consulta", "title": "Hacer consulta"},
-                    {"id": "intent_agendar", "title": "Agendar reunion"}
+                    {"id": "intent_presupuesto", "title": "💰 Presupuesto"},
+                    {"id": "intent_consulta", "title": "💬 Consulta"},
+                    {"id": "intent_agendar", "title": "📅 Agendar"}
                 ],
                 "field": "intent",
                 "use_ai": True,
@@ -388,13 +388,13 @@ TEMPLATES = {
             },
             {
                 "id": "name",
-                "question": "Como te llamas?",
+                "question": "¿Cómo te llamas? 😊",
                 "type": "text",
                 "field": "name"
             },
             {
                 "id": "service_type",
-                "question": "Que servicio te interesa?",
+                "question": "¿Qué servicio te interesa? 🛠️",
                 "type": "text",
                 "field": "custom_fields.service_type",
                 "use_ai": True,
@@ -402,16 +402,16 @@ TEMPLATES = {
             },
             {
                 "id": "description",
-                "question": "Contanos un poco mas sobre lo que necesitas",
+                "question": "Contanos un poco más sobre lo que necesitás 📝",
                 "type": "text",
                 "field": "custom_fields.description"
             },
             {
                 "id": "budget_range",
-                "question": "Tenes un presupuesto estimado?",
+                "question": "¿Tenés un presupuesto estimado? 💵",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "budget_bajo", "title": "Basico"},
+                    {"id": "budget_bajo", "title": "Básico"},
                     {"id": "budget_medio", "title": "Intermedio"},
                     {"id": "budget_alto", "title": "Premium"}
                 ],
@@ -420,10 +420,10 @@ TEMPLATES = {
             },
             {
                 "id": "urgency",
-                "question": "Para cuando lo necesitas?",
+                "question": "¿Para cuándo lo necesitás? ⏰",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "urg_urgente", "title": "Urgente"},
+                    {"id": "urg_urgente", "title": "🔥 Urgente"},
                     {"id": "urg_semana", "title": "Esta semana"},
                     {"id": "urg_mes", "title": "Este mes"},
                 ],
@@ -442,13 +442,13 @@ TEMPLATES = {
             "hot_threshold": 6,
             "warm_threshold": 3
         },
-        "appointment_message": "Queres que coordinemos una reunion o llamada?",
+        "appointment_message": "¿Querés que coordinemos una reunión o llamada? 📞",
         "appointment_buttons": [
-            {"id": "cita_reunion", "title": "Agendar reunion"},
-            {"id": "cita_llamada", "title": "Que me llamen"},
-            {"id": "cita_no", "title": "No por ahora"}
+            {"id": "cita_reunion", "title": "🤝 Agendar reunión"},
+            {"id": "cita_llamada", "title": "📞 Que me llamen"},
+            {"id": "cita_no", "title": "Por ahora no"}
         ],
-        "completion_message": "{name}, tu {appointment_type} quedo agendada para el {appointment_date}. Nos comunicaremos para confirmar. Gracias!",
+        "completion_message": "✅ ¡Genial {name}! Tu {appointment_type} quedó agendada para el *{appointment_date}*. Nos comunicaremos para confirmar. ¡Gracias! 🙌",
         "faq": {
             "direccion": "",
             "horarios": "Lun-Vie: 9:00 - 18:00",
