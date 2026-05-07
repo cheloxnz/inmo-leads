@@ -142,6 +142,36 @@ class WhatsAppService:
         }
         return self._send_request(payload)
 
+    def send_image_message(self, recipient_phone: str, image_url: str, caption: Optional[str] = None) -> Dict:
+        """Envia una imagen por URL (jpg/png/webp). Caption opcional."""
+        image_payload = {"link": image_url}
+        if caption:
+            image_payload["caption"] = caption
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient_phone,
+            "type": "image",
+            "image": image_payload,
+        }
+        return self._send_request(payload)
+
+    def send_document_message(self, recipient_phone: str, document_url: str, filename: Optional[str] = None, caption: Optional[str] = None) -> Dict:
+        """Envia un documento (PDF) por URL. filename y caption opcionales."""
+        doc_payload = {"link": document_url}
+        if filename:
+            doc_payload["filename"] = filename
+        if caption:
+            doc_payload["caption"] = caption
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient_phone,
+            "type": "document",
+            "document": doc_payload,
+        }
+        return self._send_request(payload)
+
     def _send_request(self, payload: Dict) -> Dict:
         if not self.access_token or not self.phone_number_id:
             logger.warning("WhatsApp no configurado: falta token o phone_number_id")

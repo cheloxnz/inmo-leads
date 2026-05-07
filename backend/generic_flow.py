@@ -126,6 +126,12 @@ class GenericFlowEngine:
         flow_stage = lead.flow_stage or "welcome"
         logger.info(f"[GenericFlow] {lead.phone} stage={flow_stage} msg='{message_text[:50]}'")
 
+        # Welcome buttons con archivo adjunto: si el cliente clickea un botón
+        # del welcome que tiene `media_url` configurado, enviamos el archivo
+        # ANTES de continuar con el flujo. No interrumpe el flujo normal:
+        # el flujo sigue procesando el button_id como un mensaje más.
+        await self._maybe_send_button_media(lead, message_text, template)
+
         # Catalog: detect product selection from buttons/list (id starts with prod_ or product_)
         catalog_handled = False
         msg_id_check = message_text.strip().lower()
@@ -181,6 +187,38 @@ class GenericFlowEngine:
         lead.current_step_index = 0
 
         self._add_bot_message(lead, msg)
+
+    async def _maybe_send_button_media(self, lead, message_text: str, template):
+        """Si el mensaje matchea el id de un welcome_button con media adjunta,
+        envia el archivo (imagen o documento) al cliente. No bloquea el flujo:
+        después de mandar el archivo, el flujo continua normalmente."""
+        msg_id = (message_text or "").strip()
+        if not msg_id:
+            return
+        welcome_buttons = template.get("welcome_buttons", []) or []
+        match = next(
+            (b for b in welcome_buttons if b.get("id") == msg_id and b.get("media_url")),
+            None,
+        )
+        if not match:
+            return
+
+        media_url = match.get("media_url")
+        media_type = (match.get("media_type") or "image").lower()
+        caption = match.get("media_caption") or match.get("title") or ""
+        filename = match.get("media_filename")
+
+        try:
+            if media_type == "document":
+                self.wa.send_document_message(
+                    lead.phone, media_url, filename=filename, caption=caption
+                )
+                self._add_bot_message(lead, f"📄 [Documento enviado: {caption or filename or 'archivo'}]")
+            else:
+                self.wa.send_image_message(lead.phone, media_url, caption=caption)
+                self._add_bot_message(lead, f"🖼️ [Imagen enviada: {caption or 'archivo'}]")
+        except Exception as e:
+            logger.warning(f"[generic_flow] No se pudo enviar media del boton {msg_id}: {e}")
 
     async def _process_flow_step(self, lead, message_text: str, template, db):
         """Procesa el paso actual del flujo"""

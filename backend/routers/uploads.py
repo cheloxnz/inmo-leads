@@ -19,6 +19,14 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/gif"}
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2 MB
 
+# Media para botones del bot (PDF + imágenes mas grandes)
+ALLOWED_MEDIA_TYPES = {
+    "image/jpeg", "image/png", "image/webp",
+    "application/pdf",
+}
+MAX_MEDIA_SIZE = 5 * 1024 * 1024  # 5 MB (limite de WhatsApp para documentos)
+(UPLOAD_DIR / "media").mkdir(exist_ok=True)
+
 
 @router.post("/uploads/logo")
 async def upload_logo(
@@ -97,5 +105,88 @@ async def serve_logo(filename: str):
         raise HTTPException(status_code=404, detail="No encontrado")
     # Verificar que el path resuelto sigue dentro del directorio
     if not str(path.resolve()).startswith(str((UPLOAD_DIR / "logos").resolve())):
+        raise HTTPException(status_code=400, detail="Path invalido")
+    return FileResponse(path)
+
+
+# ============================================================
+# Media uploads (imágenes / PDFs) para botones del bot
+# ============================================================
+
+EXT_MAP_MEDIA = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+}
+
+
+@router.post("/uploads/media")
+async def upload_media(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_admin),
+):
+    """Admin: sube un archivo (imagen o PDF) y devuelve la URL publica.
+    Usado para asociar archivos a botones del bot (menú, catálogo, presupuesto, etc.).
+    """
+    content_type = file.content_type or mimetypes.guess_type(file.filename or "")[0]
+    if content_type not in ALLOWED_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo no permitido: {content_type}. Permitidos: jpg, png, webp, pdf."
+        )
+
+    chunks = []
+    total = 0
+    chunk_size = 64 * 1024
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_MEDIA_SIZE:
+            raise HTTPException(status_code=413, detail="Archivo demasiado grande (max 5 MB)")
+        chunks.append(chunk)
+
+    if total == 0:
+        raise HTTPException(status_code=400, detail="Archivo vacio")
+
+    content = b"".join(chunks)
+    ext = EXT_MAP_MEDIA.get(content_type, ".bin")
+    filename = f"{current_user.tenant_id}_{uuid.uuid4().hex}{ext}"
+    path = UPLOAD_DIR / "media" / filename
+    with open(path, "wb") as f:
+        f.write(content)
+
+    scheme = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.url.hostname
+    if request.url.port and request.url.port not in (80, 443):
+        host = f"{host}:{request.url.port}"
+    public_url = f"{scheme}://{host}/api/uploads/media/{filename}"
+
+    media_kind = "document" if content_type == "application/pdf" else "image"
+
+    return {
+        "url": public_url,
+        "filename": filename,
+        "original_filename": file.filename or filename,
+        "size_bytes": total,
+        "content_type": content_type,
+        "media_type": media_kind,
+    }
+
+
+@router.get("/uploads/media/{filename}")
+async def serve_media(filename: str):
+    """Sirve un archivo de media. Validacion de path traversal."""
+    from fastapi.responses import FileResponse
+    import re
+    if not re.match(r"^[a-zA-Z0-9_\-]+\.(jpg|png|webp|pdf)$", filename):
+        raise HTTPException(status_code=400, detail="Filename invalido")
+    path = UPLOAD_DIR / "media" / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="No encontrado")
+    if not str(path.resolve()).startswith(str((UPLOAD_DIR / "media").resolve())):
         raise HTTPException(status_code=400, detail="Path invalido")
     return FileResponse(path)
