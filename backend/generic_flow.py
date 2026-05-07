@@ -78,10 +78,12 @@ class GenericFlowEngine:
                 template["labels"] = config["custom_labels"]
 
         # Replace {business_name} placeholder en TODOS los mensajes del template.
-        # Si el tenant no configuró business_name, usamos `name` o un default
-        # neutral para evitar que el cliente vea "{business_name}" literal.
+        # Prioridad: business_profiles.business_name > tenants.business_name > tenants.name > default.
+        # business_profiles es la fuente de verdad cuando el usuario completó /config.
+        profile = await db.business_profiles.find_one({"tenant_id": tenant_id}, {"_id": 0})
         bname = (
-            tenant.get("business_name")
+            (profile.get("business_name") if profile else None)
+            or tenant.get("business_name")
             or tenant.get("name")
             or "nuestro equipo"
         )
@@ -399,24 +401,42 @@ class GenericFlowEngine:
             await self._handle_welcome(lead, template, db)
             return
 
-        # Botón "Info de contacto" → mandar FAQ con datos de la empresa
+        # Botón "Info de contacto" → mandar info de la empresa (business_profile)
         if msg_id == "ver_info":
-            faq = template.get("faq", {}) or {}
             tenant = await db.tenants.find_one({"tenant_id": lead.tenant_id}, {"_id": 0}) if lead.tenant_id else None
-            bname = (tenant.get("business_name") if tenant else None) or "nuestro equipo"
+            profile = await db.business_profiles.find_one({"tenant_id": lead.tenant_id}, {"_id": 0}) if lead.tenant_id else None
+            faq = template.get("faq", {}) or {}
+
+            bname = (
+                (profile.get("business_name") if profile else None)
+                or (tenant.get("business_name") if tenant else None)
+                or "nuestro equipo"
+            )
+            address = (profile.get("address") if profile else None) or faq.get("direccion", "")
+            city = (profile.get("city") if profile else None) or ""
+            full_address = f"{address}, {city}" if address and city else (address or city)
+
+            phone = (profile.get("phone") if profile else None) or faq.get("telefono", "")
+            email = (profile.get("email") if profile else None) or faq.get("email", "")
+            website = (profile.get("website") if profile else None) or ""
+            hours = (profile.get("business_hours") if profile else None) or faq.get("horarios", "")
+            description = (profile.get("business_description") if profile else None) or ""
 
             lines = [f"📍 *Info de contacto - {bname}*", ""]
-            if faq.get("direccion"):
-                lines.append(f"📌 Dirección: {faq['direccion']}")
-            if faq.get("horarios"):
-                lines.append(f"🕐 Horarios: {faq['horarios']}")
-            if faq.get("telefono"):
-                lines.append(f"📞 Teléfono: {faq['telefono']}")
-            if faq.get("email"):
-                lines.append(f"✉️ Email: {faq['email']}")
-            if tenant and tenant.get("website"):
-                lines.append(f"🌐 Web: {tenant['website']}")
-            if len(lines) == 2:
+            if description:
+                lines.append(f"_{description}_")
+                lines.append("")
+            if full_address:
+                lines.append(f"📌 {full_address}")
+            if hours:
+                lines.append(f"🕐 {hours}")
+            if phone:
+                lines.append(f"📞 {phone}")
+            if email:
+                lines.append(f"✉️ {email}")
+            if website:
+                lines.append(f"🌐 {website}")
+            if len(lines) <= 2:
                 lines.append("Pronto un asesor se contactará con vos. ¡Gracias!")
 
             response = "\n".join(lines)
