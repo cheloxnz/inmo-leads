@@ -389,20 +389,41 @@ class GenericFlowEngine:
 
     async def _handle_completed(self, lead, message_text, template, db):
         """Lead que ya completó el flujo vuelve a escribir.
-        Procesa los botones 'nueva_consulta' / 'ver_info' o consultas libres."""
+        Procesa los botones 'nueva_consulta' / 'ver_info', detecta intents por keyword,
+        y delega a IA en último caso."""
         labels = template.get("labels", {})
         agent_label = labels.get("agent", "asesor")
-        msg_id = (message_text or "").strip().lower()
+        msg_raw = (message_text or "").strip()
+        msg_id = msg_raw.lower()
 
-        # Botón "Nueva consulta" → reset del flow
-        if msg_id == "nueva_consulta":
+        # Helper: detección de keywords (intent post-cita)
+        CONTACT_KW = [
+            "info de contacto", "informacion de contacto", "información de contacto",
+            "info contacto", "datos de contacto", "datos del negocio",
+            "info del negocio", "donde estan", "donde están", "donde quedan",
+            "direccion", "dirección", "telefono", "teléfono",
+            "email", "mail", "correo", "sitio web", "pagina", "página",
+            "horario", "horarios", "atencion", "atención",
+            "como contactarlos", "cómo contactarlos"
+        ]
+        NEW_QUERY_KW = [
+            "otra consulta", "nueva consulta", "otra cosa", "otra pregunta",
+            "tengo otra", "consultar de nuevo", "preguntar otra cosa",
+            "hacer otra consulta", "necesito otra"
+        ]
+
+        def matches_any(kws):
+            return any(kw in msg_id for kw in kws)
+
+        # Botón "Nueva consulta" o keywords → reset del flow
+        if msg_id == "nueva_consulta" or matches_any(NEW_QUERY_KW):
             lead.flow_stage = "welcome"
             lead.current_step_index = 0
             await self._handle_welcome(lead, template, db)
             return
 
-        # Botón "Info de contacto" → mandar info de la empresa (business_profile)
-        if msg_id == "ver_info":
+        # Botón "Info de contacto" o keywords → mandar info del business_profile
+        if msg_id == "ver_info" or matches_any(CONTACT_KW):
             tenant = await db.tenants.find_one({"tenant_id": lead.tenant_id}, {"_id": 0}) if lead.tenant_id else None
             profile = await db.business_profiles.find_one({"tenant_id": lead.tenant_id}, {"_id": 0}) if lead.tenant_id else None
             faq = template.get("faq", {}) or {}
