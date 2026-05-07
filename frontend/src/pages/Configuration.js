@@ -17,6 +17,11 @@ import GoogleCalendarSection from '../components/GoogleCalendarSection';
 
 export default function Configuration() {
   const [config, setConfig] = useState(null);
+  const [welcomeButtons, setWelcomeButtons] = useState([
+    { id: 'opt_1', title: '' },
+    { id: 'opt_2', title: '' },
+    { id: 'opt_3', title: '' },
+  ]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
@@ -27,8 +32,15 @@ export default function Configuration() {
   
   const fetchConfig = async () => {
     try {
-      const response = await axios.get(`${API}/config`);
-      setConfig(response.data);
+      const [cfgRes, flowRes] = await Promise.all([
+        axios.get(`${API}/config`),
+        axios.get(`${API}/flow/config`).catch(() => ({ data: { welcome_buttons: [] } })),
+      ]);
+      setConfig(cfgRes.data);
+      const btns = flowRes.data.welcome_buttons || [];
+      // Garantizamos siempre 3 slots de botones
+      const padded = [0, 1, 2].map(i => btns[i] || { id: `opt_${i + 1}`, title: '' });
+      setWelcomeButtons(padded);
     } catch (error) {
       console.error('Error fetching config:', error);
       toast.error('Error cargando configuración');
@@ -40,7 +52,18 @@ export default function Configuration() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.put(`${API}/config`, config);
+      // Filtramos botones vacíos antes de guardar (mínimo 1 visible)
+      const cleanButtons = welcomeButtons
+        .map((b, i) => ({ id: b.id || `opt_${i + 1}`, title: (b.title || '').trim() }))
+        .filter(b => b.title.length > 0);
+
+      await Promise.all([
+        axios.put(`${API}/config`, config),
+        axios.put(`${API}/flow/config`, {
+          welcome_message: config?.welcome_message || '',
+          welcome_buttons: cleanButtons,
+        }),
+      ]);
       toast.success('Configuración guardada exitosamente');
     } catch (error) {
       console.error('Error saving config:', error);
@@ -170,6 +193,33 @@ export default function Configuration() {
                 onChange={(e) => handleChange('welcome_message', e.target.value)}
                 data-testid="input-welcome-message"
               />
+            </div>
+
+            <div className="form-group" style={{ marginTop: 16 }}>
+              <label>Opciones que verá el cliente (botones)</label>
+              <p className="help-text" style={{ marginBottom: 8 }}>
+                Hasta 3 botones. Si dejás uno vacío, no se muestra. Máximo 20 caracteres por botón (recomendación: usá un emoji al inicio).
+              </p>
+              {welcomeButtons.map((btn, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ minWidth: 80, fontSize: 13, color: '#6b7280' }}>Opción {idx + 1}</span>
+                  <Input
+                    placeholder={
+                      idx === 0 ? 'ej: 💰 Presupuesto' :
+                      idx === 1 ? 'ej: 🍕 Ver menú' :
+                      'ej: 📅 Reservar mesa'
+                    }
+                    maxLength={20}
+                    value={btn.title}
+                    onChange={(e) => {
+                      const next = [...welcomeButtons];
+                      next[idx] = { ...next[idx], title: e.target.value };
+                      setWelcomeButtons(next);
+                    }}
+                    data-testid={`input-welcome-button-${idx + 1}`}
+                  />
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
