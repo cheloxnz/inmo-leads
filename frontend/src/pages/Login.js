@@ -31,12 +31,12 @@ export default function Login() {
       <div className="login-container">
         <div className="login-header">
           <img 
-            src="/logo-generic.svg" 
-            alt="InmoBot Logo" 
+            src="/logo192.png" 
+            alt="InmoBot AI Logo" 
             className="login-logo-img"
           />
-          <h1>InmoBot</h1>
-          <p>Bot de WhatsApp con IA para tu negocio</p>
+          <h1>InmoBot AI</h1>
+          <p>Asistente con IA por WhatsApp para tu negocio</p>
         </div>
 
         <Card className="login-card">
