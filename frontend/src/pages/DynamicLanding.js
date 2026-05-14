@@ -8,6 +8,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { getLandingTemplate } from '../data/landingTemplates';
+import PublicSaasSections from '../components/PublicSaasSections';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -96,8 +97,12 @@ export default function DynamicLanding() {
             <span>{businessName}</span>
           </div>
           <div className="immo-nav-links">
-            <a href="#servicios">Servicios</a>
-            <a href="#como-funciona">Cómo funciona</a>
+            {!tenantId && <a href="#tecnologias">Tecnología</a>}
+            {!tenantId && <a href="#casos">Casos</a>}
+            {!tenantId && <a href="#demo">Demo</a>}
+            {!tenantId && <a href="#faq">FAQ</a>}
+            {tenantId && <a href="#servicios">Servicios</a>}
+            {tenantId && <a href="#como-funciona">Cómo funciona</a>}
             <a href="#contacto">Contacto</a>
             {!tenantId && (
               <Button size="sm" variant="outline" onClick={() => navigate('/login')} data-testid="btn-login-nav">
@@ -201,6 +206,9 @@ export default function DynamicLanding() {
           ))}
         </div>
       </section>
+
+      {/* Secciones extra solo para landing pública (sin tenantId) */}
+      {!tenantId && <PublicSaasSections phone={phone} />}
 
       {/* CTA */}
       <section className="immo-cta" id="contacto">
