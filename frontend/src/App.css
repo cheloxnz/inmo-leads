@@ -9585,10 +9585,38 @@ body {
 
 /* CTA banner */
 .immo-landing--saas .immo-cta {
-  background: linear-gradient(135deg, rgba(255, 69, 0, 0.12), rgba(255, 69, 0, 0.02));
+  background: linear-gradient(135deg, rgba(255, 69, 0, 0.10), rgba(255, 69, 0, 0.02)) !important;
   border-top: 1px solid var(--saas-border);
   border-bottom: 1px solid var(--saas-border);
 }
+
+/* CTA button (Acceder al panel / Contactar por WhatsApp) — naranja para matchear */
+.immo-landing--saas .immo-cta-buttons button,
+.immo-landing--saas .immo-cta-buttons a[data-testid="btn-whatsapp-cta"],
+.immo-landing--saas [data-testid="btn-cta-login"] {
+  background: var(--saas-accent) !important;
+  color: #fff !important;
+  border: 1px solid var(--saas-accent) !important;
+  box-shadow: 0 8px 32px -8px rgba(255, 69, 0, 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.immo-landing--saas .immo-cta-buttons button:hover,
+.immo-landing--saas [data-testid="btn-cta-login"]:hover {
+  background: var(--saas-accent-soft) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px -8px rgba(255, 69, 0, 0.75);
+}
+
+/* Trust badges debajo del CTA: cambio el azul/celeste por blanco apagado */
+.immo-landing--saas .immo-trust { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-trust-item { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-trust-item svg { color: var(--saas-accent); }
+
+/* Footer brand icon: no usar el azul base, usar fg blanco apagado */
+.immo-landing--saas .immo-footer-brand { color: var(--saas-fg) !important; }
+.immo-landing--saas .immo-footer-brand svg { color: var(--saas-accent) !important; }
+.immo-landing--saas .immo-footer-copy { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-footer-copy strong { color: var(--saas-accent); }
 
 /* Footer */
 .immo-landing--saas .immo-footer {
