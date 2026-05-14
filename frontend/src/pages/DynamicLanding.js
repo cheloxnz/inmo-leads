@@ -82,7 +82,12 @@ export default function DynamicLanding() {
   };
 
   return (
-    <div className="immo-landing" style={customStyle} data-testid="dynamic-landing" data-template={t.template_id}>
+    <div
+      className={`immo-landing${!tenantId ? ' immo-landing--saas' : ''}`}
+      style={customStyle}
+      data-testid="dynamic-landing"
+      data-template={t.template_id}
+    >
       {/* Navbar */}
       <nav className="immo-nav">
         <div className="immo-nav-inner">

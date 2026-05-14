@@ -9425,3 +9425,182 @@ body {
   .changelog-page { padding: 40px 16px; }
   .changelog-item { padding: 18px; }
 }
+
+/* ============================================================ */
+/* Public SaaS Landing skin (immo-landing--saas)                */
+/* Negro profundo + acento naranja, estilo cinematográfico      */
+/* Aplica solo cuando NO hay tenantId (landing pública)         */
+/* ============================================================ */
+.immo-landing--saas {
+  --saas-bg: #0a0a0a;
+  --saas-bg-soft: #0f0f0f;
+  --saas-fg: #f5f5f5;
+  --saas-fg-muted: #a3a3a3;
+  --saas-accent: #ff4500;
+  --saas-accent-soft: #ff5e2a;
+  --saas-border: rgba(255, 69, 0, 0.18);
+  background: var(--saas-bg);
+  color: var(--saas-fg);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Halo radial sutil naranja en el fondo */
+.immo-landing--saas::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 85% 30%, rgba(255, 69, 0, 0.18), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 15% 75%, rgba(255, 69, 0, 0.08), transparent 65%);
+}
+
+.immo-landing--saas > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Nav */
+.immo-landing--saas .immo-nav {
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.immo-landing--saas .immo-nav-brand { color: var(--saas-fg); }
+.immo-landing--saas .immo-nav-links a { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-nav-links a:hover { color: var(--saas-accent); }
+
+/* Hero */
+.immo-landing--saas .immo-hero {
+  background: transparent;
+  padding-top: 9rem;
+}
+.immo-landing--saas .immo-hero-badge {
+  background: rgba(255, 69, 0, 0.12) !important;
+  color: var(--saas-accent) !important;
+  border: 1px solid var(--saas-border) !important;
+  backdrop-filter: blur(6px);
+}
+.immo-landing--saas .immo-hero h1 { color: var(--saas-fg); }
+.immo-landing--saas .immo-hero-tagline,
+.immo-landing--saas .immo-hero-sub { color: var(--saas-fg-muted); }
+
+/* Botones */
+.immo-landing--saas .immo-hero-buttons button,
+.immo-landing--saas .immo-hero-buttons [data-testid="btn-whatsapp-hero"],
+.immo-landing--saas .immo-hero-buttons [data-testid="btn-signup-hero"] {
+  background: var(--saas-accent);
+  color: #fff;
+  border: 1px solid var(--saas-accent);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 32px -8px rgba(255, 69, 0, 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.immo-landing--saas .immo-hero-buttons button:hover {
+  background: var(--saas-accent-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px -8px rgba(255, 69, 0, 0.75);
+}
+.immo-landing--saas .immo-hero-buttons button[variant="outline"],
+.immo-landing--saas .immo-hero-buttons .btn-outline,
+.immo-landing--saas [data-testid="btn-ver-servicios"],
+.immo-landing--saas [data-testid="btn-ver-catalogo"] {
+  background: transparent;
+  color: var(--saas-fg);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+.immo-landing--saas [data-testid="btn-ver-servicios"]:hover,
+.immo-landing--saas [data-testid="btn-ver-catalogo"]:hover {
+  border-color: var(--saas-accent);
+  color: var(--saas-accent);
+}
+
+/* Stats */
+.immo-landing--saas .immo-stats {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.immo-landing--saas .immo-stat {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.immo-landing--saas .immo-stat:hover {
+  border-color: var(--saas-border);
+  transform: translateY(-2px);
+}
+.immo-landing--saas .immo-stat svg { color: var(--saas-accent); }
+.immo-landing--saas .immo-stat-number { color: var(--saas-fg); }
+.immo-landing--saas .immo-stat-label { color: var(--saas-fg-muted); }
+
+/* Servicios / Features cards */
+.immo-landing--saas .immo-services,
+.immo-landing--saas .immo-how,
+.immo-landing--saas .immo-cta,
+.immo-landing--saas .immo-footer {
+  background: transparent;
+  color: var(--saas-fg);
+}
+.immo-landing--saas .immo-services h2,
+.immo-landing--saas .immo-how h2,
+.immo-landing--saas .immo-cta h2 { color: var(--saas-fg); }
+.immo-landing--saas .immo-section-sub,
+.immo-landing--saas .immo-how p,
+.immo-landing--saas .immo-cta p { color: var(--saas-fg-muted); }
+
+.immo-landing--saas .immo-service-card,
+.immo-landing--saas .immo-step,
+.immo-landing--saas .immo-how-step {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--saas-fg);
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.immo-landing--saas .immo-service-card:hover,
+.immo-landing--saas .immo-step:hover,
+.immo-landing--saas .immo-how-step:hover {
+  border-color: var(--saas-border);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px -16px rgba(255, 69, 0, 0.35);
+}
+.immo-landing--saas .immo-service-card h3,
+.immo-landing--saas .immo-step h3,
+.immo-landing--saas .immo-how-step h3 { color: var(--saas-fg); }
+.immo-landing--saas .immo-service-card p,
+.immo-landing--saas .immo-step p,
+.immo-landing--saas .immo-how-step p { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-service-icon,
+.immo-landing--saas .immo-how-step-number,
+.immo-landing--saas .immo-step-number {
+  background: rgba(255, 69, 0, 0.15);
+  color: var(--saas-accent);
+  border: 1px solid var(--saas-border);
+}
+
+/* CTA banner */
+.immo-landing--saas .immo-cta {
+  background: linear-gradient(135deg, rgba(255, 69, 0, 0.12), rgba(255, 69, 0, 0.02));
+  border-top: 1px solid var(--saas-border);
+  border-bottom: 1px solid var(--saas-border);
+}
+
+/* Footer */
+.immo-landing--saas .immo-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--saas-fg-muted);
+}
+.immo-landing--saas .immo-footer a { color: var(--saas-fg-muted); }
+.immo-landing--saas .immo-footer a:hover { color: var(--saas-accent); }
+
+/* Override CSS custom props del template para botones internos */
+.immo-landing--saas {
+  --immo-primary: #ff4500 !important;
+  --immo-accent: #ff5e2a !important;
+}
+
