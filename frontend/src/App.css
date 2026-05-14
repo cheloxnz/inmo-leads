@@ -9696,12 +9696,16 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: 1.25rem;
 }
+.saas-metrics-grid > .reveal { display: flex; height: 100%; }
 .saas-metric-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 1.75rem 1.5rem;
   text-align: left;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .saas-metric-card:hover {
@@ -9728,12 +9732,16 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
 }
+.saas-tech-grid > .reveal { display: flex; height: 100%; }
 .saas-tech-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 1.75rem;
   transition: border-color 0.25s ease, transform 0.25s ease;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .saas-tech-card:hover {
   border-color: rgba(255, 69, 0, 0.4);
@@ -9768,12 +9776,16 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
 }
+.saas-cases-grid > .reveal { display: flex; height: 100%; }
 .saas-case-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 1.75rem;
   transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .saas-case-card:hover {
   border-color: rgba(255, 69, 0, 0.4);
@@ -9801,6 +9813,7 @@ body {
   color: #a3a3a3;
   line-height: 1.55;
   margin: 0 0 1rem;
+  flex: 1;
 }
 .saas-case-card ul {
   list-style: none;
@@ -10012,12 +10025,16 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
 }
+.saas-testimonials-grid > .reveal { display: flex; height: 100%; }
 .saas-testimonial-card {
   background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 1.75rem;
   position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.25s ease, transform 0.25s ease;
 }
 .saas-testimonial-card:hover {
@@ -10034,6 +10051,7 @@ body {
   color: #d4d4d4;
   line-height: 1.55;
   margin: 0 0 1.25rem;
+  flex: 1;
 }
 .saas-testimonial-author {
   display: flex;

@@ -200,7 +200,7 @@ const UseCasesSection = () => (
    ────────────────────────────────────────────────────────────────────────── */
 const DEMO_MESSAGES = [
   { from: 'user', text: '¡Hola! Quiero pedir una pizza' },
-  { from: 'bot', text: '👋 ¡Hola! Soy el asistente virtual de Chevamaso. ¿Qué te gustaría hacer hoy?', buttons: ['🍕 Ver menú', '📦 Hacer pedido', '📅 Reservar mesa'] },
+  { from: 'bot', text: '👋 ¡Hola! Soy el asistente virtual de InmoBot. ¿Qué te gustaría hacer hoy?', buttons: ['🍕 Ver menú', '📦 Hacer pedido', '📅 Reservar mesa'] },
   { from: 'user', text: 'Ver menú' },
   { from: 'bot', text: '📄 Te paso nuestro menú actualizado:', attachment: 'menu.pdf' },
   { from: 'bot', text: '¿Querés que te ayude a armar un pedido? 🤖' },
@@ -233,7 +233,7 @@ const DemoSection = () => (
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="saas-demo-name">Chevamaso</div>
+              <div className="saas-demo-name">InmoBot</div>
               <div className="saas-demo-status">en línea</div>
             </div>
           </div>
