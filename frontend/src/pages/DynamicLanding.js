@@ -118,7 +118,7 @@ export default function DynamicLanding() {
         <div className="immo-hero-content">
           <div className="immo-hero-badge">
             <Sparkles className="w-4 h-4" />
-            Atención con Inteligencia Artificial 24/7
+            {tenantId ? 'Atención con Inteligencia Artificial 24/7' : '7 días gratis · Sin tarjeta · Cancelás cuando quieras'}
           </div>
           <h1 data-testid="hero-title">{tpl.hero_title_text}</h1>
           {t.business_tagline && <p className="immo-hero-tagline">{t.business_tagline}</p>}
@@ -132,6 +132,11 @@ export default function DynamicLanding() {
                 </a>
               </Button>
             )}
+            {!tenantId && (
+              <Button size="lg" onClick={() => navigate('/signup')} data-testid="btn-signup-hero">
+                Probalo gratis 7 días <Sparkles className="w-4 h-4 ml-2" />
+              </Button>
+            )}
             {tenantId && tenantData.products?.length > 0 && (
               <Button size="lg" variant="outline" onClick={() => navigate(`/p/catalogo/${tenantId}`)} data-testid="btn-ver-catalogo">
                 Ver {tpl.catalog_title}
@@ -139,15 +144,10 @@ export default function DynamicLanding() {
               </Button>
             )}
             {!tenantId && (
-              <Button size="lg" variant="outline" onClick={() => navigate('/signup')} data-testid="btn-signup-hero">
-                Crear mi bot gratis <Sparkles className="w-4 h-4 ml-2" />
-              </Button>
-            )}
-            {!tenantId && (
-              <Button size="lg" variant="ghost" onClick={() => {
-                document.getElementById('servicios')?.scrollIntoView({ behavior: 'smooth' });
+              <Button size="lg" variant="outline" onClick={() => {
+                document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
               }} data-testid="btn-ver-servicios">
-                Ver Servicios <ArrowRight className="w-4 h-4 ml-2" />
+                Ver demo <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             )}
           </div>
@@ -214,7 +214,11 @@ export default function DynamicLanding() {
       <section className="immo-cta" id="contacto">
         <div className="immo-cta-content">
           <h2>{tenantId ? 'Empezá ahora' : 'Empezá hoy con InmoBot'}</h2>
-          <p>{phone ? 'Escribinos por WhatsApp y te respondemos al instante.' : 'Configurá tu bot y empezá a vender por WhatsApp con IA.'}</p>
+          <p>
+            {phone
+              ? 'Escribinos por WhatsApp y te respondemos al instante.'
+              : 'Probalo gratis 7 días, sin tarjeta de crédito. Si te sirve, te suscribís. Si no, no perdés nada.'}
+          </p>
           <div className="immo-cta-buttons">
             {phone ? (
               <Button size="lg" asChild data-testid="btn-whatsapp-cta">
@@ -224,9 +228,14 @@ export default function DynamicLanding() {
                 </a>
               </Button>
             ) : (
-              <Button size="lg" onClick={() => navigate('/login')} data-testid="btn-cta-login">
-                Acceder al panel
-              </Button>
+              <>
+                <Button size="lg" onClick={() => navigate('/signup')} data-testid="btn-cta-trial">
+                  Crear mi bot gratis <Sparkles className="w-4 h-4 ml-2" />
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => navigate('/login')} data-testid="btn-cta-login">
+                  Ya tengo cuenta
+                </Button>
+              </>
             )}
           </div>
           <div className="immo-trust">
