@@ -9491,16 +9491,17 @@ body {
 .immo-landing--saas .immo-hero-buttons button,
 .immo-landing--saas .immo-hero-buttons [data-testid="btn-whatsapp-hero"],
 .immo-landing--saas .immo-hero-buttons [data-testid="btn-signup-hero"] {
-  background: var(--saas-accent);
-  color: #fff;
-  border: 1px solid var(--saas-accent);
+  background: var(--saas-accent) !important;
+  color: #fff !important;
+  border: 1px solid var(--saas-accent) !important;
   font-weight: 600;
   letter-spacing: 0.01em;
   box-shadow: 0 8px 32px -8px rgba(255, 69, 0, 0.55);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 .immo-landing--saas .immo-hero-buttons button:hover {
-  background: var(--saas-accent-soft);
+  background: var(--saas-accent-soft) !important;
+  color: #fff !important;
   transform: translateY(-1px);
   box-shadow: 0 12px 40px -8px rgba(255, 69, 0, 0.75);
 }
@@ -9508,10 +9509,10 @@ body {
 .immo-landing--saas .immo-hero-buttons .btn-outline,
 .immo-landing--saas [data-testid="btn-ver-servicios"],
 .immo-landing--saas [data-testid="btn-ver-catalogo"] {
-  background: transparent;
-  color: var(--saas-fg);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: none;
+  background: transparent !important;
+  color: var(--saas-fg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: none !important;
 }
 .immo-landing--saas [data-testid="btn-ver-servicios"]:hover,
 .immo-landing--saas [data-testid="btn-ver-catalogo"]:hover {
@@ -9578,9 +9579,19 @@ body {
 .immo-landing--saas .immo-service-icon,
 .immo-landing--saas .immo-how-step-number,
 .immo-landing--saas .immo-step-number {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
   background: rgba(255, 69, 0, 0.15);
   color: var(--saas-accent);
   border: 1px solid var(--saas-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 auto 1rem;
 }
 
 /* CTA banner */
@@ -9590,21 +9601,74 @@ body {
   border-bottom: 1px solid var(--saas-border);
 }
 
-/* CTA button (Acceder al panel / Contactar por WhatsApp) — naranja para matchear */
-.immo-landing--saas .immo-cta-buttons button,
-.immo-landing--saas .immo-cta-buttons a[data-testid="btn-whatsapp-cta"],
-.immo-landing--saas [data-testid="btn-cta-login"] {
+/* CTA buttons container: gap entre los 2 botones */
+.immo-landing--saas .immo-cta-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* Hero buttons: gap consistente */
+.immo-landing--saas .immo-hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+/* CTA primario naranja (Crear mi bot gratis / Contactar por WhatsApp) */
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-cta-trial"],
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-whatsapp-cta"],
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-cta-login"]:not([variant="outline"]) {
   background: var(--saas-accent) !important;
   color: #fff !important;
   border: 1px solid var(--saas-accent) !important;
   box-shadow: 0 8px 32px -8px rgba(255, 69, 0, 0.55);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
-.immo-landing--saas .immo-cta-buttons button:hover,
-.immo-landing--saas [data-testid="btn-cta-login"]:hover {
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-cta-trial"]:hover,
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-whatsapp-cta"]:hover {
   background: var(--saas-accent-soft) !important;
+  color: #fff !important;
   transform: translateY(-1px);
   box-shadow: 0 12px 40px -8px rgba(255, 69, 0, 0.75);
+}
+
+/* "Ya tengo cuenta" → outline naranja con hover suave */
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-cta-login"] {
+  background: transparent !important;
+  color: var(--saas-fg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: none !important;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.immo-landing--saas .immo-cta-buttons [data-testid="btn-cta-login"]:hover {
+  background: transparent !important;
+  border-color: var(--saas-accent) !important;
+  color: var(--saas-accent) !important;
+}
+
+/* Hero "Probalo gratis 7 días" — override hover azul de Tailwind */
+.immo-landing--saas [data-testid="btn-signup-hero"] {
+  background: var(--saas-accent) !important;
+  color: #fff !important;
+  border: 1px solid var(--saas-accent) !important;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.immo-landing--saas [data-testid="btn-signup-hero"]:hover {
+  background: var(--saas-accent-soft) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px -8px rgba(255, 69, 0, 0.75);
+}
+
+/* Hero "Ver demo" outline → mantener outline naranja en hover, no azul */
+.immo-landing--saas [data-testid="btn-ver-servicios"]:hover {
+  background: transparent !important;
+  border-color: var(--saas-accent) !important;
+  color: var(--saas-accent) !important;
 }
 
 /* Trust badges debajo del CTA: cambio el azul/celeste por blanco apagado */
