@@ -497,5 +497,64 @@ async def update_business_profile(
     }
 
     profile = await upsert_business_profile(_db, current_user.tenant_id, data)
+
+    # Auto-mapping industry → template_id: si el admin actualiza el rubro,
+    # cambiamos automáticamente el flujo del bot al template más apropiado.
+    # Soporta español/inglés/snake_case porque la UI puede mandar cualquiera.
+    if "industry" in incoming_keys and data.get("industry"):
+        industry_raw = str(data["industry"]).strip().lower()
+        # Normalizamos: minúsculas, sin acentos, sin espacios
+        normalized = (
+            industry_raw
+            .replace(" ", "_")
+            .replace("á", "a").replace("é", "e").replace("í", "i")
+            .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
+        )
+
+        INDUSTRY_TO_TEMPLATE = {
+            # Real estate / inmobiliaria
+            "inmobiliaria": "inmobiliaria",
+            "real_state": "inmobiliaria",
+            "real_estate": "inmobiliaria",
+            "bienes_raices": "inmobiliaria",
+            # Salud / clinica
+            "clinica": "clinica",
+            "salud": "clinica",
+            "consultorio": "clinica",
+            "medico": "clinica",
+            "dentista": "clinica",
+            "estetica": "clinica",
+            # Restaurant / food
+            "restaurante": "restaurante",
+            "restaurant": "restaurante",
+            "gastronomia": "restaurante",
+            "pizzeria": "restaurante",
+            "cafe": "restaurante",
+            "delivery": "restaurante",
+            # E-commerce / retail
+            "ecommerce": "ecommerce",
+            "e-commerce": "ecommerce",
+            "tienda": "ecommerce",
+            "retail": "ecommerce",
+            "shop": "ecommerce",
+            # Otros: usar el genérico de servicios
+        }
+        suggested_template = INDUSTRY_TO_TEMPLATE.get(normalized, "servicios")
+
+        # Solo overrideamos si cambió el rubro y no hay flow_steps custom.
+        # Si el admin armó flow_steps manualmente desde el FlowBuilder, no pisamos.
+        cfg = await _db.bot_config.find_one(
+            {"tenant_id": current_user.tenant_id},
+            {"_id": 0, "custom_flow_steps": 1},
+        ) or {}
+        has_custom_flow = bool(cfg.get("custom_flow_steps"))
+
+        if not has_custom_flow:
+            await _db.tenants.update_one(
+                {"tenant_id": current_user.tenant_id},
+                {"$set": {"template_id": suggested_template}},
+            )
+            profile["template_applied"] = suggested_template
+
     profile["exists"] = True
     return profile
