@@ -59,6 +59,57 @@ const FieldTextarea = React.memo(function FieldTextarea({
   );
 });
 
+// Rubros soportados. La key se manda al backend exactamente así.
+// El mapeo industry → flow del bot vive en /app/backend/routers/config.py
+// (función update_business_profile).
+const INDUSTRY_OPTIONS = [
+  { value: '', label: 'Seleccioná tu rubro…', flow: '—' },
+  { value: 'inmobiliaria', label: '🏠 Inmobiliaria / Bienes raíces', flow: 'Comprar / Alquilar / Vender + zona y presupuesto' },
+  { value: 'clinica', label: '🏥 Salud / Clínica / Consultorio', flow: 'Turnos, especialidades, derivación' },
+  { value: 'restaurante', label: '🍕 Gastronomía / Restaurante / Delivery', flow: 'Menú, pedidos, reservas' },
+  { value: 'ecommerce', label: '🛒 E-commerce / Tienda / Retail', flow: 'Catálogo, pedido, tracking' },
+  { value: 'servicios', label: '💼 Servicios generales / Otro rubro', flow: 'Presupuesto, consulta, agendar' },
+];
+
+const FieldSelect = React.memo(function FieldSelect({
+  field, label, value, onChange, options, helpText,
+}) {
+  const selected = options.find(o => o.value === value);
+  return (
+    <div style={{ gridColumn: '1 / -1' }}>
+      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block' }}>
+        {label}
+      </label>
+      <select
+        value={value || ''}
+        onChange={e => onChange(field, e.target.value)}
+        data-testid={`bp-${field}`}
+        style={{
+          width: '100%',
+          padding: '8px 12px',
+          fontSize: 14,
+          border: '1px solid #d1d5db',
+          borderRadius: 6,
+          background: '#fff',
+          cursor: 'pointer',
+        }}
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      {selected && selected.value && (
+        <p style={{ fontSize: 12, color: '#059669', marginTop: 6 }}>
+          ✨ El bot se adaptará automáticamente con el flujo de: <strong>{selected.flow}</strong>
+        </p>
+      )}
+      {helpText && !selected?.value && (
+        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>{helpText}</p>
+      )}
+    </div>
+  );
+});
+
 const SwitchRow = React.memo(function SwitchRow({ field, label, checked, onChange }) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '6px 0', fontSize: 13 }}>
@@ -176,7 +227,14 @@ export default function BusinessProfileSection() {
         <SectionHeader>Identidad</SectionHeader>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 20 }}>
           <FieldInput field="business_name" label="Nombre del negocio" placeholder="Inmobiliaria López" value={data.business_name} onChange={handleChange} />
-          <FieldInput field="industry" label="Rubro / Industria" placeholder="Inmobiliaria, panadería, clínica..." value={data.industry} onChange={handleChange} />
+          <FieldSelect
+            field="industry"
+            label="Rubro / Industria"
+            value={data.industry}
+            onChange={handleChange}
+            options={INDUSTRY_OPTIONS}
+            helpText="Elegí el rubro de tu negocio. El bot se adaptará automáticamente con el flujo correcto."
+          />
           <FieldTextarea field="business_description" label="Descripción corta" placeholder="Vendemos y alquilamos propiedades en CABA desde 1995" value={data.business_description} onChange={handleChange} full />
         </div>
 
