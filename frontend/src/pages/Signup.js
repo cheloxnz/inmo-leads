@@ -126,7 +126,19 @@ export default function Signup() {
       try { localStorage.removeItem(REF_STORAGE_KEY); } catch (e) { /* noop */ }
       setStep(3);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Error en el registro');
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail || '';
+      let msg = detail || 'Error en el registro';
+      if (status === 409) {
+        if (detail.toLowerCase().includes('email')) {
+          msg = `Ya existe una cuenta con el email "${data.email}". Probá con otro email o iniciá sesión.`;
+        } else if (detail.toLowerCase().includes('tenant')) {
+          msg = `Ya existe un negocio llamado "${data.business_name}". Cambialo (ej: agregale tu apellido o ciudad) y probá de nuevo.`;
+        } else {
+          msg = detail || 'Ya existe una cuenta o negocio con esos datos.';
+        }
+      }
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSubmitting(false);
     }

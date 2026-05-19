@@ -7093,6 +7093,31 @@ body {
   gap: 0.5rem;
   margin-top: 1rem;
 }
+
+/* Botones de signup: forzamos colores explícitos para que no caigan en
+   estados invisibles cuando el theme primary CSS variable no resuelve. */
+.sw-step1-btn,
+[data-testid="sw-submit"] {
+  background: linear-gradient(135deg, #ff4500, #ff6a2a) !important;
+  color: #ffffff !important;
+  border: 1px solid #ff4500 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 6px 24px -8px rgba(255, 69, 0, 0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.sw-step1-btn:hover,
+[data-testid="sw-submit"]:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff5e2a, #ff8050) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 32px -8px rgba(255, 69, 0, 0.7);
+}
+[data-testid="sw-submit"]:disabled {
+  background: #d4d4d4 !important;
+  border-color: #d4d4d4 !important;
+  color: #6b7280 !important;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 .sw-success {
   text-align: center;
   padding: 2.5rem 2rem;
