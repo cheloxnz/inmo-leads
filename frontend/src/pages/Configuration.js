@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import BillingSection from '../components/BillingSection';
-import ReferralProgramSection from '../components/ReferralProgramSection';
+import BillingSection from '../components/BillingSection';  // eslint-disable-line no-unused-vars
+import ReferralProgramSection from '../components/ReferralProgramSection';  // eslint-disable-line no-unused-vars
 import AIBotConfigAssistant from '../components/AIBotConfigAssistant';
 import BrandingPanel from '../components/BrandingPanel';
 import WhatsAppConfigSection from '../components/WhatsAppConfigSection';
@@ -431,13 +431,9 @@ export default function Configuration() {
         </Button>
       </div>
 
-      <BillingSection />
-
       <div style={{ marginTop: 24 }}>
         <BrandingPanel />
       </div>
-
-      <ReferralProgramSection />
     </div>
   );
 }
