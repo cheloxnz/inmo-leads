@@ -250,8 +250,15 @@ async def _run_whatsapp_check(tenant_id: str) -> dict:
         }
         code_ver = (data.get("code_verification_status") or "").upper()
         quality = (data.get("quality_rating") or "").upper()
+        name_status = (data.get("name_status") or "").upper()
 
-        if code_ver and code_ver != "VERIFIED":
+        # Si Meta nos devolvió quality_rating, el número está conectado y enviando
+        # mensajes. El campo code_verification_status puede quedar como EXPIRED en
+        # algunos casos (histórico de Meta) aunque el número esté operativo: lo
+        # tratamos como warning, no como error bloqueante.
+        is_operational = quality in {"GREEN", "YELLOW", "UNKNOWN"} and name_status in {"APPROVED", "AVAILABLE_WITHOUT_REVIEW", ""}
+
+        if code_ver and code_ver != "VERIFIED" and not is_operational:
             result = {
                 "ok": False,
                 "status": "unverified_number",
@@ -266,13 +273,17 @@ async def _run_whatsapp_check(tenant_id: str) -> dict:
                 "details": details,
             }
         else:
+            warning = ""
+            if code_ver and code_ver != "VERIFIED":
+                # Operativo pero con campo legacy de Meta: aviso suave sin bloquear
+                warning = f" ⚠️ Meta reporta code_verification_status={code_ver} (campo histórico, generalmente ignorable si el bot envía mensajes correctamente)."
             result = {
                 "ok": True,
                 "status": "connected",
                 "message": (
                     f"✅ Conectado a Meta. Número {data.get('display_phone_number') or '—'} "
                     f"({data.get('verified_name') or 'sin nombre verificado'}). "
-                    f"Quality: {quality or 'desconocida'}."
+                    f"Quality: {quality or 'desconocida'}.{warning}"
                 ),
                 "details": details,
             }
