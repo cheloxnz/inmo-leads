@@ -35,7 +35,7 @@ import MarketingEffectiveness from './pages/MarketingEffectiveness';
 import Changelog from './pages/Changelog';
 import UpdateBanner from './components/UpdateBanner';
 import OnboardingTour from './components/OnboardingTour';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package, BarChart2 } from 'lucide-react';
 import '@/App.css';
 
 // Usar variable de entorno si está definida, sino fallback al mismo origen
@@ -184,17 +184,6 @@ function Navigation() {
             </Link>
 
             <Link
-              to="/broadcast"
-              className={`nav-link ${isActive('/broadcast') ? 'active' : ''}`}
-              data-testid="nav-broadcast"
-              title="Mensajes Masivos"
-            >
-              <span className="icon">📢</span>
-              {!isCollapsed && <span>Broadcast</span>}
-            </Link>
-
-
-            <Link
               to="/catalogo"
               className={`nav-link ${isActive('/catalogo') && !isActive('/catalogo/analytics') ? 'active' : ''}`}
               data-testid="nav-catalog"
@@ -210,18 +199,8 @@ function Navigation() {
               data-testid="nav-widget-analytics"
               title="Analytics del Widget"
             >
-              <span className="icon">📊</span>
+              <span className="icon"><BarChart2 size={16} /></span>
               {!isCollapsed && <span>Widget Stats</span>}
-            </Link>
-
-            <Link
-              to="/landing/editor"
-              className={`nav-link ${isActive('/landing/editor') ? 'active' : ''}`}
-              data-testid="nav-landing-editor"
-              title="Editor de Landing"
-            >
-              <span className="icon">🎨</span>
-              {!isCollapsed && <span>Landing</span>}
             </Link>
 
             <Link
@@ -234,15 +213,17 @@ function Navigation() {
               {!isCollapsed && <span>Marketing</span>}
             </Link>
 
-            <Link
-              to="/auditoria"
-              className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
-              data-testid="nav-audit"
-              title="Historial de Auditoría"
-            >
-              <span className="icon">📜</span>
-              {!isCollapsed && <span>Auditoría</span>}
-            </Link>
+            {isSuperAdmin && (
+              <Link
+                to="/auditoria"
+                className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
+                data-testid="nav-audit"
+                title="Historial de Auditoría"
+              >
+                <span className="icon">📜</span>
+                {!isCollapsed && <span>Auditoría</span>}
+              </Link>
+            )}
           </>
         ) : (
           <>
@@ -278,25 +259,15 @@ function Navigation() {
           </>
         )}
 
-        <Link
-          to="/flow"
-          className={`nav-link ${isActive('/flow') ? 'active' : ''}`}
-          data-testid="nav-flow"
-          title="Flujo Bot"
-        >
-          <span className="icon">🔄</span>
-          {!isCollapsed && <span>Flujo Bot</span>}
-        </Link>
-
         {isAdmin && (
           <Link
             to="/flujo"
             className={`nav-link ${isActive('/flujo') ? 'active' : ''}`}
             data-testid="nav-flow-builder"
-            title="Editor de Flujo"
+            title="Bot"
           >
-            <span className="icon"><Settings size={16} /></span>
-            {!isCollapsed && <span>Editor de Flujo</span>}
+            <span className="icon">🔄</span>
+            {!isCollapsed && <span>Bot</span>}
           </Link>
         )}
 
