@@ -72,6 +72,8 @@ export default function UsagePanel() {
   const leads = usage.leads;
   const packs = usage.packs_available || {};
 
+  if (!ai || !leads) return null;
+
   const aiPercentage = ai.unlimited ? 0 : Math.min(ai.percentage, 100);
   const leadsPercentage = Math.min(leads.percentage, 100);
 
