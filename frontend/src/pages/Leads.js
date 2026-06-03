@@ -52,7 +52,7 @@ export default function Leads({ filterByAgent = null }) {
   const fetchAgents = async () => {
     try {
       const response = await axios.get(`${API}/agents`);
-      setAgents(response.data);
+      setAgents(Array.isArray(response.data) ? response.data : (response.data.agents || []));
     } catch (error) {
       console.error('Error fetching agents:', error);
     }

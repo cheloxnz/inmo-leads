@@ -84,7 +84,7 @@ export default function CatalogPage() {
   const fetchCategories = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/catalog/categories`);
-      setCategories(res.data);
+      setCategories(Array.isArray(res.data) ? res.data : (res.data.categories || []));
     } catch (err) {
       console.error('Error:', err);
     }

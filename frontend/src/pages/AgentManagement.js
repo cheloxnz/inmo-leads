@@ -94,7 +94,7 @@ export default function AgentManagement() {
           axios.get(`${API}/auth/agents`),
           axios.get(`${API}/metrics/all-agents`)
         ]);
-        setAgents(agentsRes.data);
+        setAgents(Array.isArray(agentsRes.data) ? agentsRes.data : (agentsRes.data.agents || []));
         setMetrics(metricsRes.data);
       } catch (error) {
         console.error('Error:', error);
@@ -138,7 +138,7 @@ export default function AgentManagement() {
       }
       setShowModal(false);
       const res = await axios.get(`${API}/auth/agents`);
-      setAgents(res.data);
+      setAgents(Array.isArray(res.data) ? res.data : (res.data.agents || []));
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error');
     } finally {
