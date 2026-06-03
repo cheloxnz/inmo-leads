@@ -321,6 +321,9 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.APPOINTMENT_OFFER:
             await self.handle_appointment_offer(lead, message_text)
         
+        elif lead.flow_stage == FlowStage.SCHEDULE_DAY:
+            await self.handle_schedule_day(lead, message_text)
+
         elif lead.flow_stage == FlowStage.SELECT_DAY:
             await self.handle_select_day(lead, message_text)
         
@@ -595,6 +598,28 @@ class BotFlowManager:
         self.wa.send_text_message(lead.phone, response)
         lead.flow_stage = FlowStage.MUST_HAVE
     
+    async def handle_schedule_day(self, lead: Lead, message: str):
+        """Maneja selección de día para tasación (flujo vendedor)"""
+        message_lower = message.lower()
+        from datetime import date, timedelta
+        today = date.today()
+
+        if "hoy" in message_lower:
+            day_str = today.strftime("%d/%m/%Y")
+        elif "mañana" in message_lower or "manana" in message_lower:
+            day_str = (today + timedelta(days=1)).strftime("%d/%m/%Y")
+        else:
+            day_str = "esta semana"
+
+        response = f"Perfecto, ¿en qué horario te queda mejor para {day_str}?"
+        buttons = [
+            {"type": "reply", "reply": {"id": f"tasacion_manana_{day_str}", "title": "Manana (9-12hs)"}},
+            {"type": "reply", "reply": {"id": f"tasacion_tarde_{day_str}", "title": "Tarde (14-17hs)"}},
+            {"type": "reply", "reply": {"id": f"tasacion_noche_{day_str}", "title": "Noche (17-20hs)"}},
+        ]
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        lead.flow_stage = FlowStage.SELECT_TIME
+
     async def handle_must_have(self, lead: Lead, message: str):
         """Maneja requisitos obligatorios"""
         message_lower = message.lower()
