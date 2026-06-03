@@ -590,17 +590,36 @@ class BotFlowManager:
     
     async def handle_must_have(self, lead: Lead, message: str):
         """Maneja requisitos obligatorios"""
-        if "no" not in message.lower():
+        message_lower = message.lower()
+        if "no" not in message_lower:
             requirements = [r.strip() for r in message.split(",")]
             lead.must_have = requirements[:5]
-        
+
+        # Si el mensaje parece una pregunta (cines, negocios, servicios, etc.), responderla con GPT
+        question_keywords = ["hay ", "tienen", "existe", "cine", "comercio", "negocio", "supermercado",
+                             "transporte", "colegio", "escuela", "hospital", "parque", "plaza", "?"]
+        is_question = any(kw in message_lower for kw in question_keywords)
+
+        if is_question:
+            try:
+                gpt_response = await self.llm.generate_contextual_response(
+                    user_message=message,
+                    business_context="",
+                    lead_context={"zone": getattr(lead, "zone", None), "name": lead.name},
+                    history=lead.conversation_history,
+                    bot_tone="neutro",
+                )
+                self.wa.send_text_message(lead.phone, gpt_response)
+            except Exception as e:
+                logger.warning(f"GPT en must_have falló: {e}")
+
         response = "¿Qué tan urgente es tu búsqueda?"
         buttons = [
             {"type": "reply", "reply": {"id": "urgente", "title": "Urgente (semanas)"}},
             {"type": "reply", "reply": {"id": "mes", "title": "Próximo mes"}},
             {"type": "reply", "reply": {"id": "meses", "title": "Próximos meses"}}
         ]
-        
+
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.URGENCY
     
@@ -667,12 +686,12 @@ class BotFlowManager:
             emoji = "👍"
             message = f"Entiendo! {emoji} Te voy a mantener informado de nuevas opciones.\n\n"
         
-        message += "¿Te gustaría agendar una visita o llamada con un asesor?"
-        
+        message += "¿Qué querés hacer ahora?"
+
         buttons = [
-            {"type": "reply", "reply": {"id": "si_visita", "title": "Sí, visita"}},
-            {"type": "reply", "reply": {"id": "si_llamada", "title": "Sí, llamada"}},
-            {"type": "reply", "reply": {"id": "no_ahora", "title": "No ahora"}}
+            {"type": "reply", "reply": {"id": "si_visita", "title": "📅 Reservar visita"}},
+            {"type": "reply", "reply": {"id": "si_llamada", "title": "📞 Hablar con asesor"}},
+            {"type": "reply", "reply": {"id": "no_ahora", "title": "🕐 Más adelante"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, message, buttons)
@@ -874,9 +893,14 @@ class BotFlowManager:
         lead.appointment_datetime = appointment_date
         lead.notes = None  # Limpiar notes temporal
         
-        response = f"¡Perfecto! ✅\n\nTu {lead.appointment_type or 'cita'} quedó agendada para:\n{appointment_date.strftime('%d/%m/%Y a las %H:%M')}\n\nUn asesor se va a comunicar con vos para confirmar. ¡Gracias! 🙌"
-        
-        self.wa.send_text_message(lead.phone, response)
+        response = f"¡Perfecto! ✅\n\nTu {lead.appointment_type or 'cita'} quedó agendada para:\n{appointment_date.strftime('%d/%m/%Y a las %H:%M')}\n\nUn asesor se va a comunicar con vos para confirmar. ¿Qué más necesitás?"
+
+        buttons = [
+            {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "📅 Cambiar fecha/hora"}},
+            {"type": "reply", "reply": {"id": "opcion_cancelar", "title": "❌ Cancelar cita"}},
+            {"type": "reply", "reply": {"id": "opcion_consulta", "title": "💬 Tengo una consulta"}},
+        ]
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.COMPLETED
 
         # Sincronizar con Google Calendar si el tenant tiene la integración
