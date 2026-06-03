@@ -35,29 +35,19 @@ import MarketingEffectiveness from './pages/MarketingEffectiveness';
 import Changelog from './pages/Changelog';
 import UpdateBanner from './components/UpdateBanner';
 import OnboardingTour from './components/OnboardingTour';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package, BarChart2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Key, Building2, Settings, Package, BarChart2 } from 'lucide-react';
 import '@/App.css';
 
 // Usar variable de entorno si está definida, sino fallback al mismo origen
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 export const API = `${BACKEND_URL}/api`;
 
-// Hook para tema oscuro
+// Tema oscuro fijo — Automatik Media palette
 function useTheme() {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('theme') || 'light';
-  });
-
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  return { theme, toggleTheme };
+    document.documentElement.removeAttribute('data-theme');
+  }, []);
+  return {};
 }
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -81,7 +71,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
 function Navigation() {
   const location = useLocation();
   const { user, logout, isAdmin, isSuperAdmin, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  useTheme();
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true';
   });
@@ -285,14 +275,6 @@ function Navigation() {
       </div>
 
       <div className="nav-footer">
-        <button 
-          className="theme-toggle" 
-          onClick={toggleTheme}
-          data-testid="btn-theme-toggle"
-          title={theme === 'light' ? 'Activar modo oscuro' : 'Activar modo claro'}
-        >
-          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-        </button>
         {!isCollapsed && (
           <div className="user-info">
             <div className="user-avatar">
