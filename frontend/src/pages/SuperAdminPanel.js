@@ -27,7 +27,7 @@ export default function SuperAdminPanel() {
   const fetchTenants = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/auth/tenants`);
-      setTenants(res.data);
+      setTenants(Array.isArray(res.data) ? res.data : (res.data.tenants || []));
     } catch (err) {
       console.error('Error fetching tenants:', err);
     } finally {
