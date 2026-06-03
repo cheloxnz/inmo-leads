@@ -11,7 +11,11 @@ import {
 
 export default function UsagePanel() {
   const { isSuperAdmin } = useAuth();
-  const [usage, setUsage] = useState(null);
+  const [usage, setUsage] = useState({
+    ai_messages: { used: 0, limit: 0, percentage: 0, unlimited: false, extra_balance: 0, total_available: 0, overage: 0, overage_rate: 0, overage_cost: 0 },
+    leads: { used: 0, limit: 0, percentage: 0 },
+    packs_available: {}
+  });
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(null);
 
