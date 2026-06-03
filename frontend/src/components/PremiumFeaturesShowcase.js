@@ -25,7 +25,7 @@ export default function PremiumFeaturesShowcase() {
   }, []);
 
   if (loading || !data) return null;
-  const { active, available } = data;
+  const { active = [], available = [] } = data;
   if (active.length === 0 && available.length === 0) return null;
 
   return (
