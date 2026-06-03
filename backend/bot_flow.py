@@ -264,8 +264,10 @@ class BotFlowManager:
             logger.info(f"Detected reschedule intent for {lead.phone}")
             await self.handle_reschedule_request(lead, message_text)
         
-        # Detectar preguntas frecuentes
-        elif self.is_faq_question(message_text):
+        # Detectar preguntas frecuentes (solo si NO está en medio del flujo de calificación)
+        elif self.is_faq_question(message_text) and lead.flow_stage in (
+            FlowStage.COMPLETED, FlowStage.HANDOFF, FlowStage.CONFIRMATION, FlowStage.CONSULTING
+        ):
             await self.handle_faq(lead, message_text)
         
         # Lead completado o en handoff que vuelve a escribir
@@ -1315,6 +1317,14 @@ class BotFlowManager:
         now = datetime.utcnow()
         appointment_passed = lead.appointment_datetime < now
         
+        # Detectar despedidas / agradecimientos — no responder nada
+        farewell_keywords = ["gracias", "muchas gracias", "ok gracias", "genial", "perfecto",
+                             "excelente", "listo", "ok", "dale", "buenisimo", "buenísimo",
+                             "de nada", "hasta luego", "chau", "adios", "adiós", "bye"]
+        if any(kw in message_lower for kw in farewell_keywords):
+            logger.info(f"Farewell detected for completed lead {lead.phone}, no response sent")
+            return
+
         # Si seleccionó reagendar (desde botón o texto)
         if "opcion_reagendar" in message_lower or ("reagendar" in message_lower and "mejor" not in message_lower):
             await self.handle_reschedule_request(lead, message)
