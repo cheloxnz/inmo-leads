@@ -11,6 +11,11 @@ import re
 logger = logging.getLogger(__name__)
 
 
+def _enum_val(v):
+    """Devuelve el valor del enum si es enum, o el string directamente."""
+    return v.value if hasattr(v, "value") else v
+
+
 class ScoringEngine:
     """Wrapper simple de scoring para el flujo inmobiliaria."""
 
@@ -547,7 +552,7 @@ class BotFlowManager:
         
         # Flujo diferente para vendedores - van directo a agendar tasación
         if lead.intent == LeadIntent.VENDER:
-            response = f"Excelente, {lead.name}. Tenés un/a {lead.property_type.value} en {lead.zone}.\n\n"
+            response = f"Excelente, {lead.name}. Tenés un/a {_enum_val(lead.property_type)} en {lead.zone}.\n\n"
             response += "Para darte una valoración precisa, necesitamos agendar una visita de tasación gratuita.\n\n"
             response += "¿Qué día te viene mejor esta semana?"
             
@@ -676,10 +681,10 @@ class BotFlowManager:
         lead.status = ScoringEngine.classify_lead(lead.score)
         
         # Mensaje según clasificación
-        if lead.status.value == "hot":
+        if _enum_val(lead.status) == "hot":
             emoji = "🔥"
             message = f"Excelente! {emoji} Encontré varias opciones que se ajustan a lo que buscás.\n\n"
-        elif lead.status.value == "warm":
+        elif _enum_val(lead.status) == "warm":
             emoji = "🟡"
             message = f"Perfecto! {emoji} Tengo opciones interesantes para mostrarte.\n\n"
         else:
@@ -689,9 +694,9 @@ class BotFlowManager:
         message += "¿Qué querés hacer ahora?"
 
         buttons = [
-            {"type": "reply", "reply": {"id": "si_visita", "title": "📅 Reservar visita"}},
-            {"type": "reply", "reply": {"id": "si_llamada", "title": "📞 Hablar con asesor"}},
-            {"type": "reply", "reply": {"id": "no_ahora", "title": "🕐 Más adelante"}}
+            {"type": "reply", "reply": {"id": "si_visita", "title": "Reservar visita"}},
+            {"type": "reply", "reply": {"id": "si_llamada", "title": "Hablar con asesor"}},
+            {"type": "reply", "reply": {"id": "no_ahora", "title": "Mas adelante"}}
         ]
         
         self.wa.send_interactive_buttons(lead.phone, message, buttons)
@@ -896,9 +901,9 @@ class BotFlowManager:
         response = f"¡Perfecto! ✅\n\nTu {lead.appointment_type or 'cita'} quedó agendada para:\n{appointment_date.strftime('%d/%m/%Y a las %H:%M')}\n\nUn asesor se va a comunicar con vos para confirmar. ¿Qué más necesitás?"
 
         buttons = [
-            {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "📅 Cambiar fecha/hora"}},
-            {"type": "reply", "reply": {"id": "opcion_cancelar", "title": "❌ Cancelar cita"}},
-            {"type": "reply", "reply": {"id": "opcion_consulta", "title": "💬 Tengo una consulta"}},
+            {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "Cambiar fecha/hora"}},
+            {"type": "reply", "reply": {"id": "opcion_cancelar", "title": "Cancelar cita"}},
+            {"type": "reply", "reply": {"id": "opcion_consulta", "title": "Tengo una consulta"}},
         ]
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.COMPLETED
@@ -1497,7 +1502,7 @@ class BotFlowManager:
                             products=products,
                             lead_context={
                                 "name": lead.name,
-                                "intent": lead.intent.value if lead.intent else None,
+                                "intent": _enum_val(lead.intent) if lead.intent else None,
                             },
                         )
                         if catalog_response:
@@ -1511,11 +1516,11 @@ class BotFlowManager:
                 try:
                     lead_context = {
                         "name": lead.name,
-                        "intent": lead.intent.value if lead.intent else None,
+                        "intent": _enum_val(lead.intent) if lead.intent else None,
                         "zone": getattr(lead, "zone", None),
                         "budget_text": getattr(lead, "budget_text", None),
                         "property_type": (
-                            lead.property_type.value if hasattr(lead.property_type, "value") else lead.property_type
+                            _enum_val(lead.property_type)
                         ) if getattr(lead, "property_type", None) else None,
                     }
                     business_ctx = ""
@@ -1579,11 +1584,11 @@ class BotFlowManager:
         try:
             lead_context = {
                 "name": lead.name,
-                "intent": lead.intent.value if lead.intent else None,
+                "intent": _enum_val(lead.intent) if lead.intent else None,
                 "zone": getattr(lead, "zone", None),
                 "budget_text": getattr(lead, "budget_text", None),
                 "property_type": (
-                    lead.property_type.value if hasattr(lead.property_type, "value") else lead.property_type
+                    _enum_val(lead.property_type)
                 ) if getattr(lead, "property_type", None) else None,
             }
             business_ctx = ""
