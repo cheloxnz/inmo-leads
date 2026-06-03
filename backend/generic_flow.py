@@ -352,7 +352,7 @@ class GenericFlowEngine:
             for b in appt_buttons[:3]
         ]
 
-        score_msg = f"Gracias por toda la info! Tu consulta tiene prioridad {'alta' if status == 'hot' else 'media' if status == 'warm' else 'normal'}.\n\n"
+        score_msg = f"¡Gracias por toda la información! Tu consulta tiene prioridad {'alta' if status == 'hot' else 'media' if status == 'warm' else 'normal'}.\n\n"
         self.wa.send_interactive_buttons(lead.phone, score_msg + msg, buttons)
         self._add_bot_message(lead, score_msg + msg)
 
@@ -363,18 +363,18 @@ class GenericFlowEngine:
         msg_lower = message_text.lower()
 
         if "no" in msg_lower:
-            response = f"Entendido {lead.name or ''}! Cualquier cosa que necesites, escribinos. Gracias!"
+            response = f"¡Entendido{', ' + lead.name if lead.name else ''}! Ante cualquier consulta, escríbenos. ¡Gracias!"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = "completed"
             self._add_bot_message(lead, response)
         else:
             # Determine appointment type from button
             if "visita" in msg_lower or "turno" in msg_lower or "reserva" in msg_lower or "reunion" in msg_lower:
-                lead.appointment_type = "presencial"
+                lead.appointment_type = "visita"
             else:
                 lead.appointment_type = "llamada"
 
-            response = "Perfecto! Que dia te viene bien?\n\nPodes decirme:\n- 'Manana'\n- 'Jueves'\n- '15/03'\n- 'La semana que viene'"
+            response = "¡Perfecto! ¿Qué día te queda bien?\n\nPuedes decirme:\n- 'Mañana'\n- 'Jueves'\n- '15/03'\n- 'La próxima semana'"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = "select_day"
             self._add_bot_message(lead, response)
@@ -385,17 +385,17 @@ class GenericFlowEngine:
 
         if parsed_date:
             lead.appointment_datetime = parsed_date
-            response = "Y en que horario preferis?"
+            response = "¿En qué horario prefieres?"
             buttons = [
-                {"type": "reply", "reply": {"id": "hora_manana", "title": "Manana (9-12hs)"}},
-                {"type": "reply", "reply": {"id": "hora_tarde", "title": "Tarde (14-17hs)"}},
-                {"type": "reply", "reply": {"id": "hora_noche", "title": "Noche (17-20hs)"}}
+                {"type": "reply", "reply": {"id": "hora_manana", "title": "Mañana (9-12h)"}},
+                {"type": "reply", "reply": {"id": "hora_tarde", "title": "Tarde (14-17h)"}},
+                {"type": "reply", "reply": {"id": "hora_noche", "title": "Noche (17-20h)"}}
             ]
             self.wa.send_interactive_buttons(lead.phone, response, buttons)
             lead.flow_stage = "select_time"
             self._add_bot_message(lead, response)
         else:
-            response = "No entendi la fecha. Podes decirme algo como 'manana', 'jueves', o '15/03'?"
+            response = "No entendí la fecha. ¿Puedes decirme algo como 'mañana', 'jueves' o '15/03'?"
             self.wa.send_text_message(lead.phone, response)
             self._add_bot_message(lead, response)
 
@@ -514,7 +514,7 @@ class GenericFlowEngine:
             return
 
         # Fallback: reofrecer el menú
-        response = f"¡Hola {lead.name or ''}! 👋 Un {agent_label} ya está al tanto de tu consulta.\n\n¿Hay algo más en lo que pueda ayudarte?"
+        response = f"¡Hola{', ' + lead.name if lead.name else ''}! 👋 Un {agent_label} ya tiene tu consulta. ¿Hay algo más en lo que pueda ayudarte?"
         buttons = [
             {"type": "reply", "reply": {"id": "nueva_consulta", "title": "Nueva consulta"}},
             {"type": "reply", "reply": {"id": "ver_info", "title": "Info de contacto"}}
@@ -530,7 +530,7 @@ class GenericFlowEngine:
                 {"name": lead.name, "intent": lead.intent}
             )
         else:
-            response = "Gracias por tu consulta. Un asesor se comunicara contigo pronto para ayudarte."
+            response = "Gracias por tu consulta. Un asesor se comunicará contigo pronto para ayudarte."
 
         self.wa.send_text_message(lead.phone, response)
         self._add_bot_message(lead, response)
@@ -677,7 +677,7 @@ class GenericFlowEngine:
                     break
 
         if not selected:
-            self.wa.send_text_message(lead.phone, "No encontre ese producto. Escribi 'catalogo' para ver opciones.")
+            self.wa.send_text_message(lead.phone, "No encontré ese producto. Escribe 'catálogo' para ver las opciones disponibles.")
             return
 
         msg = catalog.build_single_product_message(selected)
@@ -690,7 +690,7 @@ class GenericFlowEngine:
             self.wa.send_text_message(lead.phone, msg + f"\n\n{selected['image_url']}", preview_url=True)
         else:
             self.wa.send_text_message(lead.phone, msg)
-        self.wa.send_interactive_buttons(lead.phone, "Te interesa este producto?", buttons)
+        self.wa.send_interactive_buttons(lead.phone, "¿Te interesa esta propiedad?", buttons)
         self._add_bot_message(lead, f"[Detalle producto: {selected['name']}]")
 
     def _add_bot_message(self, lead, text: str):

@@ -8,98 +8,98 @@ TEMPLATES = {
         "id": "inmobiliaria",
         "name": "Inmobiliaria",
         "description": "Bot para inmobiliarias: compra, alquiler, venta de propiedades",
-        "welcome_message": "Hola! Soy el asistente virtual de {business_name}. Estoy aca para ayudarte a encontrar tu propiedad ideal.",
+        "welcome_message": "👋 ¡Hola! Soy el asistente virtual de *{business_name}*. Estoy aquí para ayudarte a encontrar la propiedad ideal. ¿Qué estás buscando?",
         "welcome_buttons": [
-            {"id": "intent_comprar", "title": "Comprar"},
-            {"id": "intent_alquilar", "title": "Alquilar"},
-            {"id": "intent_vender", "title": "Vender"}
+            {"id": "intent_comprar", "title": "🏠 Comprar"},
+            {"id": "intent_alquilar", "title": "🔑 Alquilar"},
+            {"id": "intent_vender", "title": "💰 Vender"}
         ],
         "intents": ["comprar", "alquilar", "vender", "inversion"],
         "flow_steps": [
             {
                 "id": "intent",
-                "question": "Que te interesa?",
+                "question": "¿Qué te interesa?",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "intent_comprar", "title": "Comprar"},
-                    {"id": "intent_alquilar", "title": "Alquilar"},
-                    {"id": "intent_vender", "title": "Vender"}
+                    {"id": "intent_comprar", "title": "🏠 Comprar"},
+                    {"id": "intent_alquilar", "title": "🔑 Alquilar"},
+                    {"id": "intent_vender", "title": "💰 Vender"}
                 ],
                 "field": "intent",
                 "use_ai": True,
-                "ai_prompt": "Clasifica la intencion del usuario: comprar, alquilar, vender, inversion, sin_definir"
+                "ai_prompt": "Clasifica la intención del usuario: comprar, alquilar, vender, inversion, sin_definir"
             },
             {
                 "id": "name",
-                "question": "Como te llamas?",
+                "question": "¿Cuál es tu nombre?",
                 "type": "text",
                 "field": "name"
             },
             {
                 "id": "zone",
-                "question": "En que zona estas buscando?",
+                "question": "¿En qué zona o ciudad estás buscando?",
                 "type": "text",
                 "field": "custom_fields.zone",
                 "use_ai": True,
-                "ai_prompt": "Extrae la zona o barrio del mensaje del usuario"
+                "ai_prompt": "Extrae la zona, barrio o ciudad del mensaje del usuario"
             },
             {
                 "id": "budget",
-                "question": "Cual es tu presupuesto aproximado?",
+                "question": "¿Cuál es tu presupuesto aproximado?",
                 "type": "text",
                 "field": "custom_fields.budget",
                 "use_ai": True,
-                "ai_prompt": "Extrae y normaliza el presupuesto. Ej: '200 lucas' -> 'USD 200.000'",
+                "ai_prompt": "Extrae y normaliza el presupuesto mencionado por el usuario",
                 "skip_for_intents": ["vender"]
             },
             {
                 "id": "property_type",
-                "question": "Que tipo de propiedad buscas?",
+                "question": "¿Qué tipo de propiedad buscas?",
                 "type": "buttons",
                 "buttons": [
                     {"id": "tipo_depto", "title": "Departamento"},
                     {"id": "tipo_casa", "title": "Casa"},
-                    {"id": "tipo_ph", "title": "PH"}
+                    {"id": "tipo_ph", "title": "PH / Dúplex"}
                 ],
                 "field": "custom_fields.property_type"
             },
             {
                 "id": "bedrooms",
-                "question": "Cuantos ambientes necesitas?",
+                "question": "¿Cuántas habitaciones necesitas?",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "amb_1", "title": "1 ambiente"},
-                    {"id": "amb_2", "title": "2 ambientes"},
-                    {"id": "amb_3", "title": "3 o mas"}
+                    {"id": "amb_1", "title": "1 habitación"},
+                    {"id": "amb_2", "title": "2 habitaciones"},
+                    {"id": "amb_3", "title": "3 o más"}
                 ],
                 "field": "custom_fields.bedrooms",
                 "skip_for_intents": ["vender"]
             },
             {
                 "id": "must_have",
-                "question": "Hay algo que sea imprescindible? (balcon, cochera, pileta, etc.)",
+                "question": "¿Hay algo indispensable para ti? (estacionamiento, terraza, piscina, etc.)",
                 "type": "text",
                 "field": "custom_fields.must_have"
             },
             {
                 "id": "urgency",
-                "question": "Para cuando lo necesitas?",
+                "question": "¿Para cuándo lo necesitas?",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "urg_urgente", "title": "Urgente (semanas)"},
-                    {"id": "urg_mes", "title": "Proximo mes"},
-                    {"id": "urg_meses", "title": "Proximos meses"}
+                    {"id": "urg_urgente", "title": "🔥 Urgente"},
+                    {"id": "urg_mes", "title": "Próximo mes"},
+                    {"id": "urg_meses", "title": "En los próximos meses"}
                 ],
                 "field": "urgency"
             },
             {
                 "id": "financing",
-                "question": "Como pensas financiarlo?",
+                "question": "¿Cómo planeas financiarlo?",
                 "type": "buttons",
                 "buttons": [
-                    {"id": "fin_efectivo", "title": "Efectivo"},
-                    {"id": "fin_credito", "title": "Credito hipotecario"},
-                    {"id": "fin_nose", "title": "No se aun"}
+                    {"id": "fin_efectivo", "title": "Al contado"},
+                    {"id": "fin_credito", "title": "Crédito hipotecario"},
+                    {"id": "fin_nose", "title": "Aún no lo sé"}
                 ],
                 "field": "custom_fields.financing",
                 "skip_for_intents": ["alquilar", "vender"]
@@ -121,16 +121,16 @@ TEMPLATES = {
             "hot_threshold": 7,
             "warm_threshold": 4
         },
-        "appointment_message": "Queres agendar una visita o una llamada con un asesor?",
+        "appointment_message": "¿Te gustaría agendar una visita a la propiedad o una llamada con un asesor?",
         "appointment_buttons": [
-            {"id": "cita_visita", "title": "Agendar visita"},
-            {"id": "cita_llamada", "title": "Agendar llamada"},
-            {"id": "cita_no", "title": "No por ahora"}
+            {"id": "cita_visita", "title": "🏠 Agendar visita"},
+            {"id": "cita_llamada", "title": "📞 Agendar llamada"},
+            {"id": "cita_no", "title": "Por ahora no"}
         ],
-        "completion_message": "Excelente! {name}, tu {appointment_type} quedo agendada para el {appointment_date}. Un asesor se comunicara para confirmar. Gracias!",
+        "completion_message": "✅ ¡Excelente, {name}! Tu {appointment_type} quedó agendada para el {appointment_date}. Un asesor se comunicará contigo para confirmar. ¡Gracias!",
         "faq": {
-            "direccion": "Av. Corrientes 1234, Piso 5, CABA, Buenos Aires",
-            "horarios": "Lun-Vie: 9:00 - 18:00 | Sab: 10:00 - 14:00",
+            "direccion": "",
+            "horarios": "Lun-Vie: 9:00 - 18:00 | Sáb: 10:00 - 14:00",
             "telefono": "",
             "email": "",
             "web": ""
@@ -138,8 +138,8 @@ TEMPLATES = {
         "labels": {
             "lead": "Lead",
             "leads": "Leads",
-            "appointment": "Visita",
-            "agent": "Asesor"
+            "appointment": "visita",
+            "agent": "asesor"
         }
     },
 
