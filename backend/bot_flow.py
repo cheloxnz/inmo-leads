@@ -287,7 +287,12 @@ class BotFlowManager:
         # Estado de consulta con IA
         elif lead.flow_stage == FlowStage.CONSULTING:
             await self.handle_consulting(lead, message_text)
-        
+
+        # Lead descalificado por presupuesto - mantener en CONSULTING
+        elif lead.flow_stage == FlowStage.DISQUALIFIED:
+            response = "Entendido. Si en algún momento cambia tu situación o querés explorar otras opciones, escribinos y con gusto te asesoramos. 🙌"
+            self.wa.send_text_message(lead.phone, response)
+
         # Fallback: estado no reconocido - manejar opciones o reiniciar
         else:
             message_lower = message_text.lower()
@@ -439,14 +444,20 @@ class BotFlowManager:
             
             # Validar presupuesto mínimo según intención
             if budget and lead.intent == LeadIntent.COMPRAR:
-                # Extraer número del presupuesto para validar
+                # Extraer número del presupuesto para validar (soporta 60k, 60.000, 60000)
                 import re
-                numbers = re.findall(r'\d+', budget.replace('.', '').replace(',', ''))
-                if numbers:
-                    amount = int(numbers[0])
-                    
+                budget_lower = budget.lower()
+                amounts = []
+                # Buscar patrones con sufijo k (ej: 60k, 100k)
+                for m in re.finditer(r'(\d+(?:[.,]\d+)?)\s*k', budget_lower):
+                    amounts.append(float(m.group(1).replace(',', '.')) * 1000)
+                # Buscar números de 5+ dígitos (ej: 60000, 100000)
+                for m in re.finditer(r'\d{5,}', budget_lower.replace('.', '').replace(',', '')):
+                    amounts.append(float(m.group()))
+                amount = max(amounts) if amounts else 0
+
                     # Si es menor a 50,000 USD, descalificar educadamente
-                    if amount < 50000:
+                if amount > 0 and amount < 50000:
                         response = f"Gracias por tu interés, {lead.name}. "
                         response += f"Actualmente nuestras propiedades en venta tienen un valor desde USD 50.000. "
                         response += f"Con un presupuesto de {budget}, te recomendaría:\n\n"
