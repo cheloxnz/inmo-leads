@@ -35,9 +35,9 @@ export default function MetricsCharts() {
         axios.get(`${API}/metrics/conversion-funnel`)
       ]);
       
-      setLeadsByDay(byDay.data);
-      setLeadsByStatus(byStatus.data);
-      setLeadsByIntent(byIntent.data);
+      setLeadsByDay(Array.isArray(byDay.data) ? byDay.data : []);
+      setLeadsByStatus(Array.isArray(byStatus.data) ? byStatus.data : []);
+      setLeadsByIntent(Array.isArray(byIntent.data) ? byIntent.data : []);
       setFunnel(funnelData.data);
     } catch (error) {
       console.error('Error fetching metrics:', error);
