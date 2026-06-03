@@ -38,8 +38,8 @@ import OnboardingTour from './components/OnboardingTour';
 import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package } from 'lucide-react';
 import '@/App.css';
 
-// Siempre usar la URL actual del navegador (mismo dominio)
-const BACKEND_URL = window.location.origin;
+// Usar variable de entorno si está definida, sino fallback al mismo origen
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || window.location.origin;
 export const API = `${BACKEND_URL}/api`;
 
 // Hook para tema oscuro
