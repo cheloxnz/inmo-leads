@@ -682,16 +682,13 @@ class BotFlowManager:
         
         # Mensaje según clasificación
         if _enum_val(lead.status) == "hot":
-            emoji = "🔥"
-            message = f"Excelente! {emoji} Encontré varias opciones que se ajustan a lo que buscás.\n\n"
+            message = "Excelente! Encontre varias opciones que se ajustan a lo que buscas."
         elif _enum_val(lead.status) == "warm":
-            emoji = "🟡"
-            message = f"Perfecto! {emoji} Tengo opciones interesantes para mostrarte.\n\n"
+            message = "Perfecto! Tengo opciones interesantes para mostrarte."
         else:
-            emoji = "👍"
-            message = f"Entiendo! {emoji} Te voy a mantener informado de nuevas opciones.\n\n"
-        
-        message += "¿Qué querés hacer ahora?"
+            message = "Entendido! Te voy a mantener al tanto de nuevas opciones."
+
+        message += "\n\n¿Que quieres hacer ahora?"
 
         buttons = [
             {"type": "reply", "reply": {"id": "si_visita", "title": "Reservar visita"}},
