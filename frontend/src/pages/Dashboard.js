@@ -9,16 +9,6 @@ import CoachCelebrations from '../components/CoachCelebrations';
 import PremiumFeaturesShowcase from '../components/PremiumFeaturesShowcase';
 import ROICard from '../components/ROICard';
 import { MessageSquare, TrendingUp, Users, Calendar } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.35, delay: i * 0.07, ease: [0.4, 0, 0.2, 1] }
-  })
-};
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -67,47 +57,74 @@ export default function Dashboard() {
   
   return (
     <div className="page-container" data-testid="dashboard-page">
-      <motion.header
-        className="page-header"
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      >
-        <div>
-          <h1>Dashboard</h1>
-          <p className="subtitle">Métricas y estadísticas en tiempo real</p>
-        </div>
-      </motion.header>
+      <header className="page-header">
+        <h1>Dashboard</h1>
+        <p className="subtitle">Métricas y estadísticas en tiempo real</p>
+      </header>
 
       <CoachCelebrations />
       <CoachNudges />
 
       {/* ROI Hero Card */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible" custom={0}>
-        <ROICard />
-      </motion.div>
+      <ROICard />
 
       <div className="stats-grid">
-        {[
-          { testid: 'stat-total-leads', label: 'Total Leads', value: stats?.total || 0, change: `+${stats?.today || 0} hoy`, className: '' },
-          { testid: 'stat-hot-leads', label: '🔥 Leads Calientes', value: stats?.hot || 0, change: `${stats?.conversion_rate || 0}% conversión`, className: 'hot' },
-          { testid: 'stat-warm-leads', label: '🟡 Leads Tibios', value: stats?.warm || 0, change: null, className: 'warm' },
-          { testid: 'stat-cold-leads', label: '❄️ Leads Fríos', value: stats?.cold || 0, change: null, className: 'cold' },
-          { testid: 'stat-appointments', label: '📅 Citas Agendadas', value: stats?.with_appointment || 0, change: null, className: '' },
-          { testid: 'stat-avg-score', label: '⭐ Score Promedio', value: stats?.avg_score || 0, change: 'de 12 puntos', className: '' },
-        ].map((card, i) => (
-          <motion.div key={card.testid} variants={fadeUp} initial="hidden" animate="visible" custom={i + 1}>
-            <Card className={`stat-card ${card.className}`} data-testid={card.testid}>
-              <CardHeader>
-                <CardTitle className="stat-label">{card.label}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="stat-value">{card.value}</div>
-                {card.change && <div className="stat-change">{card.change}</div>}
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+        <Card className="stat-card" data-testid="stat-total-leads">
+          <CardHeader>
+            <CardTitle className="stat-label">Total Leads</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.total || 0}</div>
+            <div className="stat-change">+{stats?.today || 0} hoy</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="stat-card hot" data-testid="stat-hot-leads">
+          <CardHeader>
+            <CardTitle className="stat-label">🔥 Leads Calientes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.hot || 0}</div>
+            <div className="stat-change">{stats?.conversion_rate || 0}% conversión</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="stat-card warm" data-testid="stat-warm-leads">
+          <CardHeader>
+            <CardTitle className="stat-label">🟡 Leads Tibios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.warm || 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="stat-card cold" data-testid="stat-cold-leads">
+          <CardHeader>
+            <CardTitle className="stat-label">❄️ Leads Fríos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.cold || 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="stat-card" data-testid="stat-appointments">
+          <CardHeader>
+            <CardTitle className="stat-label">📅 Citas Agendadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.with_appointment || 0}</div>
+          </CardContent>
+        </Card>
+        
+        <Card className="stat-card" data-testid="stat-avg-score">
+          <CardHeader>
+            <CardTitle className="stat-label">⭐ Score Promedio</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="stat-value">{stats?.avg_score || 0}</div>
+            <div className="stat-change">de 12 puntos</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Métricas de Mensajes */}

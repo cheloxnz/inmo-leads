@@ -1,6 +1,6 @@
 {
   "buildCommand": "DISABLE_ESLINT_PLUGIN=true npm run build",
   "outputDirectory": "build",
-  "installCommand": "npm install --legacy-peer-deps && npm install ajv@^8 framer-motion --legacy-peer-deps",
+  "installCommand": "npm install --legacy-peer-deps && npm install ajv@^8 --legacy-peer-deps",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
