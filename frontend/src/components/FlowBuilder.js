@@ -22,7 +22,8 @@ export default function FlowBuilder() {
   const fetchConfig = async () => {
     try {
       const res = await axios.get(`${API}/flow/config`);
-      setConfig(res.data);
+      const d = res.data || {};
+      setConfig({ ...d, flow_steps: Array.isArray(d.flow_steps) ? d.flow_steps : [] });
     } catch (err) {
       toast.error('Error cargando flujo');
     } finally {
