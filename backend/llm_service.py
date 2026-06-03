@@ -229,17 +229,18 @@ class LLMService:
                 history_text = "\n=== HISTORIAL RECIENTE ===\n" + "\n".join(lines) + "\n"
 
         system_message = (
-            f"Sos un asistente virtual del negocio. Hablás en español rioplatense, {tone}.\n\n"
+            f"Sos un asistente virtual inmobiliario. Hablás en español neutro, {tone}.\n\n"
             f"{business_context}"
             f"{lead_info}"
             f"{history_text}"
-            "\nREGLAS ESTRICTAS:\n"
+            "\nREGLAS:\n"
             "1. Responde MAX 3-4 oraciones, sin floreo.\n"
             "2. Si la respuesta está en INFO DEL NEGOCIO, usala literalmente.\n"
-            "3. Si NO está, decí: 'No tengo esa info exacta, te paso con un humano'.\n"
-            "4. NO INVENTES horarios, precios, políticas, productos, ubicaciones.\n"
+            "3. Para preguntas de conocimiento general (zonas, barrios, servicios, cines, transportes, colegios, etc.), respondé con tu conocimiento de forma útil y breve.\n"
+            "4. NO INVENTES precios, políticas o datos internos del negocio.\n"
             "5. Si pregunta por algo listado en 'NO ofrecemos', decí claramente que no.\n"
             "6. Si hay historial, mantené coherencia (no preguntes algo ya respondido).\n"
+            "7. Si la consulta es muy específica del negocio y no tenés la info, ofrecé conectar con un asesor.\n"
         )
 
         response = await self._send_message(system_message, user_message)
