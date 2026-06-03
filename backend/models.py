@@ -173,6 +173,13 @@ class Lead(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
     # Memoria del bot: sentiment streak, flags efímeros, preferencias, etc.
     metadata: dict = Field(default_factory=dict)
+    # Campos flujo inmobiliaria
+    zone: Optional[str] = None
+    budget_text: Optional[str] = None
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    must_have: List[str] = Field(default_factory=list)
+    financing: Optional[str] = None
 
 class LeadCreate(BaseModel):
     phone: str
