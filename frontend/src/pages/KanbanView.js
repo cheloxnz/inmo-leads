@@ -34,7 +34,10 @@ export default function KanbanView() {
   const fetchKanbanData = async () => {
     try {
       const response = await axios.get(`${API}/leads/kanban`);
-      setColumns(response.data);
+      // Asegurar que cada columna tenga leads como array
+      const data = response.data || {};
+      Object.keys(data).forEach(k => { if (!Array.isArray(data[k].leads)) data[k].leads = []; });
+      setColumns(data);
     } catch (error) {
       console.error('Error fetching kanban data:', error);
       toast.error('Error cargando datos');
