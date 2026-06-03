@@ -538,13 +538,19 @@ class BotFlowManager:
         message_lower = message.lower()
         
         type_mapping = {
+            "1": PropertyType.DEPARTAMENTO,
             "departamento": PropertyType.DEPARTAMENTO,
             "depto": PropertyType.DEPARTAMENTO,
+            "2": PropertyType.CASA,
             "casa": PropertyType.CASA,
+            "3": PropertyType.PH,
             "ph": PropertyType.PH,
+            "4": PropertyType.LOCAL,
             "local": PropertyType.LOCAL,
+            "5": PropertyType.TERRENO,
             "terreno": PropertyType.TERRENO,
-            "oficina": PropertyType.OFICINA
+            "6": PropertyType.OFICINA,
+            "oficina": PropertyType.OFICINA,
         }
         
         for key, value in type_mapping.items():
@@ -605,17 +611,37 @@ class BotFlowManager:
         today = date.today()
 
         if "hoy" in message_lower:
-            day_str = today.strftime("%d/%m/%Y")
+            day = today
         elif "mañana" in message_lower or "manana" in message_lower:
-            day_str = (today + timedelta(days=1)).strftime("%d/%m/%Y")
+            day = today + timedelta(days=1)
+        elif "semana" in message_lower:
+            # Pedir día específico dentro de la semana
+            response = "¿Qué día de la semana te queda mejor?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "dia_lunes", "title": "Lunes"}},
+                {"type": "reply", "reply": {"id": "dia_miercoles", "title": "Miercoles"}},
+                {"type": "reply", "reply": {"id": "dia_viernes", "title": "Viernes"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            return  # Quedamos en SCHEDULE_DAY esperando el día
+        elif "lunes" in message_lower or "dia_lunes" in message_lower:
+            days_ahead = (0 - today.weekday()) % 7 or 7
+            day = today + timedelta(days=days_ahead)
+        elif "miercoles" in message_lower or "miércoles" in message_lower or "dia_miercoles" in message_lower:
+            days_ahead = (2 - today.weekday()) % 7 or 7
+            day = today + timedelta(days=days_ahead)
+        elif "viernes" in message_lower or "dia_viernes" in message_lower:
+            days_ahead = (4 - today.weekday()) % 7 or 7
+            day = today + timedelta(days=days_ahead)
         else:
-            day_str = "esta semana"
+            day = today + timedelta(days=1)
 
-        response = f"Perfecto, ¿en qué horario te queda mejor para {day_str}?"
+        day_str = day.strftime("%d/%m/%Y")
+        response = f"Perfecto, ¿en qué horario te queda mejor el {day_str}?"
         buttons = [
-            {"type": "reply", "reply": {"id": f"tasacion_manana_{day_str}", "title": "Manana (9-12hs)"}},
-            {"type": "reply", "reply": {"id": f"tasacion_tarde_{day_str}", "title": "Tarde (14-17hs)"}},
-            {"type": "reply", "reply": {"id": f"tasacion_noche_{day_str}", "title": "Noche (17-20hs)"}},
+            {"type": "reply", "reply": {"id": f"hora_9_{day.strftime('%Y%m%d')}", "title": "Manana (9-12hs)"}},
+            {"type": "reply", "reply": {"id": f"hora_14_{day.strftime('%Y%m%d')}", "title": "Tarde (14-17hs)"}},
+            {"type": "reply", "reply": {"id": f"hora_17_{day.strftime('%Y%m%d')}", "title": "Noche (17-20hs)"}},
         ]
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.SELECT_TIME
