@@ -41,7 +41,7 @@ export default function Leads({ filterByAgent = null }) {
     try {
       const endpoint = filterByAgent ? `${API}/leads/assigned-to-me` : `${API}/leads`;
       const response = await axios.get(endpoint);
-      setLeads(response.data);
+      setLeads(Array.isArray(response.data) ? response.data : (response.data.leads || []));
     } catch (error) {
       console.error('Error fetching leads:', error);
     } finally {

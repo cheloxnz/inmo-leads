@@ -73,7 +73,7 @@ export default function CatalogPage() {
     try {
       const url = filterCategory ? `${API}/catalog?category=${filterCategory}` : `${API}/catalog`;
       const res = await axios.get(url);
-      setProducts(res.data);
+      setProducts(Array.isArray(res.data) ? res.data : (res.data.products || []));
     } catch (err) {
       console.error('Error:', err);
     } finally {
