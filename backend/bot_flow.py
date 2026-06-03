@@ -10,6 +10,42 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
+class ScoringEngine:
+    """Wrapper simple de scoring para el flujo inmobiliaria."""
+
+    @staticmethod
+    def calculate_score(lead: Lead) -> int:
+        score = 0
+        if lead.intent in (LeadIntent.COMPRAR, LeadIntent.ALQUILAR):
+            score += 2
+        if lead.budget_text:
+            score += 2
+        if lead.zone:
+            score += 1
+        if lead.property_type:
+            score += 1
+        if lead.urgency in (UrgencyLevel.URGENTE, UrgencyLevel.PROXIMO_MES):
+            score += 3
+        elif lead.urgency == UrgencyLevel.MESES:
+            score += 1
+        if lead.financing and lead.financing not in (FinancingType.NO_SE,):
+            score += 1
+        return score
+
+    @staticmethod
+    def classify_lead(score: int) -> LeadStatus:
+        if score >= 7:
+            return LeadStatus.HOT
+        elif score >= 4:
+            return LeadStatus.WARM
+        return LeadStatus.COLD
+
+    @staticmethod
+    def should_handoff_to_human(lead: Lead) -> bool:
+        return lead.score >= 7
+
+
 # Palabras clave de urgencia
 URGENCY_KEYWORDS = [
     "urgente", "urgencia", "urgentemente",
