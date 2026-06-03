@@ -1491,8 +1491,8 @@ class BotFlowManager:
                         "zone": getattr(lead, "zone", None),
                         "budget_text": getattr(lead, "budget_text", None),
                         "property_type": (
-                            lead.property_type.value if getattr(lead, "property_type", None) else None
-                        ),
+                            lead.property_type.value if hasattr(lead.property_type, "value") else lead.property_type
+                        ) if getattr(lead, "property_type", None) else None,
                     }
                     business_ctx = ""
                     bot_tone = "neutro"
@@ -1559,8 +1559,8 @@ class BotFlowManager:
                 "zone": getattr(lead, "zone", None),
                 "budget_text": getattr(lead, "budget_text", None),
                 "property_type": (
-                    lead.property_type.value if getattr(lead, "property_type", None) else None
-                ),
+                    lead.property_type.value if hasattr(lead.property_type, "value") else lead.property_type
+                ) if getattr(lead, "property_type", None) else None,
             }
             business_ctx = ""
             bot_tone = "neutro"
