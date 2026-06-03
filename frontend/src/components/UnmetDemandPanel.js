@@ -76,7 +76,7 @@ export default function UnmetDemandPanel() {
       <CardContent>
         {loading && !data ? (
           <div className="unmet-empty"><Loader2 className="w-5 h-5 animate-spin" /> Cargando...</div>
-        ) : !data || data.top_products.length === 0 ? (
+        ) : !data || !data.top_products || data.top_products.length === 0 ? (
           <div className="unmet-empty" data-testid="unmet-empty">
             <Package className="w-10 h-10" />
             <p><strong>Todavía no hay demanda insatisfecha registrada.</strong></p>
