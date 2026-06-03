@@ -143,6 +143,28 @@ class LLMService:
             return None
         return response.strip()
 
+    async def extract_zone(self, user_message: str) -> Optional[str]:
+        """Extrae zona/barrio del mensaje. Sin LLM, devuelve el texto directamente."""
+        if not self.enabled:
+            return user_message.strip() if user_message.strip() else None
+        system_message = """Extrae el nombre de la zona, barrio o ciudad del mensaje.
+        Responde SOLO con el nombre de la zona. Si no puedes extraer nada, responde: NINGUNO"""
+        response = await self._send_message(system_message, user_message)
+        if "NINGUNO" in response.upper():
+            return None
+        return response.strip()
+
+    async def extract_budget(self, user_message: str) -> Optional[str]:
+        """Extrae presupuesto del mensaje. Sin LLM, devuelve el texto directamente."""
+        if not self.enabled:
+            return user_message.strip() if user_message.strip() else None
+        system_message = """Extrae el presupuesto o rango de precio del mensaje.
+        Responde SOLO con el valor o rango. Si no puedes extraer nada, responde: NINGUNO"""
+        response = await self._send_message(system_message, user_message)
+        if "NINGUNO" in response.upper():
+            return None
+        return response.strip()
+
     async def generate_smart_response(self, user_message: str, lead_context: Dict = None) -> str:
         """Genera respuesta inteligente para consultas generales"""
         context_info = ""
