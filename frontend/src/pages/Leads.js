@@ -82,7 +82,7 @@ export default function Leads({ filterByAgent = null }) {
     }
     
     // Filtrar por intención
-    if (searchIntent) {
+    if (searchIntent && searchIntent !== 'all') {
       if (searchIntent === 'sin_definir') {
         filtered = filtered.filter(lead => !lead.intent);
       } else {
@@ -394,7 +394,7 @@ export default function Leads({ filterByAgent = null }) {
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   <SelectItem value="comprar">🏠 Comprar</SelectItem>
                   <SelectItem value="alquilar">🔑 Alquilar</SelectItem>
                   <SelectItem value="vender">💰 Vender</SelectItem>
