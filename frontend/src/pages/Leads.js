@@ -133,6 +133,35 @@ export default function Leads({ filterByAgent = null }) {
     setFilteredLeads(filtered);
   };
 
+  const FLOW_STEPS = [
+    { key: 'welcome',          label: 'Inicio' },
+    { key: 'intent',           label: 'Intención' },
+    { key: 'zone',             label: 'Zona' },
+    { key: 'budget',           label: 'Presupuesto' },
+    { key: 'appointment_offer',label: 'Cita' },
+    { key: 'hot_lead',         label: '✅ Listo' },
+  ];
+
+  const FlowStageBar = ({ stage }) => {
+    const idx = FLOW_STEPS.findIndex(s =>
+      stage === s.key ||
+      (['scoring', 'property_type', 'select_day', 'confirm_appointment', 'bedrooms', 'urgency'].includes(stage) && s.key === 'budget') ||
+      (['appointment_reminder', 'completed'].includes(stage) && s.key === 'hot_lead')
+    );
+    const activeIdx = idx === -1 ? 0 : idx;
+    const pct = Math.round((activeIdx / (FLOW_STEPS.length - 1)) * 100);
+    const currentLabel = FLOW_STEPS[activeIdx]?.label || stage;
+
+    return (
+      <div className="flow-stage-bar" title={`Etapa del bot: ${currentLabel}`}>
+        <div className="flow-stage-track">
+          <div className="flow-stage-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="flow-stage-label">{currentLabel}</span>
+      </div>
+    );
+  };
+
   const toggleSort = (field) => {
     if (sortBy === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -688,7 +717,9 @@ export default function Leads({ filterByAgent = null }) {
                         </div>
                       )}
                     </div>
-                    
+
+                    {lead.flow_stage && <FlowStageBar stage={lead.flow_stage} />}
+
                     <div className="lead-footer">
                       {lead.assigned_agent_name ? (
                         <span className="lead-agent" title="Asesor asignado">
