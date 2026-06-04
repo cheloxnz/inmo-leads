@@ -27,22 +27,24 @@ def _parse_lead_dates(lead: dict) -> dict:
     return lead
 
 
-@router.get("/leads", response_model=List[Lead])
+@router.get("/leads")
 async def get_leads(
     status: Optional[str] = None,
-    limit: int = 100,
+    limit: int = 20,
+    skip: int = 0,
     current_user: User = Depends(get_current_user),
 ):
-    """Obtiene lista de leads (filtrado por tenant)"""
+    """Obtiene lista de leads paginada (filtrado por tenant)"""
     query = tenant_filter(current_user)
     if status:
         query["status"] = status
+    total = await _db.leads.count_documents(query)
     leads = await _db.leads.find(
         query, {"_id": 0, "conversation_history": 0}
-    ).sort("created_at", -1).limit(limit).to_list(limit)
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     for lead in leads:
         _parse_lead_dates(lead)
-    return leads
+    return {"leads": leads, "total": total, "skip": skip, "limit": limit}
 
 
 # NOTE: /leads/kanban y /leads/assigned-to-me DEBEN estar antes de /leads/{phone}

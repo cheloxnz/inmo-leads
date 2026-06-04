@@ -26,6 +26,8 @@ export default function Leads({ filterByAgent = null }) {
   const [searchIntent, setSearchIntent] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [bulkAction, setBulkAction] = useState('');
   const [bulkValue, setBulkValue] = useState('');
@@ -49,13 +51,17 @@ export default function Leads({ filterByAgent = null }) {
   
   useEffect(() => {
     filterLeads();
+    setCurrentPage(1); // reset al cambiar filtros
   }, [activeTab, leads, searchName, searchPhone, searchZone, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir]);
   
   const fetchLeads = async () => {
     try {
-      const endpoint = filterByAgent ? `${API}/leads/assigned-to-me` : `${API}/leads`;
+      const endpoint = filterByAgent
+        ? `${API}/leads/assigned-to-me`
+        : `${API}/leads?limit=500`;
       const response = await axios.get(endpoint);
-      setLeads(Array.isArray(response.data) ? response.data : (response.data.leads || []));
+      const data = response.data;
+      setLeads(Array.isArray(data) ? data : (data.leads || []));
     } catch (error) {
       console.error('Error fetching leads:', error);
     } finally {
@@ -431,6 +437,9 @@ export default function Leads({ filterByAgent = null }) {
     no_intent:   leadsPreTab.filter(l => !l.intent || l.intent === 'sin_definir').length,
   };
 
+  const totalPages = Math.ceil(filteredLeads.length / PAGE_SIZE);
+  const pagedLeads = filteredLeads.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -708,7 +717,7 @@ export default function Leads({ filterByAgent = null }) {
                 )}
               </div>
             ) : (
-              filteredLeads.map((lead) => (
+              pagedLeads.map((lead) => (
                 <Card 
                   key={lead.phone} 
                   className={`lead-card ${selectedLeads.includes(lead.phone) ? 'selected' : ''}`}
@@ -842,6 +851,53 @@ export default function Leads({ filterByAgent = null }) {
               ))
             )}
           </div>
+
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >«</button>
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >‹</button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce((acc, p, idx, arr) => {
+                  if (idx > 0 && p - arr[idx - 1] > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) => p === '...'
+                  ? <span key={`e${i}`} className="pagination-ellipsis">…</span>
+                  : <button
+                      key={p}
+                      className={`pagination-btn ${currentPage === p ? 'pagination-btn--active' : ''}`}
+                      onClick={() => setCurrentPage(p)}
+                    >{p}</button>
+                )
+              }
+
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >›</button>
+              <button
+                className="pagination-btn"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >»</button>
+
+              <span className="pagination-info">
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredLeads.length)} de {filteredLeads.length}
+              </span>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
