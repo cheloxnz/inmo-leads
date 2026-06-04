@@ -33,6 +33,8 @@ export default function Leads({ filterByAgent = null }) {
   const [bulkValue, setBulkValue] = useState('');
   const [agents, setAgents] = useState([]);
   const [processingBulk, setProcessingBulk] = useState(false);
+  const [bulkTagInput, setBulkTagInput] = useState('');
+  const [showBulkTagInput, setShowBulkTagInput] = useState(false);
   const [drawerPhone, setDrawerPhone] = useState(null);
   const [assigningPhone, setAssigningPhone] = useState(null);
   const navigate = useNavigate();
@@ -418,6 +420,42 @@ export default function Leads({ filterByAgent = null }) {
     }
   };
 
+  // Acción masiva directa (para la barra flotante — sin paso intermedio de "Ejecutar")
+  const quickBulkAction = async (action, value) => {
+    if (selectedLeads.length === 0) return;
+    if (action === 'delete') {
+      const ok = window.confirm(`¿Eliminar ${selectedLeads.length} lead${selectedLeads.length > 1 ? 's' : ''}? Esta acción no se puede deshacer.`);
+      if (!ok) return;
+    }
+    setProcessingBulk(true);
+    try {
+      const res = await axios.post(`${API}/leads/bulk-action`, {
+        lead_phones: selectedLeads,
+        action,
+        value: value || null,
+      });
+      toast.success(`${res.data.updated_count} lead${res.data.updated_count > 1 ? 's' : ''} actualizado${res.data.updated_count > 1 ? 's' : ''}`);
+      setSelectedLeads([]);
+      setBulkTagInput('');
+      setShowBulkTagInput(false);
+      fetchLeads();
+    } catch {
+      toast.error('Error ejecutando acción masiva');
+    } finally {
+      setProcessingBulk(false);
+    }
+  };
+
+  // Helpers de intención — icono + label legible
+  const INTENT_MAP = {
+    comprar:   { icon: '🏠', label: 'Comprar' },
+    alquilar:  { icon: '🔑', label: 'Alquilar' },
+    vender:    { icon: '💰', label: 'Vender' },
+    inversion: { icon: '📈', label: 'Inversión' },
+  };
+  const intentIcon  = (intent) => INTENT_MAP[intent]?.icon  ?? '❓';
+  const intentLabel = (intent) => INTENT_MAP[intent]?.label ?? null;
+
   const copyPhone = (e, phone) => {
     e.stopPropagation();
     navigator.clipboard.writeText(formatPhone(phone));
@@ -559,88 +597,113 @@ export default function Leads({ filterByAgent = null }) {
         </div>
       </div>
 
-      {/* Bulk Actions Panel */}
+      {/* ── Barra flotante de acciones masivas ── */}
       {selectedLeads.length > 0 && (
-        <Card className="bulk-actions-panel" data-testid="bulk-actions-panel">
-          <CardContent className="bulk-actions-content">
-            <div className="bulk-selection-info">
-              <Checkbox 
-                checked={selectedLeads.length === filteredLeads.length}
-                onCheckedChange={toggleSelectAll}
-                data-testid="checkbox-select-all"
-              />
-              <span>{selectedLeads.length} leads seleccionados</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedLeads([])}>
-                Deseleccionar
-              </Button>
-            </div>
-            
-            <div className="bulk-actions-form">
-              <Select value={bulkAction} onValueChange={setBulkAction}>
-                <SelectTrigger className="w-40" data-testid="select-bulk-action">
-                  <SelectValue placeholder="Acción..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tag"><Tag className="w-4 h-4 inline mr-2" />Agregar Tag</SelectItem>
-                  <SelectItem value="status"><RefreshCw className="w-4 h-4 inline mr-2" />Cambiar Estado</SelectItem>
-                  <SelectItem value="assign"><UserCheck className="w-4 h-4 inline mr-2" />Asignar Asesor</SelectItem>
-                  <SelectItem value="delete"><Trash2 className="w-4 h-4 inline mr-2" />Eliminar</SelectItem>
-                </SelectContent>
-              </Select>
+        <div className="bulk-float-bar" data-testid="bulk-actions-panel">
+          {/* Izquierda: conteo + select all */}
+          <div className="bulk-float-left">
+            <Checkbox
+              checked={selectedLeads.length === filteredLeads.length}
+              onCheckedChange={toggleSelectAll}
+              data-testid="checkbox-select-all"
+              className="bulk-float-checkbox"
+            />
+            <span className="bulk-float-count">
+              {selectedLeads.length} lead{selectedLeads.length > 1 ? 's' : ''}
+            </span>
+          </div>
 
-              {bulkAction === 'tag' && (
-                <Input 
+          {/* Centro: acciones directas */}
+          <div className="bulk-float-actions">
+
+            {/* Asignar asesor */}
+            <Select onValueChange={(val) => quickBulkAction('assign', val)} disabled={processingBulk}>
+              <SelectTrigger className="bulk-float-select" data-testid="select-bulk-agent">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Asignar</span>
+              </SelectTrigger>
+              <SelectContent>
+                {agents.filter(a => a.role !== 'admin').map(agent => (
+                  <SelectItem key={agent.email} value={agent.email}>{agent.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Cambiar estado */}
+            <Select onValueChange={(val) => quickBulkAction('status', val)} disabled={processingBulk}>
+              <SelectTrigger className="bulk-float-select" data-testid="select-bulk-status">
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Estado</span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hot">🔥 Caliente</SelectItem>
+                <SelectItem value="warm">🟡 Tibio</SelectItem>
+                <SelectItem value="cold">❄️ Frío</SelectItem>
+                <SelectItem value="contacted">Contactado</SelectItem>
+                <SelectItem value="qualified">Calificado</SelectItem>
+                <SelectItem value="completed">Cerrado</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Tag rápido */}
+            {showBulkTagInput ? (
+              <div className="bulk-float-tag-wrap">
+                <Input
+                  className="bulk-float-tag-input"
                   placeholder="Nombre del tag..."
-                  value={bulkValue}
-                  onChange={(e) => setBulkValue(e.target.value)}
-                  className="w-40"
+                  value={bulkTagInput}
+                  onChange={e => setBulkTagInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && bulkTagInput.trim()) quickBulkAction('tag', bulkTagInput.trim());
+                    if (e.key === 'Escape') { setShowBulkTagInput(false); setBulkTagInput(''); }
+                  }}
+                  autoFocus
                   data-testid="input-bulk-tag"
                 />
-              )}
-
-              {bulkAction === 'status' && (
-                <Select value={bulkValue} onValueChange={setBulkValue}>
-                  <SelectTrigger className="w-40" data-testid="select-bulk-status">
-                    <SelectValue placeholder="Estado..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">Nuevo</SelectItem>
-                    <SelectItem value="contacted">Contactado</SelectItem>
-                    <SelectItem value="qualified">Calificado</SelectItem>
-                    <SelectItem value="hot">Caliente</SelectItem>
-                    <SelectItem value="warm">Tibio</SelectItem>
-                    <SelectItem value="cold">Frío</SelectItem>
-                    <SelectItem value="completed">Cerrado</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-
-              {bulkAction === 'assign' && (
-                <Select value={bulkValue} onValueChange={setBulkValue}>
-                  <SelectTrigger className="w-48" data-testid="select-bulk-agent">
-                    <SelectValue placeholder="Asesor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agents.filter(a => a.role !== 'admin').map(agent => (
-                      <SelectItem key={agent.email} value={agent.email}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              <Button 
-                onClick={executeBulkAction} 
-                disabled={processingBulk || !bulkAction}
-                variant={bulkAction === 'delete' ? 'destructive' : 'default'}
-                data-testid="btn-execute-bulk"
+                <button
+                  className="bulk-float-tag-ok"
+                  onClick={() => bulkTagInput.trim() && quickBulkAction('tag', bulkTagInput.trim())}
+                  disabled={!bulkTagInput.trim() || processingBulk}
+                >✓</button>
+                <button
+                  className="bulk-float-tag-cancel"
+                  onClick={() => { setShowBulkTagInput(false); setBulkTagInput(''); }}
+                >✕</button>
+              </div>
+            ) : (
+              <button
+                className="bulk-float-btn"
+                onClick={() => setShowBulkTagInput(true)}
+                disabled={processingBulk}
+                title="Agregar tag"
               >
-                {processingBulk ? 'Procesando...' : 'Ejecutar'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <Tag className="w-3.5 h-3.5" /> Tag
+              </button>
+            )}
+
+            {/* Separador */}
+            <span className="bulk-float-sep" />
+
+            {/* Eliminar */}
+            <button
+              className="bulk-float-btn bulk-float-btn--danger"
+              onClick={() => quickBulkAction('delete')}
+              disabled={processingBulk}
+              title="Eliminar seleccionados"
+              data-testid="btn-execute-bulk"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {processingBulk ? '...' : 'Eliminar'}
+            </button>
+          </div>
+
+          {/* Derecha: cerrar */}
+          <button
+            className="bulk-float-close"
+            onClick={() => { setSelectedLeads([]); setShowBulkTagInput(false); setBulkTagInput(''); }}
+            title="Deseleccionar todo"
+          >✕</button>
+        </div>
       )}
       
       <Card className="filters-card">
@@ -865,28 +928,36 @@ export default function Leads({ filterByAgent = null }) {
                       {getStatusBadge(lead.status)}
                     </div>
                     
+                    {/* ── Detalles: siempre 5 filas, altura uniforme ── */}
                     <div className="lead-details" onClick={() => setDrawerPhone(lead.phone)}>
+
+                      {/* Fila 1 — Intención */}
                       <div className="detail-row">
-                        <span className="label">Intención:</span>
-                        <span className="value">{lead.intent || 'No definida'}</span>
+                        <span className="label">{intentIcon(lead.intent)} Intención</span>
+                        <span className={`value ${!intentLabel(lead.intent) ? 'value--empty' : ''}`}>
+                          {intentLabel(lead.intent) || 'Sin definir'}
+                        </span>
                       </div>
-                      
-                      {lead.zone && (
-                        <div className="detail-row">
-                          <span className="label">Zona:</span>
-                          <span className="value">{lead.zone}</span>
-                        </div>
-                      )}
-                      
-                      {lead.budget_text && (
-                        <div className="detail-row">
-                          <span className="label">Presupuesto:</span>
-                          <span className="value">{lead.budget_text}</span>
-                        </div>
-                      )}
-                      
+
+                      {/* Fila 2 — Zona */}
+                      <div className="detail-row">
+                        <span className="label">📍 Zona</span>
+                        <span className={`value ${!lead.zone ? 'value--empty' : ''}`}>
+                          {lead.zone || '—'}
+                        </span>
+                      </div>
+
+                      {/* Fila 3 — Presupuesto */}
+                      <div className="detail-row">
+                        <span className="label">💰 Presupuesto</span>
+                        <span className={`value ${!lead.budget_text ? 'value--empty' : ''}`}>
+                          {lead.budget_text || '—'}
+                        </span>
+                      </div>
+
+                      {/* Fila 4 — Score con barra + tooltip */}
                       <div className="detail-row score-row score-tooltip-wrap">
-                        <span className="label">Score:</span>
+                        <span className="label">📊 Score</span>
                         <div className="score-bar-wrapper">
                           <div
                             className="score-bar-fill"
@@ -903,12 +974,15 @@ export default function Leads({ filterByAgent = null }) {
                           ))}
                         </div>
                       </div>
-                      
-                      {lead.appointment_datetime && (
-                        <div className="appointment-badge">
-                          📅 Cita: {formatDate(lead.appointment_datetime)}
-                        </div>
-                      )}
+
+                      {/* Fila 5 — Cita */}
+                      <div className="detail-row">
+                        <span className="label">📅 Cita</span>
+                        <span className={`value ${!lead.appointment_datetime ? 'value--empty' : 'value--appointment'}`}>
+                          {lead.appointment_datetime ? formatDate(lead.appointment_datetime) : 'Sin cita'}
+                        </span>
+                      </div>
+
                     </div>
 
                     {lead.flow_stage && <FlowStageBar stage={lead.flow_stage} />}
