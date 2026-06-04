@@ -562,8 +562,23 @@ export default function Leads({ filterByAgent = null }) {
         <TabsContent value={activeTab}>
           <div className="leads-grid">
             {filteredLeads.length === 0 ? (
-              <div className="empty-state">
-                <p>No hay leads en esta categoría</p>
+              <div className="empty-state-leads">
+                {leads.length === 0 ? (
+                  <>
+                    <span className="empty-state-icon">🤖</span>
+                    <h3>Aún no hay leads</h3>
+                    <p>Cuando el bot capture contactos por WhatsApp aparecerán aquí automáticamente.</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="empty-state-icon">🔍</span>
+                    <h3>Sin resultados</h3>
+                    <p>Ningún lead coincide con los filtros activos.</p>
+                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                      Limpiar filtros
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
               filteredLeads.map((lead) => (

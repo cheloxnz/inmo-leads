@@ -736,6 +736,36 @@ body {
   color: var(--text-secondary);
 }
 
+.empty-state-leads {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-leads h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.empty-state-leads p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+  max-width: 28rem;
+}
+
 .loading-container {
   display: flex;
   justify-content: center;
