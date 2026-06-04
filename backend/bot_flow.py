@@ -396,11 +396,23 @@ class BotFlowManager:
         return lead
     
     async def handle_welcome(self, lead: Lead, message: str):
-        """Maneja etapa de bienvenida — reconoce al lead que vuelve"""
+        """Maneja etapa de bienvenida — reconoce al lead que vuelve y personaliza por inmobiliaria"""
+        # Cargar perfil del negocio para personalización
+        bot_name = "el asistente virtual"
+        business_name = "la inmobiliaria"
+        try:
+            profile = await self.db.business_profiles.find_one(
+                {"tenant_id": lead.tenant_id}, {"_id": 0}
+            )
+            if profile:
+                bot_name = profile.get("bot_name") or bot_name
+                business_name = profile.get("business_name") or business_name
+        except Exception:
+            pass
+
         returning = lead.name and lead.created_at and (datetime.utcnow() - lead.created_at).total_seconds() > 300
 
         if returning:
-            # Lead conocido — saludo personalizado con contexto
             name = lead.name.split()[0] if lead.name else ""
             intent_str = _enum_val(lead.intent) if lead.intent else None
             zone = getattr(lead, "zone", None)
@@ -414,7 +426,7 @@ class BotFlowManager:
 
             response = f"¡Hola {name}! 👋 {context_hint.capitalize()}.\n\n¿En qué te puedo ayudar hoy?"
         else:
-            response = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy aqui para ayudarte 🏡\n\n¿Qué te gustaria hacer?"
+            response = f"¡Hola! Soy {bot_name} de *{business_name}*. Estoy aqui para ayudarte 🏡\n\n¿Qué te gustaria hacer?"
 
         buttons = [
             {"type": "reply", "reply": {"id": "comprar", "title": "Comprar"}},
@@ -456,14 +468,22 @@ class BotFlowManager:
             lead.flow_stage = FlowStage.NAME
     
     async def handle_name(self, lead: Lead, message: str):
-        """Maneja captura de nombre"""
+        """Maneja captura de nombre con validación"""
         name = message.strip()
-        
-        if len(name) < 2:
-            response = "Por favor, ingresá tu nombre completo."
+
+        # Validaciones: muy corto, solo números, solo caracteres repetidos, o palabras sin sentido
+        only_digits = name.replace(" ", "").isdigit()
+        too_short = len(name) < 2
+        only_symbols = not any(c.isalpha() for c in name)
+        looks_like_gibberish = len(name) >= 2 and len(set(name.lower().replace(" ", ""))) <= 2
+
+        if too_short or only_digits or only_symbols or looks_like_gibberish:
+            response = "No pude reconocer ese nombre. ¿Podés decirme tu nombre y apellido?\n\nEjemplo: Juan García"
             self.wa.send_text_message(lead.phone, response)
             return
-        
+
+        # Capitalizar correctamente
+        name = " ".join(w.capitalize() for w in name.split())
         lead.name = name
         
         # Pregunta diferente para vendedores

@@ -69,6 +69,11 @@ class BusinessProfile(BaseModel):
     # Tono del bot (config opcional para vertical-aware)
     bot_tone: Optional[str] = None  # "casual" | "formal" | "vendedor" | "neutro"
 
+    # Personalización inmobiliaria
+    bot_name: Optional[str] = None           # Nombre del asistente virtual, ej: "Sofia"
+    operation_zones: Optional[str] = None    # Zonas donde opera, ej: "Palermo, Belgrano, Recoleta"
+    advisor_name: Optional[str] = None       # Nombre del asesor humano, ej: "Carlos"
+
     updated_at: Optional[str] = None
 
 
@@ -86,7 +91,13 @@ def build_business_context_text(profile: dict) -> str:
 
     # Identidad
     if p.get("business_name"):
-        lines.append(f"- Nombre: {p['business_name']}")
+        lines.append(f"- Nombre del negocio: {p['business_name']}")
+    if p.get("bot_name"):
+        lines.append(f"- Tu nombre como asistente: {p['bot_name']}")
+    if p.get("advisor_name"):
+        lines.append(f"- Nombre del asesor humano: {p['advisor_name']}")
+    if p.get("operation_zones"):
+        lines.append(f"- Zonas de operación: {p['operation_zones']}")
     if p.get("business_description"):
         lines.append(f"- Descripción: {p['business_description']}")
     if p.get("industry"):
