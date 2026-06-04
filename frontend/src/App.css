@@ -532,6 +532,35 @@ body {
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.phone-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.phone-action-btn:hover {
+  opacity: 1;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary);
+}
+
+.phone-action-btn.whatsapp-btn:hover {
+  color: #25d366;
+  background: #dcfce7;
 }
 
 .badge-hot {
@@ -576,6 +605,57 @@ body {
 .detail-row .score {
   font-weight: 700;
   color: var(--primary);
+}
+
+.score-row {
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-bar-wrapper {
+  flex: 1;
+  height: 6px;
+  background: var(--border-color, #e5e7eb);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0 0.25rem;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  background: #ef4444;
+}
+
+.score-bar-fill[data-score="4"],
+.score-bar-fill[data-score="5"] {
+  background: #f97316;
+}
+
+.score-bar-fill[data-score="6"],
+.score-bar-fill[data-score="7"] {
+  background: #eab308;
+}
+
+.score-bar-fill[data-score="8"],
+.score-bar-fill[data-score="9"] {
+  background: #84cc16;
+}
+
+.score-bar-fill[data-score="10"],
+.score-bar-fill[data-score="11"],
+.score-bar-fill[data-score="12"] {
+  background: #22c55e;
+}
+
+.score-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 2.5rem;
+  text-align: right;
 }
 
 .appointment-badge {

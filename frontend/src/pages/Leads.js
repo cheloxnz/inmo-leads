@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Trash2, Tag, UserCheck, RefreshCw } from 'lucide-react';
+import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle } from 'lucide-react';
 
 export default function Leads({ filterByAgent = null }) {
   const [leads, setLeads] = useState([]);
@@ -21,6 +21,7 @@ export default function Leads({ filterByAgent = null }) {
   const [searchZone, setSearchZone] = useState('');
   const [searchDateFrom, setSearchDateFrom] = useState('');
   const [searchDateTo, setSearchDateTo] = useState('');
+  const [searchIntent, setSearchIntent] = useState('');
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [bulkAction, setBulkAction] = useState('');
   const [bulkValue, setBulkValue] = useState('');
@@ -35,7 +36,7 @@ export default function Leads({ filterByAgent = null }) {
   
   useEffect(() => {
     filterLeads();
-  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo]);
+  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo, searchIntent]);
   
   const fetchLeads = async () => {
     try {
@@ -80,6 +81,15 @@ export default function Leads({ filterByAgent = null }) {
       );
     }
     
+    // Filtrar por intención
+    if (searchIntent) {
+      if (searchIntent === 'sin_definir') {
+        filtered = filtered.filter(lead => !lead.intent);
+      } else {
+        filtered = filtered.filter(lead => lead.intent === searchIntent);
+      }
+    }
+
     // Filtrar por fecha
     if (searchDateFrom) {
       filtered = filtered.filter(lead => {
@@ -106,6 +116,7 @@ export default function Leads({ filterByAgent = null }) {
     setSearchZone('');
     setSearchDateFrom('');
     setSearchDateTo('');
+    setSearchIntent('');
   };
 
   // Bulk Actions
@@ -225,6 +236,29 @@ export default function Leads({ filterByAgent = null }) {
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
   
+  const formatPhone = (phone) => {
+    // Convierte 5491168754798 → +54 9 11 6875-4798
+    const p = String(phone).replace(/\D/g, '');
+    if (p.startsWith('549') && p.length === 13) {
+      return `+54 9 ${p.slice(3, 5)} ${p.slice(5, 9)}-${p.slice(9)}`;
+    }
+    if (p.startsWith('54') && p.length === 12) {
+      return `+54 ${p.slice(2, 4)} ${p.slice(4, 8)}-${p.slice(8)}`;
+    }
+    return `+${p}`;
+  };
+
+  const copyPhone = (e, phone) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(formatPhone(phone));
+    toast.success('Teléfono copiado');
+  };
+
+  const openWhatsApp = (e, phone) => {
+    e.stopPropagation();
+    window.open(`https://wa.me/${phone}`, '_blank');
+  };
+
   if (loading) {
     return <div className="loading-container">Cargando leads...</div>;
   }
@@ -354,6 +388,23 @@ export default function Leads({ filterByAgent = null }) {
             </div>
             
             <div className="filter-item">
+              <label>Intención</label>
+              <Select value={searchIntent} onValueChange={setSearchIntent}>
+                <SelectTrigger data-testid="filter-intent">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="comprar">🏠 Comprar</SelectItem>
+                  <SelectItem value="alquilar">🔑 Alquilar</SelectItem>
+                  <SelectItem value="vender">💰 Vender</SelectItem>
+                  <SelectItem value="inversion">📈 Inversión</SelectItem>
+                  <SelectItem value="sin_definir">❓ Sin definir</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="filter-item">
               <label>Fecha desde</label>
               <Input 
                 type="date"
@@ -418,7 +469,23 @@ export default function Leads({ filterByAgent = null }) {
                         />
                         <div onClick={() => navigate(`/leads/${lead.phone}`)} className="lead-info-clickable">
                           <h3>{lead.name || 'Sin nombre'}</h3>
-                          <p className="lead-phone">{lead.phone}</p>
+                          <p className="lead-phone">
+                            {formatPhone(lead.phone)}
+                            <button
+                              className="phone-action-btn"
+                              onClick={(e) => copyPhone(e, lead.phone)}
+                              title="Copiar teléfono"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button
+                              className="phone-action-btn whatsapp-btn"
+                              onClick={(e) => openWhatsApp(e, lead.phone)}
+                              title="Abrir en WhatsApp"
+                            >
+                              <MessageCircle className="w-3 h-3" />
+                            </button>
+                          </p>
                         </div>
                       </div>
                       {getStatusBadge(lead.status)}
@@ -444,9 +511,16 @@ export default function Leads({ filterByAgent = null }) {
                         </div>
                       )}
                       
-                      <div className="detail-row">
+                      <div className="detail-row score-row">
                         <span className="label">Score:</span>
-                        <span className="value score">{lead.score}/12</span>
+                        <div className="score-bar-wrapper">
+                          <div
+                            className="score-bar-fill"
+                            style={{ width: `${Math.round((lead.score / 12) * 100)}%` }}
+                            data-score={lead.score}
+                          />
+                        </div>
+                        <span className="score-label">{lead.score}/12</span>
                       </div>
                       
                       {lead.appointment_datetime && (
