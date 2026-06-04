@@ -274,6 +274,26 @@ export default function Leads({ filterByAgent = null }) {
     return <div className="loading-container">Cargando leads...</div>;
   }
   
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const kpis = {
+    hot: leads.filter(l => l.status === 'hot').length,
+    citasHoy: leads.filter(l => {
+      if (!l.appointment_datetime) return false;
+      const d = new Date(l.appointment_datetime);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    }).length,
+    nuevosHoy: leads.filter(l => {
+      if (!l.created_at) return false;
+      const d = new Date(l.created_at);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime() === today.getTime();
+    }).length,
+    sinAsesor: leads.filter(l => !l.assigned_agent_email).length,
+  };
+
   return (
     <div className="page-container" data-testid="leads-page">
       <header className="page-header">
@@ -290,6 +310,37 @@ export default function Leads({ filterByAgent = null }) {
           </Button>
         </div>
       </header>
+
+      <div className="leads-kpis">
+        <div className="kpi-card kpi-hot">
+          <span className="kpi-icon">🔥</span>
+          <div>
+            <span className="kpi-value">{kpis.hot}</span>
+            <span className="kpi-label">Calientes</span>
+          </div>
+        </div>
+        <div className="kpi-card kpi-citas">
+          <span className="kpi-icon">📅</span>
+          <div>
+            <span className="kpi-value">{kpis.citasHoy}</span>
+            <span className="kpi-label">Citas hoy</span>
+          </div>
+        </div>
+        <div className="kpi-card kpi-nuevos">
+          <span className="kpi-icon">⚡</span>
+          <div>
+            <span className="kpi-value">{kpis.nuevosHoy}</span>
+            <span className="kpi-label">Nuevos hoy</span>
+          </div>
+        </div>
+        <div className="kpi-card kpi-sinasesor">
+          <span className="kpi-icon">⚠️</span>
+          <div>
+            <span className="kpi-value">{kpis.sinAsesor}</span>
+            <span className="kpi-label">Sin asesor</span>
+          </div>
+        </div>
+      </div>
 
       {/* Bulk Actions Panel */}
       {selectedLeads.length > 0 && (
