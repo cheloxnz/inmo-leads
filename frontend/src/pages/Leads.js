@@ -75,7 +75,9 @@ export default function Leads({ filterByAgent = null }) {
     let filtered = leads;
     
     // Filtrar por status (tab)
-    if (activeTab !== 'all') {
+    if (activeTab === 'no_intent') {
+      filtered = filtered.filter(l => !l.intent || l.intent === 'sin_definir');
+    } else if (activeTab !== 'all') {
       filtered = filtered.filter(lead => lead.status === activeTab);
     }
     
@@ -408,10 +410,11 @@ export default function Leads({ filterByAgent = null }) {
   });
 
   const tabCounts = {
-    all:  leadsPreTab.length,
-    hot:  leadsPreTab.filter(l => l.status === 'hot').length,
-    warm: leadsPreTab.filter(l => l.status === 'warm').length,
-    cold: leadsPreTab.filter(l => l.status === 'cold').length,
+    all:         leadsPreTab.length,
+    hot:         leadsPreTab.filter(l => l.status === 'hot').length,
+    warm:        leadsPreTab.filter(l => l.status === 'warm').length,
+    cold:        leadsPreTab.filter(l => l.status === 'cold').length,
+    no_intent:   leadsPreTab.filter(l => !l.intent || l.intent === 'sin_definir').length,
   };
 
   const today = new Date();
@@ -652,6 +655,11 @@ export default function Leads({ filterByAgent = null }) {
           <TabsTrigger value="hot" data-testid="tab-hot">🔥 Calientes ({tabCounts.hot})</TabsTrigger>
           <TabsTrigger value="warm" data-testid="tab-warm">🟡 Tibios ({tabCounts.warm})</TabsTrigger>
           <TabsTrigger value="cold" data-testid="tab-cold">❄️ Fríos ({tabCounts.cold})</TabsTrigger>
+          {tabCounts.no_intent > 0 && (
+            <TabsTrigger value="no_intent" data-testid="tab-no-intent" className="tab-warning">
+              ⚠️ Sin intención ({tabCounts.no_intent})
+            </TabsTrigger>
+          )}
         </TabsList>
         
         <TabsContent value={activeTab}>

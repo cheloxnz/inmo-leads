@@ -685,6 +685,15 @@ body {
   }
 }
 
+.tab-warning {
+  color: #b45309 !important;
+}
+
+.tab-warning[data-state="active"] {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+
 .leads-tabs {
   background: white;
   border-radius: 12px;
