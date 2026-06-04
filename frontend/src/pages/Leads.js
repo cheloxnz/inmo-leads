@@ -10,9 +10,111 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle } from 'lucide-react';
+import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle, FileText, LayoutGrid, List } from 'lucide-react';
 import LeadDrawer from '../components/LeadDrawer';
 
+// ── Helpers de intención (nivel módulo — compartidos con KanbanBoard) ──────
+const INTENT_MAP = {
+  comprar:   { icon: '🏠', label: 'Comprar' },
+  alquilar:  { icon: '🔑', label: 'Alquilar' },
+  vender:    { icon: '💰', label: 'Vender' },
+  inversion: { icon: '📈', label: 'Inversión' },
+};
+const intentIcon  = (intent) => INTENT_MAP[intent]?.icon  ?? '❓';
+const intentLabel = (intent) => INTENT_MAP[intent]?.label ?? null;
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+// ── Columnas Kanban ────────────────────────────────────────────────────────
+const KANBAN_COLS = [
+  { id: 'hot',  label: '🔥 Calientes', color: '#ef4444', bg: '#fff1f1', border: '#fca5a5' },
+  { id: 'warm', label: '🟡 Tibios',    color: '#d97706', bg: '#fffbeb', border: '#fcd34d' },
+  { id: 'cold', label: '❄️ Fríos',     color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
+];
+
+// ── KanbanBoard (inline — usa filteredLeads ya cargados) ──────────────────
+function KanbanBoard({ leads, onDrop, onCardClick, dragState, setDragState }) {
+  const byStatus = KANBAN_COLS.reduce((acc, col) => {
+    acc[col.id] = leads.filter(l => l.status === col.id);
+    return acc;
+  }, {});
+
+  const handleDragStart = (lead, sourceCol) => setDragState({ lead, sourceCol });
+  const handleDragOver  = (e, colId) => { e.preventDefault(); setDragState(s => ({ ...s, overCol: colId })); };
+  const handleDragLeave = ()          => setDragState(s => ({ ...s, overCol: null }));
+  const handleDrop      = (e, colId)  => {
+    e.preventDefault();
+    if (dragState?.lead && dragState.sourceCol !== colId) onDrop(dragState.lead, colId);
+    setDragState(null);
+  };
+
+  return (
+    <div className="kanban-board-inline">
+      {KANBAN_COLS.map(col => (
+        <div
+          key={col.id}
+          className={`kanban-col-inline ${dragState?.overCol === col.id ? 'kanban-col-inline--over' : ''}`}
+          style={{ '--col-color': col.color, '--col-bg': col.bg, '--col-border': col.border }}
+          onDragOver={e => handleDragOver(e, col.id)}
+          onDragLeave={handleDragLeave}
+          onDrop={e => handleDrop(e, col.id)}
+        >
+          {/* Header columna */}
+          <div className="kanban-col-header">
+            <span className="kanban-col-title">{col.label}</span>
+            <span className="kanban-col-count">{byStatus[col.id].length}</span>
+          </div>
+
+          {/* Cards */}
+          <div className="kanban-col-cards">
+            {byStatus[col.id].map(lead => (
+              <div
+                key={lead.phone}
+                className={`kanban-mini-card ${dragState?.lead?.phone === lead.phone ? 'kanban-mini-card--dragging' : ''}`}
+                draggable
+                onDragStart={() => handleDragStart(lead, col.id)}
+                onClick={() => onCardClick(lead.phone)}
+                title="Click para ver detalle"
+              >
+                <div className="kanban-mini-name">{lead.name || 'Sin nombre'}</div>
+                <div className="kanban-mini-meta">
+                  {lead.intent && <span>{intentIcon(lead.intent)} {intentLabel(lead.intent) || '—'}</span>}
+                  {lead.zone   && <span>📍 {lead.zone}</span>}
+                  {lead.budget_text && <span>💰 {lead.budget_text}</span>}
+                </div>
+                <div className="kanban-mini-score">
+                  <div className="score-bar-wrapper" style={{ flex: 1 }}>
+                    <div className="score-bar-fill" style={{ width: `${Math.round((lead.score / 12) * 100)}%` }} data-score={lead.score} />
+                  </div>
+                  <span className="kanban-score-num">{lead.score}/12</span>
+                </div>
+                {lead.appointment_datetime && (
+                  <div className="kanban-mini-cita">📅 {formatDate(lead.appointment_datetime)}</div>
+                )}
+                <div className="kanban-mini-footer">
+                  {lead.assigned_agent_name
+                    ? <span className="kanban-agent">👤 {lead.assigned_agent_name}</span>
+                    : <span className="kanban-agent kanban-agent--empty">Sin asesor</span>}
+                </div>
+              </div>
+            ))}
+
+            {byStatus[col.id].length === 0 && (
+              <div className="kanban-col-empty">
+                <span>Arrastrá leads acá</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Componente principal ───────────────────────────────────────────────────
 export default function Leads({ filterByAgent = null }) {
   const [leads, setLeads] = useState([]);
   const [filteredLeads, setFilteredLeads] = useState([]);
@@ -36,6 +138,12 @@ export default function Leads({ filterByAgent = null }) {
   const [bulkTagInput, setBulkTagInput] = useState('');
   const [showBulkTagInput, setShowBulkTagInput] = useState(false);
   const [drawerPhone, setDrawerPhone] = useState(null);
+  // Mejora 5 — toggle vista
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
+  const [dragState, setDragState] = useState(null); // { lead, sourceCol, overCol }
+  // Mejora 6 — notas rápidas inline
+  const [notePhone, setNotePhone] = useState(null);
+  const [noteText, setNoteText] = useState('');
   const [assigningPhone, setAssigningPhone] = useState(null);
   const navigate = useNavigate();
   
@@ -375,12 +483,6 @@ export default function Leads({ filterByAgent = null }) {
     return <Badge className={styles[status]}>{labels[status] || status}</Badge>;
   };
   
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
-
   const timeAgo = (dateString) => {
     if (!dateString) return null;
     const diff = Math.floor((Date.now() - new Date(dateString)) / 1000);
@@ -420,7 +522,30 @@ export default function Leads({ filterByAgent = null }) {
     }
   };
 
-  // Acción masiva directa (para la barra flotante — sin paso intermedio de "Ejecutar")
+  // ── Kanban: mover lead entre columnas ─────────────────────────────────────
+  const handleKanbanDrop = async (lead, targetStatus) => {
+    try {
+      await axios.put(`${API}/leads/${lead.phone}`, { status: targetStatus });
+      setLeads(prev => prev.map(l => l.phone === lead.phone ? { ...l, status: targetStatus } : l));
+      toast.success(`Lead movido a ${KANBAN_COLS.find(c => c.id === targetStatus)?.label || targetStatus}`);
+    } catch {
+      toast.error('Error actualizando estado');
+    }
+  };
+
+  // ── Notas rápidas inline ───────────────────────────────────────────────────
+  const saveNote = async (phone) => {
+    try {
+      await axios.put(`${API}/leads/${phone}`, { notes: noteText });
+      setLeads(prev => prev.map(l => l.phone === phone ? { ...l, notes: noteText } : l));
+      toast.success('Nota guardada');
+      setNotePhone(null);
+    } catch {
+      toast.error('Error guardando nota');
+    }
+  };
+
+  // ── Acción masiva directa (para la barra flotante — sin paso intermedio de "Ejecutar") ──
   const quickBulkAction = async (action, value) => {
     if (selectedLeads.length === 0) return;
     if (action === 'delete') {
@@ -445,16 +570,6 @@ export default function Leads({ filterByAgent = null }) {
       setProcessingBulk(false);
     }
   };
-
-  // Helpers de intención — icono + label legible
-  const INTENT_MAP = {
-    comprar:   { icon: '🏠', label: 'Comprar' },
-    alquilar:  { icon: '🔑', label: 'Alquilar' },
-    vender:    { icon: '💰', label: 'Vender' },
-    inversion: { icon: '📈', label: 'Inversión' },
-  };
-  const intentIcon  = (intent) => INTENT_MAP[intent]?.icon  ?? '❓';
-  const intentLabel = (intent) => INTENT_MAP[intent]?.label ?? null;
 
   const copyPhone = (e, phone) => {
     e.stopPropagation();
@@ -537,6 +652,25 @@ export default function Leads({ filterByAgent = null }) {
           <p className="subtitle">Gestión y seguimiento de contactos</p>
         </div>
         <div className="header-actions">
+          {/* Toggle Lista / Kanban */}
+          <div className="view-toggle" role="group" aria-label="Cambiar vista">
+            <button
+              className={`view-toggle-btn ${viewMode === 'list' ? 'view-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="Vista lista"
+              data-testid="btn-view-list"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              className={`view-toggle-btn ${viewMode === 'kanban' ? 'view-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('kanban')}
+              title="Vista Kanban"
+              data-testid="btn-view-kanban"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
           <Button onClick={fetchLeads} variant="ghost" size="sm" data-testid="btn-refresh">
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -854,7 +988,19 @@ export default function Leads({ filterByAgent = null }) {
         </CardContent>
       </Card>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
+      {/* ── Vista Kanban ── */}
+      {viewMode === 'kanban' && (
+        <KanbanBoard
+          leads={filteredLeads}
+          onDrop={handleKanbanDrop}
+          onCardClick={(phone) => setDrawerPhone(phone)}
+          dragState={dragState}
+          setDragState={setDragState}
+        />
+      )}
+
+      {/* ── Vista Lista (tabs + grid) ── */}
+      {viewMode === 'list' && <Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
         <TabsList>
           <TabsTrigger value="all" data-testid="tab-all">Todos ({tabCounts.all})</TabsTrigger>
           <TabsTrigger value="hot" data-testid="tab-hot">🔥 Calientes ({tabCounts.hot})</TabsTrigger>
@@ -922,11 +1068,46 @@ export default function Leads({ filterByAgent = null }) {
                             >
                               <MessageCircle className="w-3 h-3" />
                             </button>
+                            <button
+                              className={`phone-action-btn note-btn ${lead.notes ? 'note-btn--has-note' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (notePhone === lead.phone) { setNotePhone(null); }
+                                else { setNotePhone(lead.phone); setNoteText(lead.notes || ''); }
+                              }}
+                              title={lead.notes ? `Nota: ${lead.notes}` : 'Agregar nota'}
+                            >
+                              <FileText className="w-3 h-3" />
+                            </button>
                           </p>
                         </div>
                       </div>
                       {getStatusBadge(lead.status)}
                     </div>
+
+                    {/* ── Nota rápida inline ── */}
+                    {notePhone === lead.phone && (
+                      <div className="note-inline" onClick={e => e.stopPropagation()}>
+                        <textarea
+                          className="note-inline-textarea"
+                          value={noteText}
+                          onChange={e => setNoteText(e.target.value)}
+                          placeholder="Escribí una nota sobre este lead..."
+                          rows={2}
+                          autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && e.ctrlKey) saveNote(lead.phone);
+                            if (e.key === 'Escape') setNotePhone(null);
+                          }}
+                        />
+                        <div className="note-inline-actions">
+                          <button className="note-save-btn" onClick={() => saveNote(lead.phone)}>
+                            ✓ Guardar <span className="note-hint">Ctrl+Enter</span>
+                          </button>
+                          <button className="note-cancel-btn" onClick={() => setNotePhone(null)}>✕</button>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* ── Detalles: siempre 5 filas, altura uniforme ── */}
                     <div className="lead-details" onClick={() => setDrawerPhone(lead.phone)}>
@@ -1082,7 +1263,8 @@ export default function Leads({ filterByAgent = null }) {
             </div>
           )}
         </TabsContent>
-      </Tabs>
+      </Tabs>}
+      {/* fin viewMode list */}
 
       <LeadDrawer
         phone={drawerPhone}
