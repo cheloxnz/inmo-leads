@@ -1236,7 +1236,6 @@ export default function Leads({ filterByAgent = null }) {
                             onChange={e => updateIntent(lead.phone, e.target.value)}
                             onBlur={() => setEditingIntentPhone(null)}
                             onClick={e => e.stopPropagation()}
-                            autoFocus
                           >
                             <option value="">Sin definir</option>
                             <option value="comprar">🏠 Comprar</option>
