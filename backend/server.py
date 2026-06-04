@@ -512,6 +512,20 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
                     wa_service.send_text_message(sender, "No pude escuchar el audio. ¿Podés escribirme tu consulta?")
                     return
         
+        # Manejar tipos de mensaje no soportados (imagen, video, sticker, documento)
+        if not message_text and message_type in ("image", "video", "sticker", "document", "location", "contacts"):
+            type_responses = {
+                "image": "Recibí tu imagen, pero por ahora solo puedo procesar texto. ¿Podés contarme qué necesitás?",
+                "video": "Recibí tu video, pero por ahora solo puedo procesar texto. ¿En qué te puedo ayudar?",
+                "sticker": "¡Gracias por el sticker! 😄 ¿En qué te puedo ayudar?",
+                "document": "Recibí tu documento. Para consultas sobre propiedades, escribime y con gusto te ayudo.",
+                "location": "Gracias por compartir tu ubicación. ¿Estás buscando propiedades en esa zona?",
+                "contacts": "Recibí el contacto. ¿En qué te puedo ayudar hoy?",
+            }
+            reply = type_responses.get(message_type, "Por ahora solo proceso texto. ¿En qué te puedo ayudar?")
+            wa_service.send_text_message(sender, reply)
+            return
+
         if message_text:
             # Determine which flow engine to use based on tenant template
             use_generic = True

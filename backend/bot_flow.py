@@ -1393,6 +1393,13 @@ class BotFlowManager:
             logger.info(f"Farewell detected for completed lead {lead.phone}, no response sent")
             return
 
+        # Confirmación de recordatorio de cita
+        if "confirmar_cita" in message_lower:
+            formatted = lead.appointment_datetime.strftime('%d/%m/%Y a las %H:%M') if lead.appointment_datetime else ""
+            response = f"Perfecto {lead.name or ''}! Tu cita esta confirmada para {formatted}. Te esperamos!"
+            self.wa.send_text_message(lead.phone, response)
+            return
+
         # Si seleccionó reagendar (desde botón o texto)
         if "opcion_reagendar" in message_lower or ("reagendar" in message_lower and "mejor" not in message_lower):
             await self.handle_reschedule_request(lead, message)

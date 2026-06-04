@@ -584,30 +584,36 @@ class ScheduledTasks:
                 for lead in leads:
                     try:
                         phone = lead.get('phone')
-                        name = lead.get('name', 'Cliente')
+                        name = (lead.get('name') or 'Cliente').split()[0]
                         appointment = lead.get('appointment_datetime')
-                        
+                        appointment_type = lead.get('appointment_type', 'cita')
+
                         if isinstance(appointment, str):
                             appointment = datetime.fromisoformat(appointment)
-                        
+
                         formatted_date = appointment.strftime('%d/%m/%Y a las %H:%M')
-                        
-                        message = f"¡Hola {name}! 👋\n\n"
-                        message += f"Te recordamos que tenés una cita agendada para *mañana {formatted_date}*.\n\n"
-                        message += "¿Podés confirmar tu asistencia?\n\n"
-                        message += "Si necesitás reagendar o cancelar, escribinos."
-                        
-                        # Enviar mensaje
-                        self.wa.send_text_message(phone, message)
-                        
+
+                        message = (
+                            f"Hola {name}! Te recordamos que manana tenes tu "
+                            f"{appointment_type} agendada para las {formatted_date}.\n\n"
+                            f"Por favor confirma tu asistencia."
+                        )
+
+                        buttons = [
+                            {"type": "reply", "reply": {"id": "confirmar_cita", "title": "Confirmo asistencia"}},
+                            {"type": "reply", "reply": {"id": "opcion_reagendar", "title": "Cambiar fecha"}},
+                            {"type": "reply", "reply": {"id": "opcion_cancelar", "title": "Cancelar cita"}},
+                        ]
+                        self.wa.send_interactive_buttons(phone, message, buttons)
+
                         # Marcar como enviado
                         await self.db.leads.update_one(
                             {"phone": phone},
                             {"$set": {"whatsapp_reminder_sent": True}}
                         )
-                        
+
                         logger.info(f"Recordatorio WhatsApp enviado a {phone}")
-                        
+
                     except Exception as e:
                         logger.error(f"Error enviando recordatorio WhatsApp a {lead.get('phone')}: {str(e)}")
                 
