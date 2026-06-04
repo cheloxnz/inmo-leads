@@ -915,18 +915,31 @@ async def bulk_action(request: BulkActionRequest, current_user: User = Depends(r
     """Ejecuta acción masiva sobre múltiples leads"""
     updated_count = 0
     
+    # Para "assign" buscamos el nombre del agente una sola vez
+    agent_name = None
+    if request.action == "assign" and request.value:
+        agent_doc = await db.users.find_one(
+            {"email": request.value, "tenant_id": current_user.tenant_id},
+            {"name": 1}
+        )
+        agent_name = agent_doc.get("name", request.value) if agent_doc else request.value
+
     for phone in request.lead_phones:
         try:
             tf = tenant_filter(current_user, {"phone": phone})
             if request.action == "tag" and request.value:
                 await db.leads.update_one(tf, {"$addToSet": {"tags": request.value}})
             elif request.action == "assign" and request.value:
-                await db.leads.update_one(tf, {"$set": {"assigned_to": request.value}})
+                await db.leads.update_one(tf, {"$set": {
+                    "assigned_agent": request.value,
+                    "assigned_agent_name": agent_name,
+                    "assigned_at": datetime.utcnow().isoformat(),
+                }})
             elif request.action == "status" and request.value:
                 await db.leads.update_one(tf, {"$set": {"status": request.value}})
             elif request.action == "delete":
                 await db.leads.delete_one(tf)
-            
+
             updated_count += 1
         except Exception as e:
             logger.error(f"Error in bulk action for {phone}: {e}")
