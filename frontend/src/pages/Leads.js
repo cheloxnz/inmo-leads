@@ -690,6 +690,13 @@ export default function Leads({ filterByAgent = null }) {
                     </div>
                     
                     <div className="lead-footer">
+                      {lead.assigned_agent_name ? (
+                        <span className="lead-agent" title="Asesor asignado">
+                          👤 {lead.assigned_agent_name}
+                        </span>
+                      ) : (
+                        <span className="lead-agent lead-agent--unassigned">Sin asesor</span>
+                      )}
                       <span className="created-date" title={`Creado: ${formatDate(lead.created_at)}`}>
                         {lead.last_message_at
                           ? <>🕐 {timeAgo(lead.last_message_at)}</>

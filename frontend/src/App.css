@@ -883,6 +883,17 @@ body {
   color: var(--text-secondary);
 }
 
+.lead-agent {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.lead-agent--unassigned {
+  color: #f59e0b;
+  font-weight: 400;
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem;
