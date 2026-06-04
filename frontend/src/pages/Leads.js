@@ -235,6 +235,17 @@ export default function Leads({ filterByAgent = null }) {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
+
+  const timeAgo = (dateString) => {
+    if (!dateString) return null;
+    const diff = Math.floor((Date.now() - new Date(dateString)) / 1000);
+    if (diff < 60) return 'hace un momento';
+    if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+    if (diff < 172800) return 'ayer';
+    if (diff < 604800) return `hace ${Math.floor(diff / 86400)} días`;
+    return formatDate(dateString);
+  };
   
   const formatPhone = (phone) => {
     // Convierte 5491168754798 → +54 9 11 6875-4798
@@ -531,8 +542,11 @@ export default function Leads({ filterByAgent = null }) {
                     </div>
                     
                     <div className="lead-footer">
-                      <span className="created-date">
-                        Creado: {formatDate(lead.created_at)}
+                      <span className="created-date" title={`Creado: ${formatDate(lead.created_at)}`}>
+                        {lead.last_message_at
+                          ? <>🕐 {timeAgo(lead.last_message_at)}</>
+                          : <>📅 {formatDate(lead.created_at)}</>
+                        }
                       </span>
                       {lead.tags && lead.tags.length > 0 && (
                         <div className="lead-tags">
