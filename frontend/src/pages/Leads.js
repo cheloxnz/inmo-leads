@@ -18,12 +18,12 @@ export default function Leads({ filterByAgent = null }) {
   const [filteredLeads, setFilteredLeads] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [searchName, setSearchName] = useState('');
-  const [searchPhone, setSearchPhone] = useState('');
-  const [searchZone, setSearchZone] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');   // búsqueda unificada (nombre/tel/zona)
   const [searchDateFrom, setSearchDateFrom] = useState('');
   const [searchDateTo, setSearchDateTo] = useState('');
   const [searchIntent, setSearchIntent] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false); // panel avanzado colapsable
+  const [quickFilter, setQuickFilter] = useState(null);  // 'citas_hoy' | 'nuevos_hoy' | 'sin_asesor' | null
   const [sortBy, setSortBy] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,7 +52,7 @@ export default function Leads({ filterByAgent = null }) {
   useEffect(() => {
     filterLeads();
     setCurrentPage(1); // reset al cambiar filtros
-  }, [activeTab, leads, searchName, searchPhone, searchZone, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir]);
+  }, [activeTab, leads, searchQuery, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir, quickFilter]);
   
   const fetchLeads = async () => {
     try {
@@ -88,26 +88,34 @@ export default function Leads({ filterByAgent = null }) {
       filtered = filtered.filter(lead => lead.status === activeTab);
     }
     
-    // Filtrar por nombre
-    if (searchName) {
+    // Búsqueda unificada: nombre, teléfono o zona en un solo campo
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      const qNum = searchQuery.replace(/\D/g, '');
       filtered = filtered.filter(lead =>
-        (lead.name || '').toLowerCase().includes(searchName.toLowerCase())
+        (lead.name || '').toLowerCase().includes(q) ||
+        (qNum && String(lead.phone).includes(qNum)) ||
+        (lead.zone || '').toLowerCase().includes(q)
       );
     }
 
-    // Filtrar por teléfono — normaliza quitando espacios, +, guiones
-    if (searchPhone) {
-      const normalized = searchPhone.replace(/\D/g, '');
-      filtered = filtered.filter(lead =>
-        String(lead.phone).includes(normalized)
-      );
-    }
-    
-    // Filtrar por zona
-    if (searchZone) {
-      filtered = filtered.filter(lead => 
-        (lead.zone || '').toLowerCase().includes(searchZone.toLowerCase())
-      );
+    // Quick-filters desde KPIs
+    if (quickFilter === 'citas_hoy') {
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(l => {
+        if (!l.appointment_datetime) return false;
+        const d = new Date(l.appointment_datetime); d.setHours(0, 0, 0, 0);
+        return d.getTime() === t.getTime();
+      });
+    } else if (quickFilter === 'nuevos_hoy') {
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(l => {
+        if (!l.created_at) return false;
+        const d = new Date(l.created_at); d.setHours(0, 0, 0, 0);
+        return d.getTime() === t.getTime();
+      });
+    } else if (quickFilter === 'sin_asesor') {
+      filtered = filtered.filter(l => !l.assigned_agent_email && !l.assigned_agent);
     }
     
     // Filtrar por intención
@@ -225,13 +233,34 @@ export default function Leads({ filterByAgent = null }) {
   };
   
   const clearFilters = () => {
-    setSearchName('');
-    setSearchPhone('');
-    setSearchZone('');
+    setSearchQuery('');
     setSearchDateFrom('');
     setSearchDateTo('');
     setSearchIntent('');
+    setQuickFilter(null);
+    setActiveTab('all');
   };
+
+  // Manejador de click en KPIs
+  const handleKpiClick = (filter) => {
+    if (filter === 'hot') {
+      // toggle el tab calientes
+      setActiveTab(prev => prev === 'hot' ? 'all' : 'hot');
+      setQuickFilter(null);
+    } else {
+      // para los demás, trabajamos sobre la vista "Todos"
+      setActiveTab('all');
+      setQuickFilter(prev => prev === filter ? null : filter);
+    }
+    setCurrentPage(1);
+  };
+
+  // Cuenta de filtros avanzados activos (para el badge del botón)
+  const activeAdvancedCount = [
+    searchIntent && searchIntent !== 'all',
+    !!searchDateFrom,
+    !!searchDateTo,
+  ].filter(Boolean).length;
 
   // Bulk Actions
   const toggleSelectLead = (phone) => {
@@ -407,12 +436,14 @@ export default function Leads({ filterByAgent = null }) {
   // Leads con los filtros de texto/fecha/intención aplicados pero sin filtro de tab
   // — se usa para los conteos dinámicos de los tabs
   const leadsPreTab = leads.filter(lead => {
-    if (searchName && !(lead.name || '').toLowerCase().includes(searchName.toLowerCase())) return false;
-    if (searchPhone) {
-      const n = searchPhone.replace(/\D/g, '');
-      if (!String(lead.phone).includes(n)) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase().trim();
+      const qNum = searchQuery.replace(/\D/g, '');
+      const match = (lead.name || '').toLowerCase().includes(q) ||
+        (qNum && String(lead.phone).includes(qNum)) ||
+        (lead.zone || '').toLowerCase().includes(q);
+      if (!match) return false;
     }
-    if (searchZone && !(lead.zone || '').toLowerCase().includes(searchZone.toLowerCase())) return false;
     if (searchIntent && searchIntent !== 'all') {
       if (searchIntent === 'sin_definir' && lead.intent) return false;
       if (searchIntent !== 'sin_definir' && lead.intent !== searchIntent) return false;
@@ -478,33 +509,53 @@ export default function Leads({ filterByAgent = null }) {
       </header>
 
       <div className="leads-kpis">
-        <div className="kpi-card kpi-hot">
+        <div
+          className={`kpi-card kpi-hot kpi-clickable ${activeTab === 'hot' ? 'kpi-active' : ''}`}
+          onClick={() => handleKpiClick('hot')}
+          title="Ver leads calientes"
+        >
           <span className="kpi-icon">🔥</span>
           <div>
             <span className="kpi-value">{kpis.hot}</span>
             <span className="kpi-label">Calientes</span>
           </div>
+          {activeTab === 'hot' && <span className="kpi-active-dot" />}
         </div>
-        <div className="kpi-card kpi-citas">
+        <div
+          className={`kpi-card kpi-citas kpi-clickable ${quickFilter === 'citas_hoy' ? 'kpi-active' : ''}`}
+          onClick={() => handleKpiClick('citas_hoy')}
+          title="Ver leads con cita hoy"
+        >
           <span className="kpi-icon">📅</span>
           <div>
             <span className="kpi-value">{kpis.citasHoy}</span>
             <span className="kpi-label">Citas hoy</span>
           </div>
+          {quickFilter === 'citas_hoy' && <span className="kpi-active-dot" />}
         </div>
-        <div className="kpi-card kpi-nuevos">
+        <div
+          className={`kpi-card kpi-nuevos kpi-clickable ${quickFilter === 'nuevos_hoy' ? 'kpi-active' : ''}`}
+          onClick={() => handleKpiClick('nuevos_hoy')}
+          title="Ver leads de hoy"
+        >
           <span className="kpi-icon">⚡</span>
           <div>
             <span className="kpi-value">{kpis.nuevosHoy}</span>
             <span className="kpi-label">Nuevos hoy</span>
           </div>
+          {quickFilter === 'nuevos_hoy' && <span className="kpi-active-dot" />}
         </div>
-        <div className="kpi-card kpi-sinasesor">
+        <div
+          className={`kpi-card kpi-sinasesor kpi-clickable ${quickFilter === 'sin_asesor' ? 'kpi-active kpi-active--warning' : ''}`}
+          onClick={() => handleKpiClick('sin_asesor')}
+          title="Ver leads sin asesor asignado"
+        >
           <span className="kpi-icon">⚠️</span>
           <div>
             <span className="kpi-value">{kpis.sinAsesor}</span>
             <span className="kpi-label">Sin asesor</span>
           </div>
+          {quickFilter === 'sin_asesor' && <span className="kpi-active-dot kpi-active-dot--warning" />}
         </div>
       </div>
 
@@ -594,83 +645,141 @@ export default function Leads({ filterByAgent = null }) {
       
       <Card className="filters-card">
         <CardContent>
-          <div className="filters-grid">
-            <div className="filter-item">
-              <label>Nombre</label>
+          {/* ── Barra principal: búsqueda unificada + toggle avanzado ── */}
+          <div className="filter-main-row">
+            <div className="filter-search-wrap">
+              <span className="filter-search-icon">🔍</span>
               <Input
-                placeholder="Ej: Juan Pérez"
-                value={searchName}
-                onChange={(e) => setSearchName(e.target.value)}
-                data-testid="filter-name"
+                className="filter-search-input"
+                placeholder="Buscar por nombre, teléfono o zona..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="filter-search"
               />
+              {searchQuery && (
+                <button className="filter-search-clear" onClick={() => setSearchQuery('')} title="Limpiar búsqueda">
+                  ✕
+                </button>
+              )}
             </div>
 
-            <div className="filter-item">
-              <label>Teléfono</label>
-              <Input
-                placeholder="Ej: 11 6875"
-                value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
-                data-testid="filter-phone"
-              />
-            </div>
-            
-            <div className="filter-item">
-              <label>Buscar por zona</label>
-              <Input 
-                placeholder="Ej: Palermo"
-                value={searchZone}
-                onChange={(e) => setSearchZone(e.target.value)}
-                data-testid="filter-zone"
-              />
-            </div>
-            
-            <div className="filter-item">
-              <label>Intención</label>
-              <Select value={searchIntent} onValueChange={setSearchIntent}>
-                <SelectTrigger data-testid="filter-intent">
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="comprar">🏠 Comprar</SelectItem>
-                  <SelectItem value="alquilar">🔑 Alquilar</SelectItem>
-                  <SelectItem value="vender">💰 Vender</SelectItem>
-                  <SelectItem value="inversion">📈 Inversión</SelectItem>
-                  <SelectItem value="sin_definir">❓ Sin definir</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <button
+              className={`filter-toggle-btn ${filtersOpen ? 'filter-toggle-btn--open' : ''}`}
+              onClick={() => setFiltersOpen(v => !v)}
+              data-testid="btn-toggle-filters"
+            >
+              ⚙️ Filtros
+              {activeAdvancedCount > 0 && (
+                <span className="filter-badge">{activeAdvancedCount}</span>
+              )}
+              <span className="filter-toggle-arrow">{filtersOpen ? '▲' : '▼'}</span>
+            </button>
 
-            <div className="filter-item">
-              <label>Fecha desde</label>
-              <Input 
-                type="date"
-                value={searchDateFrom}
-                onChange={(e) => setSearchDateFrom(e.target.value)}
-                data-testid="filter-date-from"
-              />
-            </div>
-            
-            <div className="filter-item">
-              <label>Fecha hasta</label>
-              <Input 
-                type="date"
-                value={searchDateTo}
-                onChange={(e) => setSearchDateTo(e.target.value)}
-                data-testid="filter-date-to"
-              />
-            </div>
-            
-            <div className="filter-item filter-actions">
-              <Button onClick={clearFilters} variant="ghost" data-testid="btn-clear-filters">
-                🔄 Limpiar Filtros
-              </Button>
-            </div>
+            {(searchQuery || activeAdvancedCount > 0 || quickFilter) && (
+              <button className="filter-clear-all-btn" onClick={clearFilters} data-testid="btn-clear-filters">
+                Limpiar todo
+              </button>
+            )}
           </div>
-          
+
+          {/* ── Chips de filtros activos ── */}
+          {(searchQuery || activeAdvancedCount > 0 || quickFilter) && (
+            <div className="filter-chips">
+              {searchQuery && (
+                <span className="filter-chip">
+                  🔍 "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')}>✕</button>
+                </span>
+              )}
+              {quickFilter === 'citas_hoy' && (
+                <span className="filter-chip filter-chip--blue">
+                  📅 Citas hoy
+                  <button onClick={() => setQuickFilter(null)}>✕</button>
+                </span>
+              )}
+              {quickFilter === 'nuevos_hoy' && (
+                <span className="filter-chip filter-chip--purple">
+                  ⚡ Nuevos hoy
+                  <button onClick={() => setQuickFilter(null)}>✕</button>
+                </span>
+              )}
+              {quickFilter === 'sin_asesor' && (
+                <span className="filter-chip filter-chip--warning">
+                  ⚠️ Sin asesor
+                  <button onClick={() => setQuickFilter(null)}>✕</button>
+                </span>
+              )}
+              {searchIntent && searchIntent !== 'all' && (
+                <span className="filter-chip">
+                  🏠 {searchIntent}
+                  <button onClick={() => setSearchIntent('')}>✕</button>
+                </span>
+              )}
+              {searchDateFrom && (
+                <span className="filter-chip">
+                  📅 Desde {searchDateFrom}
+                  <button onClick={() => setSearchDateFrom('')}>✕</button>
+                </span>
+              )}
+              {searchDateTo && (
+                <span className="filter-chip">
+                  📅 Hasta {searchDateTo}
+                  <button onClick={() => setSearchDateTo('')}>✕</button>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* ── Panel de filtros avanzados (colapsable) ── */}
+          {filtersOpen && (
+            <div className="filters-advanced">
+              <div className="filters-grid">
+                <div className="filter-item">
+                  <label>Intención</label>
+                  <Select value={searchIntent} onValueChange={setSearchIntent}>
+                    <SelectTrigger data-testid="filter-intent">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="comprar">🏠 Comprar</SelectItem>
+                      <SelectItem value="alquilar">🔑 Alquilar</SelectItem>
+                      <SelectItem value="vender">💰 Vender</SelectItem>
+                      <SelectItem value="inversion">📈 Inversión</SelectItem>
+                      <SelectItem value="sin_definir">❓ Sin definir</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="filter-item">
+                  <label>Fecha desde</label>
+                  <Input
+                    type="date"
+                    value={searchDateFrom}
+                    onChange={(e) => setSearchDateFrom(e.target.value)}
+                    data-testid="filter-date-from"
+                  />
+                </div>
+
+                <div className="filter-item">
+                  <label>Fecha hasta</label>
+                  <Input
+                    type="date"
+                    value={searchDateTo}
+                    onChange={(e) => setSearchDateTo(e.target.value)}
+                    data-testid="filter-date-to"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Resultados + Sort ── */}
           <div className="filter-results-row">
-            <span>Mostrando {filteredLeads.length} de {leads.length} leads</span>
+            <span>
+              Mostrando {filteredLeads.length} de {leads.length} leads
+              {quickFilter && <span className="filter-active-hint"> · filtro activo</span>}
+            </span>
             <div className="sort-bar">
               <span className="sort-label">Ordenar:</span>
               <SortBtn field="score" label="Score" />
