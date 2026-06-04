@@ -170,6 +170,18 @@ export default function Leads({ filterByAgent = null }) {
     );
   };
 
+  const getScoreCriteria = (lead) => [
+    { label: 'Intención',      met: !!lead.intent && lead.intent !== 'sin_definir' },
+    { label: 'Zona',           met: !!lead.zone },
+    { label: 'Presupuesto',    met: !!lead.budget_text },
+    { label: 'Tipo propiedad', met: !!lead.property_type },
+    { label: 'Urgencia',       met: !!lead.urgency },
+    { label: 'Financiamiento', met: !!lead.financing && lead.financing !== 'no_se' },
+    { label: 'Must-have',      met: !!(lead.must_have?.length) },
+    { label: 'Cita agendada',  met: !!lead.appointment_datetime },
+    { label: 'Nombre',         met: !!lead.name },
+  ];
+
   const toggleSort = (field) => {
     if (sortBy === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -723,7 +735,7 @@ export default function Leads({ filterByAgent = null }) {
                         </div>
                       )}
                       
-                      <div className="detail-row score-row">
+                      <div className="detail-row score-row score-tooltip-wrap">
                         <span className="label">Score:</span>
                         <div className="score-bar-wrapper">
                           <div
@@ -733,6 +745,13 @@ export default function Leads({ filterByAgent = null }) {
                           />
                         </div>
                         <span className="score-label">{lead.score}/12</span>
+                        <div className="score-tooltip">
+                          {getScoreCriteria(lead).map(c => (
+                            <div key={c.label} className={`score-tooltip-item ${c.met ? 'met' : 'unmet'}`}>
+                              {c.met ? '✅' : '❌'} {c.label}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       
                       {lead.appointment_datetime && (

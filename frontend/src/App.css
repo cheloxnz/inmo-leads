@@ -853,6 +853,49 @@ body {
   background: #22c55e;
 }
 
+.score-tooltip-wrap {
+  position: relative;
+}
+
+.score-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.13);
+  padding: 0.625rem 0.75rem;
+  z-index: 30;
+  min-width: 160px;
+  pointer-events: none;
+}
+
+.score-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--border-color, #e5e7eb);
+}
+
+.score-tooltip-wrap:hover .score-tooltip {
+  display: block;
+}
+
+.score-tooltip-item {
+  font-size: 0.75rem;
+  padding: 0.125rem 0;
+  white-space: nowrap;
+}
+
+.score-tooltip-item.met   { color: var(--text-primary); }
+.score-tooltip-item.unmet { color: var(--text-secondary); opacity: 0.6; }
+
 .score-label {
   font-size: 0.75rem;
   font-weight: 600;
