@@ -50,7 +50,7 @@ async def get_leads_by_intent(current_user: User = Depends(get_current_user)):
 async def get_conversion_funnel(current_user: User = Depends(get_current_user)):
     tf = tenant_filter(current_user)
     total = await _db.leads.count_documents(tf)
-    qualified = await _db.leads.count_documents({**tf, "score": {"$gte": 30}})
+    qualified = await _db.leads.count_documents({**tf, "score": {"$gte": 5}})
     with_appointment = await _db.leads.count_documents({**tf, "appointment_datetime": {"$exists": True, "$ne": None}})
     hot = await _db.leads.count_documents({**tf, "status": "hot"})
     return {
@@ -62,6 +62,43 @@ async def get_conversion_funnel(current_user: User = Depends(get_current_user)):
         "appointment_rate": round((with_appointment / total * 100) if total > 0 else 0, 1),
         "conversion_rate": round((hot / total * 100) if total > 0 else 0, 1)
     }
+
+
+# Orden lógico del flujo para el funnel por stage
+_FUNNEL_STAGES = [
+    "welcome", "intent", "name", "zone", "budget",
+    "rental_details", "property_type", "bedrooms",
+    "must_have", "urgency", "financing",
+    "appointment_offer", "select_day", "select_time",
+    "confirmation", "handoff", "completed",
+]
+
+
+@router.get("/metrics/funnel-by-stage")
+async def get_funnel_by_stage(current_user: User = Depends(get_current_user)):
+    """Cuenta leads por flow_stage para visualizar dónde se pierden en el funnel."""
+    tf = tenant_filter(current_user)
+    pipeline = [
+        {"$match": tf},
+        {"$group": {"_id": "$flow_stage", "count": {"$sum": 1}}},
+    ]
+    result = await _db.leads.aggregate(pipeline).to_list(50)
+    counts = {r["_id"]: r["count"] for r in result if r["_id"]}
+
+    ordered = [
+        {"stage": s, "count": counts.get(s, 0)}
+        for s in _FUNNEL_STAGES
+    ]
+    # Agregar stages que existan en DB pero no en el orden predefinido
+    for stage, count in counts.items():
+        if stage not in _FUNNEL_STAGES:
+            ordered.append({"stage": stage, "count": count})
+
+    total = sum(item["count"] for item in ordered)
+    for item in ordered:
+        item["pct"] = round(item["count"] / total * 100, 1) if total > 0 else 0
+
+    return {"stages": ordered, "total": total}
 
 
 @router.get("/metrics/messages")

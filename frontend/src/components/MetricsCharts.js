@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API } from '../App';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
+import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
 const COLORS = ['#10b981', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6'];
@@ -15,11 +15,32 @@ const STATUS_COLORS = {
   archived: '#6b7280'
 };
 
+const STAGE_LABELS = {
+  welcome: 'Bienvenida',
+  intent: 'Intención',
+  name: 'Nombre',
+  zone: 'Zona',
+  budget: 'Presupuesto',
+  rental_details: 'Det. Alquiler',
+  property_type: 'Tipo propiedad',
+  bedrooms: 'Dormitorios',
+  must_have: 'Requisitos',
+  urgency: 'Urgencia',
+  financing: 'Financiamiento',
+  appointment_offer: 'Oferta cita',
+  select_day: 'Elige día',
+  select_time: 'Elige hora',
+  confirmation: 'Confirmación',
+  handoff: 'Handoff',
+  completed: 'Completado',
+};
+
 export default function MetricsCharts() {
   const [leadsByDay, setLeadsByDay] = useState([]);
   const [leadsByStatus, setLeadsByStatus] = useState([]);
   const [leadsByIntent, setLeadsByIntent] = useState([]);
   const [funnel, setFunnel] = useState(null);
+  const [funnelByStage, setFunnelByStage] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,17 +49,19 @@ export default function MetricsCharts() {
 
   const fetchMetrics = async () => {
     try {
-      const [byDay, byStatus, byIntent, funnelData] = await Promise.all([
+      const [byDay, byStatus, byIntent, funnelData, byStage] = await Promise.all([
         axios.get(`${API}/metrics/leads-by-day?days=14`),
         axios.get(`${API}/metrics/leads-by-status`),
         axios.get(`${API}/metrics/leads-by-intent`),
-        axios.get(`${API}/metrics/conversion-funnel`)
+        axios.get(`${API}/metrics/conversion-funnel`),
+        axios.get(`${API}/metrics/funnel-by-stage`),
       ]);
-      
+
       setLeadsByDay(Array.isArray(byDay.data) ? byDay.data : []);
       setLeadsByStatus(Array.isArray(byStatus.data) ? byStatus.data : []);
       setLeadsByIntent(Array.isArray(byIntent.data) ? byIntent.data : []);
       setFunnel(funnelData.data);
+      setFunnelByStage(byStage.data);
     } catch (error) {
       console.error('Error fetching metrics:', error);
     } finally {
@@ -103,6 +126,54 @@ export default function MetricsCharts() {
                 <div className="funnel-label">Hot Leads</div>
                 <div className="funnel-rate">{funnel.conversion_rate}%</div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Funnel por stage del bot */}
+      {funnelByStage && funnelByStage.total > 0 && (
+        <Card className="funnel-card" style={{ marginTop: 16 }}>
+          <CardHeader>
+            <CardTitle>Dónde se pierden los leads (por etapa del bot)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={funnelByStage.stages.filter(s => s.count > 0)}
+                layout="vertical"
+                margin={{ left: 10, right: 30 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis type="number" stroke="#9ca3af" fontSize={11} />
+                <YAxis
+                  type="category"
+                  dataKey="stage"
+                  tickFormatter={(s) => STAGE_LABELS[s] || s}
+                  stroke="#9ca3af"
+                  fontSize={11}
+                  width={110}
+                />
+                <Tooltip
+                  formatter={(value, _name, props) => [
+                    `${value} leads (${props.payload.pct}%)`,
+                    'Leads en esta etapa',
+                  ]}
+                  labelFormatter={(s) => STAGE_LABELS[s] || s}
+                  contentStyle={{ background: '#1f2937', border: '1px solid #374151' }}
+                />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {funnelByStage.stages.filter(s => s.count > 0).map((entry, index) => (
+                    <Cell
+                      key={entry.stage}
+                      fill={entry.stage === 'completed' ? '#10b981' : entry.stage === 'handoff' ? '#6366f1' : COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>
+              Total: {funnelByStage.total} leads · Las barras muestran cuántos leads están actualmente en cada etapa
             </div>
           </CardContent>
         </Card>

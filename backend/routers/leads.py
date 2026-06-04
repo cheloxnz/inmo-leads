@@ -253,6 +253,28 @@ async def get_stats(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/leads/{phone}/conversation")
+async def get_lead_conversation(phone: str, current_user: User = Depends(get_current_user)):
+    """Devuelve el historial de conversación de un lead estilo chat."""
+    query = tenant_filter(current_user, {"phone": phone})
+    lead = await _db.leads.find_one(query, {"_id": 0, "conversation_history": 1, "name": 1, "phone": 1})
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+    messages = []
+    for msg in lead.get("conversation_history", []):
+        messages.append({
+            "from": msg.get("from", "unknown"),   # "customer" | "bot"
+            "text": msg.get("text", ""),
+            "timestamp": msg.get("timestamp"),
+        })
+    return {
+        "phone": lead["phone"],
+        "name": lead.get("name"),
+        "messages": messages,
+        "total": len(messages),
+    }
+
+
 @router.get("/leads/{phone}")
 async def get_lead(phone: str, current_user: User = Depends(get_current_user)):
     """Obtiene un lead específico (filtrado por tenant)"""
