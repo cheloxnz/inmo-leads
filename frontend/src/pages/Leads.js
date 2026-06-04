@@ -319,6 +319,34 @@ export default function Leads({ filterByAgent = null }) {
     return <div className="loading-container">Cargando leads...</div>;
   }
   
+  // Leads con los filtros de texto/fecha/intención aplicados pero sin filtro de tab
+  // — se usa para los conteos dinámicos de los tabs
+  const leadsPreTab = leads.filter(lead => {
+    if (searchName && !(lead.name || '').toLowerCase().includes(searchName.toLowerCase())) return false;
+    if (searchZone && !(lead.zone || '').toLowerCase().includes(searchZone.toLowerCase())) return false;
+    if (searchIntent && searchIntent !== 'all') {
+      if (searchIntent === 'sin_definir' && lead.intent) return false;
+      if (searchIntent !== 'sin_definir' && lead.intent !== searchIntent) return false;
+    }
+    if (searchDateFrom) {
+      const from = new Date(searchDateFrom);
+      if (new Date(lead.created_at) < from) return false;
+    }
+    if (searchDateTo) {
+      const to = new Date(searchDateTo);
+      to.setHours(23, 59, 59);
+      if (new Date(lead.created_at) > to) return false;
+    }
+    return true;
+  });
+
+  const tabCounts = {
+    all:  leadsPreTab.length,
+    hot:  leadsPreTab.filter(l => l.status === 'hot').length,
+    warm: leadsPreTab.filter(l => l.status === 'warm').length,
+    cold: leadsPreTab.filter(l => l.status === 'cold').length,
+  };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -553,10 +581,10 @@ export default function Leads({ filterByAgent = null }) {
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all">Todos ({leads.length})</TabsTrigger>
-          <TabsTrigger value="hot" data-testid="tab-hot">Calientes ({leads.filter(l => l.status === 'hot').length})</TabsTrigger>
-          <TabsTrigger value="warm" data-testid="tab-warm">Tibios ({leads.filter(l => l.status === 'warm').length})</TabsTrigger>
-          <TabsTrigger value="cold" data-testid="tab-cold">Fríos ({leads.filter(l => l.status === 'cold').length})</TabsTrigger>
+          <TabsTrigger value="all" data-testid="tab-all">Todos ({tabCounts.all})</TabsTrigger>
+          <TabsTrigger value="hot" data-testid="tab-hot">🔥 Calientes ({tabCounts.hot})</TabsTrigger>
+          <TabsTrigger value="warm" data-testid="tab-warm">🟡 Tibios ({tabCounts.warm})</TabsTrigger>
+          <TabsTrigger value="cold" data-testid="tab-cold">❄️ Fríos ({tabCounts.cold})</TabsTrigger>
         </TabsList>
         
         <TabsContent value={activeTab}>
