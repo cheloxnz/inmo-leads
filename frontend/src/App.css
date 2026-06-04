@@ -918,6 +918,73 @@ body {
   text-align: right;
 }
 
+.lead-agent-wrap {
+  position: relative;
+}
+
+.lead-agent-btn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lead-agent-btn:hover {
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary);
+}
+
+.lead-agent-btn--unassigned {
+  color: #f59e0b;
+}
+
+.agent-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.agent-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.agent-dropdown-item:hover {
+  background: var(--bg-secondary, #f3f4f6);
+}
+
+.agent-dropdown-item--active {
+  font-weight: 600;
+  color: var(--primary, #6366f1);
+}
+
+.agent-dropdown-empty {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
 .lead-agent {
   font-size: 0.75rem;
   color: var(--text-secondary);

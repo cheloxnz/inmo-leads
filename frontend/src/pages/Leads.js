@@ -31,12 +31,20 @@ export default function Leads({ filterByAgent = null }) {
   const [agents, setAgents] = useState([]);
   const [processingBulk, setProcessingBulk] = useState(false);
   const [drawerPhone, setDrawerPhone] = useState(null);
+  const [assigningPhone, setAssigningPhone] = useState(null);
   const navigate = useNavigate();
   
   useEffect(() => {
     fetchLeads();
     fetchAgents();
   }, [filterByAgent]);
+
+  useEffect(() => {
+    if (!assigningPhone) return;
+    const handler = () => setAssigningPhone(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [assigningPhone]);
   
   useEffect(() => {
     filterLeads();
@@ -333,6 +341,22 @@ export default function Leads({ filterByAgent = null }) {
       return `+54 ${p.slice(2, 4)} ${p.slice(4, 8)}-${p.slice(8)}`;
     }
     return `+${p}`;
+  };
+
+  const quickAssign = async (e, leadPhone, agentEmail) => {
+    e.stopPropagation();
+    setAssigningPhone(null);
+    try {
+      await axios.post(`${API}/leads/bulk-action`, {
+        lead_phones: [leadPhone],
+        action: 'assign',
+        value: agentEmail,
+      });
+      toast.success('Asesor asignado');
+      fetchLeads();
+    } catch {
+      toast.error('Error asignando asesor');
+    }
   };
 
   const copyPhone = (e, phone) => {
@@ -721,13 +745,32 @@ export default function Leads({ filterByAgent = null }) {
                     {lead.flow_stage && <FlowStageBar stage={lead.flow_stage} />}
 
                     <div className="lead-footer">
-                      {lead.assigned_agent_name ? (
-                        <span className="lead-agent" title="Asesor asignado">
-                          👤 {lead.assigned_agent_name}
-                        </span>
-                      ) : (
-                        <span className="lead-agent lead-agent--unassigned">Sin asesor</span>
-                      )}
+                      <div className="lead-agent-wrap" onClick={e => e.stopPropagation()}>
+                        <button
+                          className={`lead-agent-btn ${!lead.assigned_agent_name ? 'lead-agent-btn--unassigned' : ''}`}
+                          onClick={e => { e.stopPropagation(); setAssigningPhone(assigningPhone === lead.phone ? null : lead.phone); }}
+                          title="Asignar asesor"
+                        >
+                          👤 {lead.assigned_agent_name || 'Sin asesor'} ▾
+                        </button>
+                        {assigningPhone === lead.phone && (
+                          <div className="agent-dropdown">
+                            {agents.filter(a => a.role !== 'admin').length === 0 ? (
+                              <span className="agent-dropdown-empty">Sin asesores</span>
+                            ) : (
+                              agents.filter(a => a.role !== 'admin').map(agent => (
+                                <button
+                                  key={agent.email}
+                                  className={`agent-dropdown-item ${lead.assigned_agent === agent.email ? 'agent-dropdown-item--active' : ''}`}
+                                  onClick={e => quickAssign(e, lead.phone, agent.email)}
+                                >
+                                  {agent.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <span className="created-date" title={`Creado: ${formatDate(lead.created_at)}`}>
                         {lead.last_message_at
                           ? <>🕐 {timeAgo(lead.last_message_at)}</>
