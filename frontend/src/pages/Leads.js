@@ -19,6 +19,7 @@ export default function Leads({ filterByAgent = null }) {
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [searchName, setSearchName] = useState('');
+  const [searchPhone, setSearchPhone] = useState('');
   const [searchZone, setSearchZone] = useState('');
   const [searchDateFrom, setSearchDateFrom] = useState('');
   const [searchDateTo, setSearchDateTo] = useState('');
@@ -48,7 +49,7 @@ export default function Leads({ filterByAgent = null }) {
   
   useEffect(() => {
     filterLeads();
-  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir]);
+  }, [activeTab, leads, searchName, searchPhone, searchZone, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir]);
   
   const fetchLeads = async () => {
     try {
@@ -83,8 +84,16 @@ export default function Leads({ filterByAgent = null }) {
     
     // Filtrar por nombre
     if (searchName) {
-      filtered = filtered.filter(lead => 
+      filtered = filtered.filter(lead =>
         (lead.name || '').toLowerCase().includes(searchName.toLowerCase())
+      );
+    }
+
+    // Filtrar por teléfono — normaliza quitando espacios, +, guiones
+    if (searchPhone) {
+      const normalized = searchPhone.replace(/\D/g, '');
+      filtered = filtered.filter(lead =>
+        String(lead.phone).includes(normalized)
       );
     }
     
@@ -211,6 +220,7 @@ export default function Leads({ filterByAgent = null }) {
   
   const clearFilters = () => {
     setSearchName('');
+    setSearchPhone('');
     setSearchZone('');
     setSearchDateFrom('');
     setSearchDateTo('');
@@ -392,6 +402,10 @@ export default function Leads({ filterByAgent = null }) {
   // — se usa para los conteos dinámicos de los tabs
   const leadsPreTab = leads.filter(lead => {
     if (searchName && !(lead.name || '').toLowerCase().includes(searchName.toLowerCase())) return false;
+    if (searchPhone) {
+      const n = searchPhone.replace(/\D/g, '');
+      if (!String(lead.phone).includes(n)) return false;
+    }
     if (searchZone && !(lead.zone || '').toLowerCase().includes(searchZone.toLowerCase())) return false;
     if (searchIntent && searchIntent !== 'all') {
       if (searchIntent === 'sin_definir' && lead.intent) return false;
@@ -573,12 +587,22 @@ export default function Leads({ filterByAgent = null }) {
         <CardContent>
           <div className="filters-grid">
             <div className="filter-item">
-              <label>Buscar por nombre</label>
-              <Input 
+              <label>Nombre</label>
+              <Input
                 placeholder="Ej: Juan Pérez"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
                 data-testid="filter-name"
+              />
+            </div>
+
+            <div className="filter-item">
+              <label>Teléfono</label>
+              <Input
+                placeholder="Ej: 11 6875"
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                data-testid="filter-phone"
               />
             </div>
             
