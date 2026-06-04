@@ -396,15 +396,32 @@ class BotFlowManager:
         return lead
     
     async def handle_welcome(self, lead: Lead, message: str):
-        """Maneja etapa de bienvenida"""
-        response = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy acá para ayudarte 🏡\n\n¿Qué te gustaría hacer?"
-        
+        """Maneja etapa de bienvenida — reconoce al lead que vuelve"""
+        returning = lead.name and lead.created_at and (datetime.utcnow() - lead.created_at).total_seconds() > 300
+
+        if returning:
+            # Lead conocido — saludo personalizado con contexto
+            name = lead.name.split()[0] if lead.name else ""
+            intent_str = _enum_val(lead.intent) if lead.intent else None
+            zone = getattr(lead, "zone", None)
+
+            if intent_str and zone:
+                context_hint = f"la última vez estabas buscando para *{intent_str}* en *{zone}*"
+            elif intent_str:
+                context_hint = f"la última vez estabas interesado en *{intent_str}*"
+            else:
+                context_hint = "ya hablamos antes"
+
+            response = f"¡Hola {name}! 👋 {context_hint.capitalize()}.\n\n¿En qué te puedo ayudar hoy?"
+        else:
+            response = "¡Hola! Soy el asistente virtual de la inmobiliaria. Estoy aqui para ayudarte 🏡\n\n¿Qué te gustaria hacer?"
+
         buttons = [
             {"type": "reply", "reply": {"id": "comprar", "title": "Comprar"}},
             {"type": "reply", "reply": {"id": "alquilar", "title": "Alquilar"}},
             {"type": "reply", "reply": {"id": "vender", "title": "Vender"}}
         ]
-        
+
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.INTENT
     

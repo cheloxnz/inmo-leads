@@ -25,6 +25,7 @@ class ScheduledTasks:
         asyncio.create_task(self.check_appointment_reminders())
         asyncio.create_task(self.check_warm_lead_reactivation())
         asyncio.create_task(self.check_whatsapp_appointment_reminders())
+        asyncio.create_task(self.check_whatsapp_lead_reactivation())
         asyncio.create_task(self.bill_monthly_overage())
         asyncio.create_task(self.run_onboarding_coach())
         asyncio.create_task(self.run_commission_expiry())
@@ -709,6 +710,67 @@ class ScheduledTasks:
                 logger.error(f"Error en check_warm_lead_reactivation: {str(e)}")
                 await asyncio.sleep(43200)
     
+    async def check_whatsapp_lead_reactivation(self):
+        """Envía mensaje de reactivación por WhatsApp a leads sin actividad en 48hs."""
+        await asyncio.sleep(300)  # Esperar 5min al startup
+        while self.running:
+            try:
+                if not self.wa:
+                    await asyncio.sleep(3600)
+                    continue
+
+                cutoff_48h = (datetime.utcnow() - timedelta(hours=48)).isoformat()
+                min_days_between = (datetime.utcnow() - timedelta(days=5)).isoformat()
+
+                # Leads warm/hot sin actividad en 48hs que no hayan recibido reactivación en 5 días
+                leads = await self.db.leads.find({
+                    "status": {"$in": ["warm", "hot"]},
+                    "flow_stage": {"$nin": ["completed", "handoff", "disqualified"]},
+                    "last_message_at": {"$lt": cutoff_48h},
+                    "$or": [
+                        {"last_whatsapp_reactivation_at": {"$exists": False}},
+                        {"last_whatsapp_reactivation_at": None},
+                        {"last_whatsapp_reactivation_at": {"$lt": min_days_between}}
+                    ]
+                }, {"_id": 0}).to_list(50)
+
+                for lead in leads:
+                    try:
+                        phone = lead.get("phone")
+                        name = (lead.get("name") or "").split()[0] or "hola"
+                        intent = lead.get("intent", "")
+                        zone = lead.get("zone", "")
+
+                        if intent and zone:
+                            context = f"seguís buscando para *{intent}* en *{zone}*"
+                        elif intent:
+                            context = f"seguís interesado en *{intent}*"
+                        else:
+                            context = "seguís buscando una propiedad"
+
+                        message = (
+                            f"¡Hola {name}! 👋\n\n"
+                            f"Quería saber si {context}. "
+                            f"Tenemos nuevas opciones disponibles que podrían interesarte.\n\n"
+                            f"¿Te gustaría que un asesor te contacte?"
+                        )
+
+                        self.wa.send_text_message(phone, message)
+                        logger.info(f"[Scheduler] Reactivación WhatsApp enviada a {phone}")
+
+                        await self.db.leads.update_one(
+                            {"phone": phone},
+                            {"$set": {"last_whatsapp_reactivation_at": datetime.utcnow().isoformat()}}
+                        )
+                    except Exception as e:
+                        logger.error(f"[Scheduler] Error reactivación WA para {lead.get('phone')}: {e}")
+
+                await asyncio.sleep(6 * 3600)  # Revisar cada 6 horas
+
+            except Exception as e:
+                logger.error(f"[Scheduler] Error en check_whatsapp_lead_reactivation: {e}")
+                await asyncio.sleep(6 * 3600)
+
     async def stop(self):
         """Detiene las tareas programadas"""
         self.running = False
