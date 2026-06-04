@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle } from 'lucide-react';
+import LeadDrawer from '../components/LeadDrawer';
 
 export default function Leads({ filterByAgent = null }) {
   const [leads, setLeads] = useState([]);
@@ -29,6 +30,7 @@ export default function Leads({ filterByAgent = null }) {
   const [bulkValue, setBulkValue] = useState('');
   const [agents, setAgents] = useState([]);
   const [processingBulk, setProcessingBulk] = useState(false);
+  const [drawerPhone, setDrawerPhone] = useState(null);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -624,7 +626,7 @@ export default function Leads({ filterByAgent = null }) {
                           onClick={(e) => e.stopPropagation()}
                           data-testid={`checkbox-lead-${lead.phone}`}
                         />
-                        <div onClick={() => navigate(`/leads/${lead.phone}`)} className="lead-info-clickable">
+                        <div onClick={() => setDrawerPhone(lead.phone)} className="lead-info-clickable">
                           <h3>{lead.name || 'Sin nombre'}</h3>
                           <p className="lead-phone">
                             {formatPhone(lead.phone)}
@@ -648,7 +650,7 @@ export default function Leads({ filterByAgent = null }) {
                       {getStatusBadge(lead.status)}
                     </div>
                     
-                    <div className="lead-details" onClick={() => navigate(`/leads/${lead.phone}`)}>
+                    <div className="lead-details" onClick={() => setDrawerPhone(lead.phone)}>
                       <div className="detail-row">
                         <span className="label">Intención:</span>
                         <span className="value">{lead.intent || 'No definida'}</span>
@@ -710,6 +712,11 @@ export default function Leads({ filterByAgent = null }) {
           </div>
         </TabsContent>
       </Tabs>
+
+      <LeadDrawer
+        phone={drawerPhone}
+        onClose={() => setDrawerPhone(null)}
+      />
     </div>
   );
 }
