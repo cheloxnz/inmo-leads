@@ -22,6 +22,8 @@ export default function Leads({ filterByAgent = null }) {
   const [searchDateFrom, setSearchDateFrom] = useState('');
   const [searchDateTo, setSearchDateTo] = useState('');
   const [searchIntent, setSearchIntent] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [bulkAction, setBulkAction] = useState('');
   const [bulkValue, setBulkValue] = useState('');
@@ -36,7 +38,7 @@ export default function Leads({ filterByAgent = null }) {
   
   useEffect(() => {
     filterLeads();
-  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo, searchIntent]);
+  }, [activeTab, leads, searchName, searchZone, searchDateFrom, searchDateTo, searchIntent, sortBy, sortDir]);
   
   const fetchLeads = async () => {
     try {
@@ -108,7 +110,50 @@ export default function Leads({ filterByAgent = null }) {
       });
     }
     
+    // Ordenar
+    const statusOrder = { hot: 0, warm: 1, cold: 2 };
+    filtered = [...filtered].sort((a, b) => {
+      let valA, valB;
+      if (sortBy === 'score') {
+        valA = a.score ?? 0; valB = b.score ?? 0;
+      } else if (sortBy === 'status') {
+        valA = statusOrder[a.status] ?? 9; valB = statusOrder[b.status] ?? 9;
+      } else if (sortBy === 'last_message_at') {
+        valA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+        valB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+      } else {
+        valA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        valB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      }
+      return sortDir === 'asc' ? valA - valB : valB - valA;
+    });
+
     setFilteredLeads(filtered);
+  };
+
+  const toggleSort = (field) => {
+    if (sortBy === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortDir('desc');
+    }
+  };
+
+  const SortBtn = ({ field, label }) => {
+    const active = sortBy === field;
+    return (
+      <button
+        className={`sort-btn ${active ? 'sort-btn--active' : ''}`}
+        onClick={() => toggleSort(field)}
+        title={`Ordenar por ${label}`}
+      >
+        {label}
+        <span className="sort-arrow">
+          {active ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ' ↕'}
+        </span>
+      </button>
+    );
   };
   
   const clearFilters = () => {
@@ -493,8 +538,15 @@ export default function Leads({ filterByAgent = null }) {
             </div>
           </div>
           
-          <div className="filter-results">
-            Mostrando {filteredLeads.length} de {leads.length} leads
+          <div className="filter-results-row">
+            <span>Mostrando {filteredLeads.length} de {leads.length} leads</span>
+            <div className="sort-bar">
+              <span className="sort-label">Ordenar:</span>
+              <SortBtn field="score" label="Score" />
+              <SortBtn field="status" label="Temperatura" />
+              <SortBtn field="last_message_at" label="Actividad" />
+              <SortBtn field="created_at" label="Fecha" />
+            </div>
           </div>
         </CardContent>
       </Card>
