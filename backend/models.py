@@ -55,6 +55,7 @@ class FlowStage(str, Enum):
     CANCEL_CONFIRM = "cancel_confirm"
     CONSULTING = "consulting"
     SCHEDULE_DAY = "schedule_day"
+    RENTAL_DETAILS = "rental_details"
 
 class UrgencyLevel(str, Enum):
     URGENTE = "urgente"
@@ -180,6 +181,10 @@ class Lead(BaseModel):
     bedrooms: Optional[int] = None
     must_have: List[str] = Field(default_factory=list)
     financing: Optional[str] = None
+    # Campos específicos alquiler
+    furnished: Optional[str] = None       # "amoblado" | "sin_amueblar" | "indiferente"
+    pets_allowed: Optional[bool] = None
+    rental_duration: Optional[str] = None  # "6 meses" | "1 año" | "2 años"
 
 class LeadCreate(BaseModel):
     phone: str

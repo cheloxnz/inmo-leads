@@ -321,6 +321,9 @@ class BotFlowManager:
         elif lead.flow_stage == FlowStage.APPOINTMENT_OFFER:
             await self.handle_appointment_offer(lead, message_text)
         
+        elif lead.flow_stage == FlowStage.RENTAL_DETAILS:
+            await self.handle_rental_details(lead, message_text)
+
         elif lead.flow_stage == FlowStage.SCHEDULE_DAY:
             await self.handle_schedule_day(lead, message_text)
 
@@ -557,15 +560,25 @@ class BotFlowManager:
                         return
             
             # Si pasa la validación, continuar
-            response = "¿Qué tipo de propiedad te interesa?"
-            buttons = [
-                {"type": "reply", "reply": {"id": "departamento", "title": "Departamento"}},
-                {"type": "reply", "reply": {"id": "casa", "title": "Casa"}},
-                {"type": "reply", "reply": {"id": "ph", "title": "PH"}}
-            ]
-            
-            self.wa.send_interactive_buttons(lead.phone, response, buttons)
-            lead.flow_stage = FlowStage.PROPERTY_TYPE
+            # Para alquiler: preguntar detalles específicos primero
+            if lead.intent == LeadIntent.ALQUILAR:
+                response = "¿Necesitas que este amoblado?"
+                buttons = [
+                    {"type": "reply", "reply": {"id": "amoblado_si", "title": "Si, amoblado"}},
+                    {"type": "reply", "reply": {"id": "amoblado_no", "title": "Sin amueblar"}},
+                    {"type": "reply", "reply": {"id": "amoblado_ind", "title": "Indiferente"}},
+                ]
+                self.wa.send_interactive_buttons(lead.phone, response, buttons)
+                lead.flow_stage = FlowStage.RENTAL_DETAILS
+            else:
+                response = "¿Qué tipo de propiedad te interesa?"
+                buttons = [
+                    {"type": "reply", "reply": {"id": "departamento", "title": "Departamento"}},
+                    {"type": "reply", "reply": {"id": "casa", "title": "Casa"}},
+                    {"type": "reply", "reply": {"id": "ph", "title": "PH"}}
+                ]
+                self.wa.send_interactive_buttons(lead.phone, response, buttons)
+                lead.flow_stage = FlowStage.PROPERTY_TYPE
         else:
             response = "No pude identificar el presupuesto. ¿Podés indicarlo de nuevo?\n\nEjemplo: 200.000 USD o 150k"
             self.wa.send_text_message(lead.phone, response)
@@ -683,6 +696,56 @@ class BotFlowManager:
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.SELECT_TIME
 
+    async def handle_rental_details(self, lead: Lead, message: str):
+        """Flujo de detalles específicos para alquiler (amoblado → mascotas → duración → tipo)"""
+        message_lower = message.lower()
+
+        # Paso 1: amoblado
+        if lead.furnished is None:
+            if "amoblado_si" in message_lower or "amoblado" in message_lower or "si" in message_lower:
+                lead.furnished = "amoblado"
+            elif "amoblado_no" in message_lower or "sin" in message_lower:
+                lead.furnished = "sin_amueblar"
+            else:
+                lead.furnished = "indiferente"
+
+            response = "¿Tenes mascotas?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "mascotas_si", "title": "Si, tengo mascotas"}},
+                {"type": "reply", "reply": {"id": "mascotas_no", "title": "No tengo mascotas"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            return
+
+        # Paso 2: mascotas
+        if lead.pets_allowed is None:
+            lead.pets_allowed = "mascotas_si" in message_lower or "si" in message_lower
+            response = "¿Por cuanto tiempo buscas alquilar?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "dur_6m", "title": "6 meses"}},
+                {"type": "reply", "reply": {"id": "dur_1a", "title": "1 año"}},
+                {"type": "reply", "reply": {"id": "dur_2a", "title": "2 años o mas"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            return
+
+        # Paso 3: duración → ir a tipo propiedad
+        if "dur_6m" in message_lower or "6" in message_lower:
+            lead.rental_duration = "6 meses"
+        elif "dur_2a" in message_lower or "2" in message_lower:
+            lead.rental_duration = "2 años o más"
+        else:
+            lead.rental_duration = "1 año"
+
+        response = "¿Qué tipo de propiedad te interesa?"
+        buttons = [
+            {"type": "reply", "reply": {"id": "departamento", "title": "Departamento"}},
+            {"type": "reply", "reply": {"id": "casa", "title": "Casa"}},
+            {"type": "reply", "reply": {"id": "ph", "title": "PH"}},
+        ]
+        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        lead.flow_stage = FlowStage.PROPERTY_TYPE
+
     async def handle_must_have(self, lead: Lead, message: str):
         """Maneja requisitos obligatorios"""
         message_lower = message.lower()
@@ -765,20 +828,45 @@ class BotFlowManager:
         await self.calculate_and_offer_appointment(lead)
     
     async def calculate_and_offer_appointment(self, lead: Lead):
-        """Calcula score y ofrece agendar cita"""
-        # Calcular score
+        """Calcula score, muestra resumen del lead y ofrece agendar cita"""
         lead.score = ScoringEngine.calculate_score(lead)
         lead.status = ScoringEngine.classify_lead(lead.score)
-        
-        # Mensaje según clasificación
-        if _enum_val(lead.status) == "hot":
-            message = "Excelente! Encontre varias opciones que se ajustan a lo que buscas."
-        elif _enum_val(lead.status) == "warm":
-            message = "Perfecto! Tengo opciones interesantes para mostrarte."
-        else:
-            message = "Entendido! Te voy a mantener al tanto de nuevas opciones."
 
-        message += "\n\n¿Que quieres hacer ahora?"
+        # Resumen del lead antes de ofrecer cita
+        intent = _enum_val(lead.intent) or "buscar propiedad"
+        zone = getattr(lead, "zone", None) or "-"
+        budget = getattr(lead, "budget_text", None) or "-"
+        prop_type = _enum_val(getattr(lead, "property_type", None)) or "-"
+        bedrooms = getattr(lead, "bedrooms", None)
+        urgency = _enum_val(lead.urgency) if lead.urgency else "-"
+
+        resumen = f"Perfecto {lead.name or ''}! Esto es lo que registre:\n\n"
+        resumen += f"- Busca: {intent}\n"
+        resumen += f"- Zona: {zone}\n"
+        resumen += f"- Presupuesto: {budget}\n"
+        resumen += f"- Tipo: {prop_type}\n"
+        if bedrooms:
+            resumen += f"- Ambientes: {bedrooms}\n"
+        resumen += f"- Urgencia: {urgency}\n"
+        # Datos específicos de alquiler
+        if _enum_val(lead.intent) == "alquilar":
+            furnished = getattr(lead, "furnished", None)
+            pets = getattr(lead, "pets_allowed", None)
+            duration = getattr(lead, "rental_duration", None)
+            if furnished:
+                resumen += f"- Amoblado: {furnished}\n"
+            if pets is not None:
+                resumen += f"- Mascotas: {'Si' if pets else 'No'}\n"
+            if duration:
+                resumen += f"- Duracion: {duration}\n"
+        resumen += "\nEs correcto?"
+
+        buttons_confirm = [
+            {"type": "reply", "reply": {"id": "resumen_ok", "title": "Si, correcto"}},
+            {"type": "reply", "reply": {"id": "resumen_corregir", "title": "Quiero corregir algo"}},
+        ]
+        self.wa.send_interactive_buttons(lead.phone, resumen, buttons_confirm)
+        lead.flow_stage = FlowStage.APPOINTMENT_OFFER
 
         buttons = [
             {"type": "reply", "reply": {"id": "si_visita", "title": "Reservar visita"}},
@@ -790,22 +878,58 @@ class BotFlowManager:
         lead.flow_stage = FlowStage.APPOINTMENT_OFFER
     
     async def handle_appointment_offer(self, lead: Lead, message: str):
-        """Maneja oferta de agendamiento"""
+        """Maneja confirmación de resumen y oferta de agendamiento"""
         message_lower = message.lower()
-        
-        if "no" in message_lower:
-            response = "Sin problema! Te voy a mantener al tanto de nuevas propiedades que coincidan con tu búsqueda. ¡Gracias! 👋"
+
+        # Si quiere corregir el resumen — reiniciar desde zona
+        if "resumen_corregir" in message_lower or "corregir" in message_lower:
+            response = "Sin problema, empecemos de nuevo. ¿En qué zona estás buscando?"
             self.wa.send_text_message(lead.phone, response)
-            lead.flow_stage = FlowStage.COMPLETED
-        else:
-            if "visita" in message_lower:
-                lead.appointment_type = "visita"
+            lead.flow_stage = FlowStage.ZONE
+            return
+
+        # Si confirmó el resumen o quiere agendar — mostrar opciones
+        if "resumen_ok" in message_lower or "correcto" in message_lower or "si" in message_lower or "sí" in message_lower:
+            if _enum_val(lead.status) == "hot":
+                msg = "Excelente! Encontre varias opciones que se ajustan a tu busqueda."
+            elif _enum_val(lead.status) == "warm":
+                msg = "Perfecto! Tengo opciones interesantes para mostrarte."
             else:
-                lead.appointment_type = "llamada"
-            
+                msg = "Entendido! Te voy a mantener al tanto de nuevas opciones."
+
+            msg += "\n\n¿Que quieres hacer ahora?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "si_visita", "title": "Reservar visita"}},
+                {"type": "reply", "reply": {"id": "si_llamada", "title": "Hablar con asesor"}},
+                {"type": "reply", "reply": {"id": "no_ahora", "title": "Mas adelante"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, msg, buttons)
+            return
+
+        # Si elige visita o llamada
+        if "si_visita" in message_lower or "visita" in message_lower:
+            lead.appointment_type = "visita"
             response = "¿Qué día te viene bien?\n\nEjemplos:\n- Mañana\n- Lunes\n- 15/02"
             self.wa.send_text_message(lead.phone, response)
             lead.flow_stage = FlowStage.SELECT_DAY
+        elif "si_llamada" in message_lower or "llamada" in message_lower or "asesor" in message_lower:
+            lead.appointment_type = "llamada"
+            response = "¿Qué día te viene bien para la llamada?\n\nEjemplos:\n- Mañana\n- Lunes\n- 15/02"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.SELECT_DAY
+        elif "no_ahora" in message_lower or "mas adelante" in message_lower or "después" in message_lower:
+            response = "Sin problema! Te voy a mantener al tanto de nuevas propiedades. Si necesitas algo, escribime. 👋"
+            self.wa.send_text_message(lead.phone, response)
+            lead.flow_stage = FlowStage.COMPLETED
+        else:
+            # Fallback — mostrar botones de nuevo
+            msg = "¿Qué preferis hacer?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "si_visita", "title": "Reservar visita"}},
+                {"type": "reply", "reply": {"id": "si_llamada", "title": "Hablar con asesor"}},
+                {"type": "reply", "reply": {"id": "no_ahora", "title": "Mas adelante"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, msg, buttons)
     
     def _parse_date_from_text(self, message: str) -> datetime:
         """
@@ -1148,10 +1272,54 @@ class BotFlowManager:
 
     
     async def trigger_handoff(self, lead: Lead):
-        """Dispara notificación a asesor humano"""
+        """Dispara notificación a asesor humano por email y WhatsApp"""
         logger.info(f"HANDOFF: Lead {lead.phone} debe pasar a humano")
         lead.flow_stage = FlowStage.HANDOFF
-        
+
+        # Construir resumen del lead
+        intent = _enum_val(lead.intent) or "-"
+        zone = getattr(lead, "zone", None) or "-"
+        budget = getattr(lead, "budget_text", None) or "-"
+        prop_type = _enum_val(getattr(lead, "property_type", None)) or "-"
+        bedrooms = getattr(lead, "bedrooms", None)
+        urgency = _enum_val(lead.urgency) if lead.urgency else "-"
+        financing = _enum_val(getattr(lead, "financing", None)) or "-"
+        appointment = lead.appointment_datetime.strftime("%d/%m/%Y %H:%M") if lead.appointment_datetime else "Sin agendar"
+        score = lead.score or 0
+
+        summary = (
+            f"🔥 *Nuevo lead calificado*\n\n"
+            f"👤 Nombre: {lead.name or 'Sin nombre'}\n"
+            f"📱 Teléfono: +{lead.phone}\n"
+            f"🎯 Intención: {intent}\n"
+            f"📍 Zona: {zone}\n"
+            f"💰 Presupuesto: {budget}\n"
+            f"🏠 Tipo propiedad: {prop_type}\n"
+        )
+        if bedrooms:
+            summary += f"🛏 Ambientes: {bedrooms}\n"
+        summary += (
+            f"⚡ Urgencia: {urgency}\n"
+            f"💳 Financiamiento: {financing}\n"
+            f"📅 Cita: {appointment}\n"
+            f"⭐ Score: {score}/10"
+        )
+
+        # Notificar al asesor asignado por WhatsApp (si tiene número configurado)
+        try:
+            advisor_phone = None
+            profile = await self.db.business_profiles.find_one(
+                {"tenant_id": lead.tenant_id}, {"_id": 0, "phone": 1}
+            )
+            if profile and profile.get("phone"):
+                advisor_phone = profile["phone"].replace("+", "").replace(" ", "").replace("-", "")
+
+            if advisor_phone:
+                self.wa.send_text_message(advisor_phone, summary)
+                logger.info(f"WhatsApp de handoff enviado a asesor {advisor_phone}")
+        except Exception as e:
+            logger.warning(f"No se pudo enviar WhatsApp al asesor: {e}")
+
         # Enviar notificación por email
         try:
             lead_dict = lead.model_dump()
