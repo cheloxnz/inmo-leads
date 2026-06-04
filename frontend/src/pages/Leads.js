@@ -144,6 +144,15 @@ export default function Leads({ filterByAgent = null }) {
   // Mejora 6 — notas rápidas inline
   const [notePhone, setNotePhone] = useState(null);
   const [noteText, setNoteText] = useState('');
+  // Mejora 7 — saved views (localStorage)
+  const [savedViews, setSavedViews] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('inmobot_saved_views')) || []; }
+    catch { return []; }
+  });
+  const [savingView, setSavingView] = useState(false);
+  const [newViewName, setNewViewName] = useState('');
+  // Mejora 8 — inline editing de intención
+  const [editingIntentPhone, setEditingIntentPhone] = useState(null);
   const [assigningPhone, setAssigningPhone] = useState(null);
   const navigate = useNavigate();
   
@@ -519,6 +528,54 @@ export default function Leads({ filterByAgent = null }) {
       fetchLeads();
     } catch {
       toast.error('Error asignando asesor');
+    }
+  };
+
+  // ── Saved Views ──────────────────────────────────────────────────────────
+  const saveCurrentView = () => {
+    if (!newViewName.trim()) return;
+    const view = {
+      id: Date.now().toString(),
+      name: newViewName.trim(),
+      filters: { activeTab, searchQuery, searchIntent, searchDateFrom, searchDateTo, quickFilter, sortBy, sortDir },
+    };
+    const updated = [...savedViews, view];
+    setSavedViews(updated);
+    localStorage.setItem('inmobot_saved_views', JSON.stringify(updated));
+    setNewViewName('');
+    setSavingView(false);
+    toast.success(`Vista "${view.name}" guardada`);
+  };
+
+  const applyView = (view) => {
+    setActiveTab(view.filters.activeTab || 'all');
+    setSearchQuery(view.filters.searchQuery || '');
+    setSearchIntent(view.filters.searchIntent || '');
+    setSearchDateFrom(view.filters.searchDateFrom || '');
+    setSearchDateTo(view.filters.searchDateTo || '');
+    setQuickFilter(view.filters.quickFilter || null);
+    setSortBy(view.filters.sortBy || 'created_at');
+    setSortDir(view.filters.sortDir || 'desc');
+    setCurrentPage(1);
+  };
+
+  const deleteView = (e, id) => {
+    e.stopPropagation();
+    const updated = savedViews.filter(v => v.id !== id);
+    setSavedViews(updated);
+    localStorage.setItem('inmobot_saved_views', JSON.stringify(updated));
+  };
+
+  // ── Inline editing de intención ───────────────────────────────────────────
+  const updateIntent = async (phone, newIntent) => {
+    try {
+      await axios.put(`${API}/leads/${phone}`, { intent: newIntent || null });
+      setLeads(prev => prev.map(l => l.phone === phone ? { ...l, intent: newIntent || null } : l));
+      toast.success('Intención actualizada');
+    } catch {
+      toast.error('Error actualizando intención');
+    } finally {
+      setEditingIntentPhone(null);
     }
   };
 
@@ -988,6 +1045,63 @@ export default function Leads({ filterByAgent = null }) {
         </CardContent>
       </Card>
       
+      {/* ── Saved Views ── */}
+      {(savedViews.length > 0 || savingView) && (
+        <div className="saved-views-bar">
+          <span className="saved-views-label">📌 Vistas:</span>
+
+          {/* Chips de vistas guardadas */}
+          {savedViews.map(view => (
+            <button
+              key={view.id}
+              className="saved-view-chip"
+              onClick={() => applyView(view)}
+              title={`Aplicar vista: ${view.name}`}
+            >
+              {view.name}
+              <span
+                className="saved-view-delete"
+                onClick={e => deleteView(e, view.id)}
+                title="Eliminar vista"
+              >✕</span>
+            </button>
+          ))}
+
+          {/* Input para guardar nueva vista */}
+          {savingView ? (
+            <div className="saved-view-new">
+              <input
+                className="saved-view-input"
+                placeholder="Nombre de la vista..."
+                value={newViewName}
+                onChange={e => setNewViewName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveCurrentView();
+                  if (e.key === 'Escape') { setSavingView(false); setNewViewName(''); }
+                }}
+                autoFocus
+                maxLength={30}
+              />
+              <button className="saved-view-confirm" onClick={saveCurrentView} disabled={!newViewName.trim()}>✓</button>
+              <button className="saved-view-cancel" onClick={() => { setSavingView(false); setNewViewName(''); }}>✕</button>
+            </div>
+          ) : (
+            <button className="saved-view-add-btn" onClick={() => setSavingView(true)} title="Guardar filtros actuales como vista">
+              + Guardar vista
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Botón flotante para guardar vista (cuando no hay vistas y el panel está cerrado) */}
+      {savedViews.length === 0 && !savingView && (
+        <div className="saved-views-bar saved-views-bar--empty">
+          <button className="saved-view-add-btn" onClick={() => setSavingView(true)} title="Guardar filtros actuales como vista">
+            📌 Guardar vista actual
+          </button>
+        </div>
+      )}
+
       {/* ── Vista Kanban ── */}
       {viewMode === 'kanban' && (
         <KanbanBoard
@@ -1112,12 +1226,34 @@ export default function Leads({ filterByAgent = null }) {
                     {/* ── Detalles: siempre 5 filas, altura uniforme ── */}
                     <div className="lead-details" onClick={() => setDrawerPhone(lead.phone)}>
 
-                      {/* Fila 1 — Intención */}
+                      {/* Fila 1 — Intención (inline editable) */}
                       <div className="detail-row">
                         <span className="label">{intentIcon(lead.intent)} Intención</span>
-                        <span className={`value ${!intentLabel(lead.intent) ? 'value--empty' : ''}`}>
-                          {intentLabel(lead.intent) || 'Sin definir'}
-                        </span>
+                        {editingIntentPhone === lead.phone ? (
+                          <select
+                            className="intent-inline-select"
+                            defaultValue={lead.intent || ''}
+                            onChange={e => updateIntent(lead.phone, e.target.value)}
+                            onBlur={() => setEditingIntentPhone(null)}
+                            onClick={e => e.stopPropagation()}
+                            autoFocus
+                          >
+                            <option value="">Sin definir</option>
+                            <option value="comprar">🏠 Comprar</option>
+                            <option value="alquilar">🔑 Alquilar</option>
+                            <option value="vender">💰 Vender</option>
+                            <option value="inversion">📈 Inversión</option>
+                          </select>
+                        ) : (
+                          <span
+                            className={`value value--editable ${!intentLabel(lead.intent) ? 'value--empty' : ''}`}
+                            onClick={e => { e.stopPropagation(); setEditingIntentPhone(lead.phone); }}
+                            title="Click para editar"
+                          >
+                            {intentLabel(lead.intent) || 'Sin definir'}
+                            <span className="edit-pencil">✏️</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Fila 2 — Zona */}
