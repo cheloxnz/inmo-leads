@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle, FileText, LayoutGrid, List } from 'lucide-react';
+import { Trash2, Tag, UserCheck, RefreshCw, Copy, MessageCircle, FileText, LayoutGrid, List, Columns2 } from 'lucide-react';
 import LeadDrawer from '../components/LeadDrawer';
 
 // ── Helpers de intención (nivel módulo — compartidos con KanbanBoard) ──────
@@ -154,6 +154,8 @@ export default function Leads({ filterByAgent = null }) {
   // Mejora 8 — inline editing de intención
   const [editingIntentPhone, setEditingIntentPhone] = useState(null);
   const [assigningPhone, setAssigningPhone] = useState(null);
+  // Mejora 10 — split view lista + detalle
+  const [splitView, setSplitView] = useState(() => localStorage.getItem('inmobot_split_view') === 'true');
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -709,19 +711,27 @@ export default function Leads({ filterByAgent = null }) {
           <p className="subtitle">Gestión y seguimiento de contactos</p>
         </div>
         <div className="header-actions">
-          {/* Toggle Lista / Kanban */}
+          {/* Toggle Lista / Kanban / Split */}
           <div className="view-toggle" role="group" aria-label="Cambiar vista">
             <button
-              className={`view-toggle-btn ${viewMode === 'list' ? 'view-toggle-btn--active' : ''}`}
-              onClick={() => setViewMode('list')}
+              className={`view-toggle-btn ${viewMode === 'list' && !splitView ? 'view-toggle-btn--active' : ''}`}
+              onClick={() => { setViewMode('list'); setSplitView(false); localStorage.setItem('inmobot_split_view', 'false'); }}
               title="Vista lista"
               data-testid="btn-view-list"
             >
               <List className="w-4 h-4" />
             </button>
             <button
+              className={`view-toggle-btn ${splitView ? 'view-toggle-btn--active' : ''}`}
+              onClick={() => { setViewMode('list'); setSplitView(true); localStorage.setItem('inmobot_split_view', 'true'); }}
+              title="Vista dividida (lista + detalle)"
+              data-testid="btn-view-split"
+            >
+              <Columns2 className="w-4 h-4" />
+            </button>
+            <button
               className={`view-toggle-btn ${viewMode === 'kanban' ? 'view-toggle-btn--active' : ''}`}
-              onClick={() => setViewMode('kanban')}
+              onClick={() => { setViewMode('kanban'); setSplitView(false); localStorage.setItem('inmobot_split_view', 'false'); }}
               title="Vista Kanban"
               data-testid="btn-view-kanban"
             >
@@ -1154,8 +1164,12 @@ export default function Leads({ filterByAgent = null }) {
         />
       )}
 
-      {/* ── Vista Lista (tabs + grid) ── */}
-      {viewMode === 'list' && <Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
+      {/* ── Vista Lista / Split ── */}
+      {viewMode === 'list' && (
+        <div className={splitView ? 'split-layout' : undefined}>
+
+      {/* Panel izquierdo (lista) */}
+      {viewMode === 'list' && <div className={splitView ? 'split-list-pane' : undefined}><Tabs value={activeTab} onValueChange={setActiveTab} className="leads-tabs">
         <TabsList>
           <TabsTrigger value="all" data-testid="tab-all">Todos ({tabCounts.all})</TabsTrigger>
           <TabsTrigger value="hot" data-testid="tab-hot">🔥 Calientes ({tabCounts.hot})</TabsTrigger>
@@ -1439,13 +1453,37 @@ export default function Leads({ filterByAgent = null }) {
             </div>
           )}
         </TabsContent>
-      </Tabs>}
-      {/* fin viewMode list */}
+      </Tabs></div>}
+      {/* fin lista */}
 
-      <LeadDrawer
-        phone={drawerPhone}
-        onClose={() => setDrawerPhone(null)}
-      />
+      {/* Panel derecho (detalle) — solo en split view */}
+      {splitView && (
+        <div className="split-detail-pane">
+          {drawerPhone ? (
+            <LeadDrawer
+              phone={drawerPhone}
+              onClose={() => setDrawerPhone(null)}
+              inline
+            />
+          ) : (
+            <div className="split-empty-state">
+              <span className="split-empty-icon">👈</span>
+              <p>Seleccioná un lead para ver el detalle</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      </div>)}
+      {/* fin split wrapper */}
+
+      {/* Drawer overlay (modo normal) */}
+      {!splitView && (
+        <LeadDrawer
+          phone={drawerPhone}
+          onClose={() => setDrawerPhone(null)}
+        />
+      )}
     </div>
   );
 }
