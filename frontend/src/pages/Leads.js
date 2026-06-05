@@ -807,7 +807,18 @@ export default function Leads({ filterByAgent = null }) {
           {/* Centro: acciones directas */}
           <div className="bulk-float-actions">
 
-            {/* Asignar asesor */}
+            {/* Auto-asignar round-robin */}
+            <button
+              className="bulk-float-btn bulk-float-btn--auto"
+              onClick={() => quickBulkAction('auto_assign')}
+              disabled={processingBulk || agents.length === 0}
+              title="Distribuir automáticamente entre asesores (round-robin)"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              {processingBulk ? '...' : 'Auto-asignar'}
+            </button>
+
+            {/* Asignar asesor manualmente */}
             <Select onValueChange={(val) => quickBulkAction('assign', val)} disabled={processingBulk}>
               <SelectTrigger className="bulk-float-select" data-testid="select-bulk-agent">
                 <UserCheck className="w-3.5 h-3.5" />
@@ -958,10 +969,40 @@ export default function Leads({ filterByAgent = null }) {
                 </span>
               )}
               {quickFilter === 'sin_asesor' && (
-                <span className="filter-chip filter-chip--warning">
-                  ⚠️ Sin asesor
-                  <button onClick={() => setQuickFilter(null)}>✕</button>
-                </span>
+                <>
+                  <span className="filter-chip filter-chip--warning">
+                    ⚠️ Sin asesor ({filteredLeads.length})
+                    <button onClick={() => setQuickFilter(null)}>✕</button>
+                  </span>
+                  {filteredLeads.length > 0 && agents.length > 0 && (
+                    <button
+                      className="auto-assign-banner-btn"
+                      onClick={async () => {
+                        const phones = filteredLeads.map(l => l.phone);
+                        setProcessingBulk(true);
+                        try {
+                          const res = await axios.post(`${API}/leads/bulk-action`, {
+                            lead_phones: phones,
+                            action: 'auto_assign',
+                          });
+                          toast.success(
+                            `${res.data.updated_count} leads distribuidos entre: ${res.data.agents_used?.join(', ') || 'asesores'}`
+                          );
+                          fetchLeads();
+                          setQuickFilter(null);
+                        } catch {
+                          toast.error('Error al auto-asignar');
+                        } finally {
+                          setProcessingBulk(false);
+                        }
+                      }}
+                      disabled={processingBulk}
+                      title={`Distribuir ${filteredLeads.length} leads entre ${agents.length} asesores`}
+                    >
+                      ⚡ Auto-asignar todos ({filteredLeads.length})
+                    </button>
+                  )}
+                </>
               )}
               {searchIntent && searchIntent !== 'all' && (
                 <span className="filter-chip">

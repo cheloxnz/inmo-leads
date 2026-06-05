@@ -907,15 +907,47 @@ async def get_broadcast_history(current_user: User = Depends(require_admin)):
 # ==============================================
 class BulkActionRequest(BaseModel):
     lead_phones: List[str]
-    action: str  # "tag", "assign", "status", "delete"
+    action: str  # "tag", "assign", "status", "delete", "auto_assign"
     value: Optional[str] = None
 
 @api_router.post("/leads/bulk-action")
 async def bulk_action(request: BulkActionRequest, current_user: User = Depends(require_admin)):
     """Ejecuta acción masiva sobre múltiples leads"""
     updated_count = 0
-    
-    # Para "assign" buscamos el nombre del agente una sola vez
+
+    # ── auto_assign: round-robin entre todos los agentes activos ──────────────
+    if request.action == "auto_assign":
+        agents = await db.users.find(
+            {"tenant_id": current_user.tenant_id, "role": {"$in": ["agent", "admin"]}},
+            {"email": 1, "name": 1}
+        ).to_list(100)
+        if not agents:
+            raise HTTPException(status_code=400, detail="No hay asesores disponibles en este tenant")
+        now_iso = datetime.utcnow().isoformat()
+        for i, phone in enumerate(request.lead_phones):
+            agent = agents[i % len(agents)]
+            tf = tenant_filter(current_user, {"phone": phone})
+            try:
+                await db.leads.update_one(tf, {"$set": {
+                    "assigned_agent": agent["email"],
+                    "assigned_agent_name": agent.get("name", agent["email"]),
+                    "assigned_at": now_iso,
+                }})
+                updated_count += 1
+            except Exception as e:
+                logger.error(f"Error auto_assign for {phone}: {e}")
+        await log_audit_event(
+            action="bulk_auto_assign",
+            user_email=current_user.email,
+            details={"count": updated_count, "agents": [a["email"] for a in agents]}
+        )
+        return {
+            "updated_count": updated_count,
+            "total": len(request.lead_phones),
+            "agents_used": [a.get("name", a["email"]) for a in agents],
+        }
+
+    # ── Para "assign" buscamos el nombre del agente una sola vez ─────────────
     agent_name = None
     if request.action == "assign" and request.value:
         agent_doc = await db.users.find_one(
@@ -943,14 +975,14 @@ async def bulk_action(request: BulkActionRequest, current_user: User = Depends(r
             updated_count += 1
         except Exception as e:
             logger.error(f"Error in bulk action for {phone}: {e}")
-    
+
     # Registrar en auditoría
     await log_audit_event(
         action=f"bulk_{request.action}",
         user_email=current_user.email,
         details={"count": updated_count, "value": request.value}
     )
-    
+
     return {"updated_count": updated_count, "total": len(request.lead_phones)}
 
 
