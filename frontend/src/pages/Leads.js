@@ -154,6 +154,9 @@ export default function Leads({ filterByAgent = null }) {
   // Mejora 8 — inline editing de intención
   const [editingIntentPhone, setEditingIntentPhone] = useState(null);
   const [assigningPhone, setAssigningPhone] = useState(null);
+  // Mejora 11 — inline editing de zona
+  const [editingZonePhone, setEditingZonePhone] = useState(null);
+  const [editingZoneText, setEditingZoneText] = useState('');
   // Mejora 10 — split view lista + detalle
   const [splitView, setSplitView] = useState(() => localStorage.getItem('inmobot_split_view') === 'true');
   const navigate = useNavigate();
@@ -566,6 +569,19 @@ export default function Leads({ filterByAgent = null }) {
     const updated = savedViews.filter(v => v.id !== id);
     setSavedViews(updated);
     localStorage.setItem('inmobot_saved_views', JSON.stringify(updated));
+  };
+
+  // ── Inline editing de zona ────────────────────────────────────────────────
+  const updateZone = async (phone, newZone) => {
+    const trimmed = newZone.trim();
+    setEditingZonePhone(null);
+    try {
+      await axios.put(`${API}/leads/${phone}`, { zone: trimmed || null });
+      setLeads(prev => prev.map(l => l.phone === phone ? { ...l, zone: trimmed || null } : l));
+      toast.success('Zona actualizada');
+    } catch {
+      toast.error('Error al actualizar zona');
+    }
   };
 
   // ── Inline editing de intención ───────────────────────────────────────────
@@ -1310,12 +1326,32 @@ export default function Leads({ filterByAgent = null }) {
                         )}
                       </div>
 
-                      {/* Fila 2 — Zona */}
+                      {/* Fila 2 — Zona (inline editable) */}
                       <div className="detail-row">
                         <span className="label">📍 Zona</span>
-                        <span className={`value ${!lead.zone ? 'value--empty' : ''}`}>
-                          {lead.zone || '—'}
-                        </span>
+                        {editingZonePhone === lead.phone ? (
+                          <input
+                            className="zone-inline-input"
+                            defaultValue={lead.zone || ''}
+                            autoFocus
+                            placeholder="Ej: Palermo, Belgrano..."
+                            onClick={e => e.stopPropagation()}
+                            onBlur={e => updateZone(lead.phone, e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') e.target.blur();
+                              if (e.key === 'Escape') { setEditingZonePhone(null); }
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className={`value value--editable ${!lead.zone ? 'value--empty' : ''}`}
+                            onClick={e => { e.stopPropagation(); setEditingZonePhone(lead.phone); setEditingZoneText(lead.zone || ''); }}
+                            title="Click para editar zona"
+                          >
+                            {lead.zone || '—'}
+                            <span className="edit-pencil">✏️</span>
+                          </span>
+                        )}
                       </div>
 
                       {/* Fila 3 — Presupuesto */}

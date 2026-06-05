@@ -11487,6 +11487,20 @@ body {
   max-width: 120px;
 }
 
+.zone-inline-input {
+  font-size: 0.75rem;
+  font-family: inherit;
+  border: 1px solid #0ea5e9;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.1rem 0.4rem;
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px #e0f2fe;
+  max-width: 130px;
+  width: 130px;
+}
+
 /* =============================================
    MEJORA 5 — TOGGLE VISTA LISTA / KANBAN
    ============================================= */
