@@ -5022,6 +5022,129 @@ body {
   transform: none;
 }
 
+/* ── Command Bar (Mejora 12) ─────────────────────────────────────────────── */
+.cmd-bar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-card, #fff);
+  color: #9ca3af;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-width: 160px;
+}
+.cmd-bar-trigger:hover {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #ede9fe;
+  color: #6b7280;
+}
+.cmd-bar-trigger-text { flex: 1; text-align: left; }
+.cmd-bar-trigger-kbd {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.cmd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 400;
+  animation: fadeIn 0.1s ease;
+}
+.cmd-modal {
+  position: fixed;
+  top: 15vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560px;
+  max-width: 94vw;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 401;
+  overflow: hidden;
+  animation: cmdSlideIn 0.15s ease;
+}
+@keyframes cmdSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.cmd-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.cmd-search-icon { font-size: 16px; }
+.cmd-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-family: inherit;
+  background: transparent;
+  color: #111;
+}
+.cmd-input::placeholder { color: #b0b7c3; }
+.cmd-esc-kbd {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.cmd-results { padding: 6px 0; max-height: 340px; overflow-y: auto; }
+.cmd-result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 13.5px;
+  color: #374151;
+}
+.cmd-result-item:hover,
+.cmd-result-item--first:focus {
+  background: #f5f3ff;
+  color: #4f46e5;
+}
+.cmd-result-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.cmd-result-label { display: flex; flex-direction: column; gap: 1px; }
+.cmd-result-sublabel { font-size: 11px; color: #9ca3af; }
+
+.cmd-empty {
+  padding: 20px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 13px;
+}
+.cmd-footer {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 11px;
+  color: #b0b7c3;
+}
+
 /* Separador vertical */
 .bulk-float-sep {
   width: 1px;

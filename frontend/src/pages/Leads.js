@@ -159,12 +159,29 @@ export default function Leads({ filterByAgent = null }) {
   const [editingZoneText, setEditingZoneText] = useState('');
   // Mejora 10 — split view lista + detalle
   const [splitView, setSplitView] = useState(() => localStorage.getItem('inmobot_split_view') === 'true');
+  // Mejora 12 — command bar global
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [cmdQuery, setCmdQuery] = useState('');
   const navigate = useNavigate();
   
   useEffect(() => {
     fetchLeads();
     fetchAgents();
   }, [filterByAgent]);
+
+  // Ctrl+K → abrir command bar
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdOpen(o => !o);
+        setCmdQuery('');
+      }
+      if (e.key === 'Escape') setCmdOpen(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   useEffect(() => {
     if (!assigningPhone) return;
@@ -363,6 +380,71 @@ export default function Leads({ filterByAgent = null }) {
     setSearchIntent('');
     setQuickFilter(null);
     setActiveTab('all');
+  };
+
+  // ── Command bar ───────────────────────────────────────────────────────────
+  const CMD_STATIC = [
+    { id: 'hot',       icon: '🔥', label: 'Ver leads calientes',  action: () => { setActiveTab('hot'); setQuickFilter(null); } },
+    { id: 'warm',      icon: '🟡', label: 'Ver leads tibios',      action: () => { setActiveTab('warm'); setQuickFilter(null); } },
+    { id: 'cold',      icon: '❄️', label: 'Ver leads fríos',       action: () => { setActiveTab('cold'); setQuickFilter(null); } },
+    { id: 'sin_asesor',icon: '⚠️', label: 'Sin asesor asignado',   action: () => { setActiveTab('all'); setQuickFilter('sin_asesor'); } },
+    { id: 'citas_hoy', icon: '📅', label: 'Citas de hoy',          action: () => { setActiveTab('all'); setQuickFilter('citas_hoy'); } },
+    { id: 'nuevos_hoy',icon: '⚡', label: 'Leads de hoy',          action: () => { setActiveTab('all'); setQuickFilter('nuevos_hoy'); } },
+    { id: 'comprar',   icon: '🏠', label: 'Intención: Comprar',    action: () => { setSearchIntent('comprar'); setActiveTab('all'); } },
+    { id: 'alquilar',  icon: '🔑', label: 'Intención: Alquilar',   action: () => { setSearchIntent('alquilar'); setActiveTab('all'); } },
+    { id: 'vender',    icon: '💰', label: 'Intención: Vender',     action: () => { setSearchIntent('vender'); setActiveTab('all'); } },
+    { id: 'inversion', icon: '📈', label: 'Intención: Inversión',  action: () => { setSearchIntent('inversion'); setActiveTab('all'); } },
+    { id: 'clear',     icon: '🔄', label: 'Limpiar todos los filtros', action: clearFilters },
+    { id: 'kanban',    icon: '🗂️', label: 'Vista Kanban',          action: () => { setViewMode('kanban'); setSplitView(false); } },
+    { id: 'split',     icon: '⊠',  label: 'Vista dividida',        action: () => { setViewMode('list'); setSplitView(true); localStorage.setItem('inmobot_split_view','true'); } },
+    { id: 'list',      icon: '≡',  label: 'Vista lista',           action: () => { setViewMode('list'); setSplitView(false); localStorage.setItem('inmobot_split_view','false'); } },
+  ];
+
+  const getCmdResults = () => {
+    const q = cmdQuery.trim().toLowerCase();
+    if (!q) return CMD_STATIC.slice(0, 7);
+
+    const results = [];
+
+    // Matching estático
+    CMD_STATIC.forEach(cmd => {
+      if (cmd.label.toLowerCase().includes(q) || cmd.id.includes(q)) results.push(cmd);
+    });
+
+    // Leads que coinciden con el query (nombre / teléfono)
+    const matchedLeads = leads
+      .filter(l =>
+        (l.name || '').toLowerCase().includes(q) ||
+        String(l.phone).includes(q) ||
+        (l.zone || '').toLowerCase().includes(q)
+      )
+      .slice(0, 5);
+
+    matchedLeads.forEach(l => results.push({
+      id: `lead-${l.phone}`,
+      icon: intentIcon(l.intent) || '👤',
+      label: `${l.name || 'Sin nombre'} · ${l.zone || ''}`,
+      sublabel: l.phone,
+      action: () => setDrawerPhone(l.phone),
+    }));
+
+    // Si el query parece una zona, ofrecer filtro directo
+    if (q.length >= 3 && matchedLeads.length === 0 && results.length === 0) {
+      results.push({
+        id: 'zona-search',
+        icon: '📍',
+        label: `Buscar zona: "${cmdQuery.trim()}"`,
+        action: () => setSearchQuery(cmdQuery.trim()),
+      });
+    }
+
+    return results;
+  };
+
+  const runCmd = (cmd) => {
+    cmd.action();
+    setCmdOpen(false);
+    setCmdQuery('');
   };
 
   // Manejador de click en KPIs
@@ -754,6 +836,14 @@ export default function Leads({ filterByAgent = null }) {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
+          <button
+            className="cmd-bar-trigger"
+            onClick={() => { setCmdOpen(true); setCmdQuery(''); }}
+            title="Command bar (Ctrl+K)"
+          >
+            <span className="cmd-bar-trigger-text">Buscar...</span>
+            <span className="cmd-bar-trigger-kbd">Ctrl K</span>
+          </button>
           <Button onClick={fetchLeads} variant="ghost" size="sm" data-testid="btn-refresh">
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -1519,6 +1609,59 @@ export default function Leads({ filterByAgent = null }) {
           phone={drawerPhone}
           onClose={() => setDrawerPhone(null)}
         />
+      )}
+
+      {/* ── Command Bar (Ctrl+K) ── */}
+      {cmdOpen && (
+        <>
+          <div className="cmd-overlay" onClick={() => setCmdOpen(false)} />
+          <div className="cmd-modal">
+            <div className="cmd-search-wrap">
+              <span className="cmd-search-icon">🔍</span>
+              <input
+                className="cmd-input"
+                placeholder="Buscar lead, filtrar por zona, estado, intención..."
+                value={cmdQuery}
+                onChange={e => setCmdQuery(e.target.value)}
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Escape') setCmdOpen(false);
+                  if (e.key === 'Enter') {
+                    const results = getCmdResults();
+                    if (results.length > 0) runCmd(results[0]);
+                  }
+                }}
+              />
+              <kbd className="cmd-esc-kbd">Esc</kbd>
+            </div>
+            <div className="cmd-results">
+              {getCmdResults().length === 0 ? (
+                <div className="cmd-empty">Sin resultados para "{cmdQuery}"</div>
+              ) : (
+                getCmdResults().map((cmd, i) => (
+                  <button
+                    key={cmd.id}
+                    className={`cmd-result-item ${i === 0 ? 'cmd-result-item--first' : ''}`}
+                    onClick={() => runCmd(cmd)}
+                  >
+                    <span className="cmd-result-icon">{cmd.icon}</span>
+                    <span className="cmd-result-label">
+                      {cmd.label}
+                      {cmd.sublabel && <span className="cmd-result-sublabel">{cmd.sublabel}</span>}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+            {!cmdQuery && (
+              <div className="cmd-footer">
+                <span>↑↓ navegar</span>
+                <span>↵ seleccionar</span>
+                <span>Esc cerrar</span>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
