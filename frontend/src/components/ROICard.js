@@ -7,25 +7,48 @@ import { TrendingUp, Clock, DollarSign, Flame, Target, PackageX, Sparkles } from
 export default function ROICard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const fetchROI = () => {
+    setLoading(true);
+    setError(false);
     axios.get(`${API}/dashboard/roi?days=30`)
       .then(r => setData(r.data))
-      .catch(err => console.error('ROI fetch err', err))
+      .catch(err => { console.error('ROI fetch err', err); setError(true); })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchROI(); }, []);
 
   if (loading) {
     return (
       <Card className="roi-card roi-card-loading" data-testid="roi-card">
         <CardContent>
-          <div className="roi-loading">Calculando ROI...</div>
+          <div className="roi-loading">
+            <span className="roi-loading-spinner" />
+            Calculando ROI...
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  if (!data) return null;
+  if (error || !data) {
+    return (
+      <Card className="roi-card roi-card-error" data-testid="roi-card">
+        <CardContent>
+          <div className="roi-error">
+            <span className="roi-error-icon">📊</span>
+            <div>
+              <div className="roi-error-title">ROI no disponible</div>
+              <div className="roi-error-sub">No se pudieron cargar las métricas de ROI.</div>
+            </div>
+            <button className="roi-retry-btn" onClick={fetchROI}>↺ Reintentar</button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const pipelineFormatted = Math.round(data.estimated_pipeline_usd).toLocaleString();
   const unmetFormatted = Math.round(data.unmet_demand_usd).toLocaleString();

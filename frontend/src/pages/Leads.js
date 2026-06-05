@@ -162,6 +162,20 @@ export default function Leads({ filterByAgent = null }) {
   // Mejora 12 — command bar global
   const [cmdOpen, setCmdOpen] = useState(false);
   const [cmdQuery, setCmdQuery] = useState('');
+  // Mejora 13 — columnas configurables
+  const COLS_DEFAULT = { intent: true, zone: true, budget: true, score: true, cita: true };
+  const [visibleCols, setVisibleCols] = useState(() => {
+    try { return { ...COLS_DEFAULT, ...JSON.parse(localStorage.getItem('inmobot_cols') || '{}') }; }
+    catch { return COLS_DEFAULT; }
+  });
+  const [colsOpen, setColsOpen] = useState(false);
+  const toggleCol = (key) => {
+    setVisibleCols(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('inmobot_cols', JSON.stringify(next));
+      return next;
+    });
+  };
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -836,6 +850,42 @@ export default function Leads({ filterByAgent = null }) {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
+          {/* Columnas configurables */}
+          <div className="cols-config-wrap" style={{ position: 'relative' }}>
+            <button
+              className={`cols-config-btn ${colsOpen ? 'cols-config-btn--open' : ''}`}
+              onClick={() => setColsOpen(o => !o)}
+              title="Configurar campos visibles"
+            >
+              ⚙️ Campos
+            </button>
+            {colsOpen && (
+              <>
+                <div className="cols-config-overlay" onClick={() => setColsOpen(false)} />
+                <div className="cols-config-panel">
+                  <div className="cols-config-title">Campos visibles en las cards</div>
+                  {[
+                    { key: 'intent',  label: '🏠 Intención' },
+                    { key: 'zone',    label: '📍 Zona' },
+                    { key: 'budget',  label: '💰 Presupuesto' },
+                    { key: 'score',   label: '📊 Score' },
+                    { key: 'cita',    label: '📅 Cita' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="cols-config-item">
+                      <input
+                        type="checkbox"
+                        checked={!!visibleCols[key]}
+                        onChange={() => toggleCol(key)}
+                        className="cols-config-check"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
           <button
             className="cmd-bar-trigger"
             onClick={() => { setCmdOpen(true); setCmdQuery(''); }}
@@ -1388,7 +1438,7 @@ export default function Leads({ filterByAgent = null }) {
                     <div className="lead-details" onClick={() => setDrawerPhone(lead.phone)}>
 
                       {/* Fila 1 — Intención (inline editable) */}
-                      <div className="detail-row">
+                      {visibleCols.intent && <div className="detail-row">
                         <span className="label">{intentIcon(lead.intent)} Intención</span>
                         {editingIntentPhone === lead.phone ? (
                           <select
@@ -1414,10 +1464,10 @@ export default function Leads({ filterByAgent = null }) {
                             <span className="edit-pencil">✏️</span>
                           </span>
                         )}
-                      </div>
+                      </div>}
 
                       {/* Fila 2 — Zona (inline editable) */}
-                      <div className="detail-row">
+                      {visibleCols.zone && <div className="detail-row">
                         <span className="label">📍 Zona</span>
                         {editingZonePhone === lead.phone ? (
                           <input
@@ -1442,18 +1492,18 @@ export default function Leads({ filterByAgent = null }) {
                             <span className="edit-pencil">✏️</span>
                           </span>
                         )}
-                      </div>
+                      </div>}
 
                       {/* Fila 3 — Presupuesto */}
-                      <div className="detail-row">
+                      {visibleCols.budget && <div className="detail-row">
                         <span className="label">💰 Presupuesto</span>
                         <span className={`value ${!lead.budget_text ? 'value--empty' : ''}`}>
                           {lead.budget_text || '—'}
                         </span>
-                      </div>
+                      </div>}
 
                       {/* Fila 4 — Score con barra + tooltip */}
-                      <div className="detail-row score-row score-tooltip-wrap">
+                      {visibleCols.score && <div className="detail-row score-row score-tooltip-wrap">
                         <span className="label">📊 Score</span>
                         <div className="score-bar-wrapper">
                           <div
@@ -1470,15 +1520,15 @@ export default function Leads({ filterByAgent = null }) {
                             </div>
                           ))}
                         </div>
-                      </div>
+                      </div>}
 
                       {/* Fila 5 — Cita */}
-                      <div className="detail-row">
+                      {visibleCols.cita && <div className="detail-row">
                         <span className="label">📅 Cita</span>
                         <span className={`value ${!lead.appointment_datetime ? 'value--empty' : 'value--appointment'}`}>
                           {lead.appointment_datetime ? formatDate(lead.appointment_datetime) : 'Sin cita'}
                         </span>
-                      </div>
+                      </div>}
 
                     </div>
 

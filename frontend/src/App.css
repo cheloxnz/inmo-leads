@@ -9236,7 +9236,105 @@ body {
   text-align: center;
   color: var(--text-secondary);
   font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
+.roi-loading-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.roi-card-error { opacity: 1; }
+.roi-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem 1.5rem;
+}
+.roi-error-icon { font-size: 1.8rem; }
+.roi-error-title { font-weight: 600; font-size: 0.9rem; color: var(--text-primary); }
+.roi-error-sub { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+.roi-retry-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #6366f1;
+  background: transparent;
+  color: #6366f1;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.roi-retry-btn:hover { background: #ede9fe; }
+
+/* ── Columnas configurables (Mejora 13) ─────────────────────────────────── */
+.cols-config-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background: var(--bg-card, #fff);
+  font-size: 13px;
+  cursor: pointer;
+  color: #6b7280;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cols-config-btn:hover,
+.cols-config-btn--open {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px #ede9fe;
+  color: #4f46e5;
+}
+.cols-config-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+.cols-config-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 10px 4px;
+  z-index: 101;
+  min-width: 190px;
+  animation: cmdSlideIn 0.12s ease;
+}
+.cols-config-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 12px 8px;
+}
+.cols-config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.1s;
+  user-select: none;
+}
+.cols-config-item:hover { background: #f5f3ff; }
+.cols-config-check { cursor: pointer; accent-color: #6366f1; }
 
 .roi-hero {
   display: flex;
