@@ -1,16 +1,19 @@
 """
 setup_automatik_tenant.py
 =========================
-Script one-shot para crear el tenant "automatik-media" en MongoDB.
+Script one-shot para configurar el tenant "automatik-media" en MongoDB.
 
-Ejecutar en el VPS:
-  cd /opt/inmo-leads/backend
-  python setup_automatik_tenant.py
+Acciones:
+  1. Crea (o actualiza) el tenant "automatik-media"
+  2. Asigna el phone_number_id 1019782844562200 a automatik-media
+  3. Quita ese phone_number_id del tenant "demo-inmobiliaria"
+  4. Crea (o actualiza) el BusinessProfile del tenant
+  5. Crea el usuario admin del tenant: marcelo@automatik-media.com
 
-El tenant usa el mismo número de WhatsApp ya configurado en Meta
-(Phone Number ID: 1019782844562200).
+Ejecutar dentro del container:
+  docker exec inmobot-backend python setup_automatik_tenant.py
 
-Si el tenant ya existe, no hace nada (idempotente).
+Es idempotente: puede correrse múltiples veces sin problemas.
 """
 import asyncio
 import os
@@ -22,10 +25,12 @@ from datetime import datetime
 load_dotenv(Path(__file__).parent / '.env')
 
 MONGO_URL = os.environ['MONGO_URL']
-DB_NAME = os.environ['DB_NAME']
+DB_NAME   = os.environ['DB_NAME']
 
-TENANT_ID = "automatik-media"
+TENANT_ID       = "automatik-media"
 PHONE_NUMBER_ID = "1019782844562200"
+ADMIN_EMAIL     = "marcelo@automatik-media.com"
+ADMIN_PASSWORD  = "Automatik2026!"     # cambiar post-setup si querés
 
 
 async def main():
@@ -34,34 +39,45 @@ async def main():
 
     # ── 1. Tenant ──────────────────────────────────────────────────────
     existing = await db.tenants.find_one({"tenant_id": TENANT_ID})
+    tenant_doc = {
+        "tenant_id": TENANT_ID,
+        "name": "Automatik Media",
+        "plan": "enterprise",
+        "active": True,
+        "whatsapp_phone_number_id": PHONE_NUMBER_ID,
+        "template_id": "automatik",
+        "updated_at": datetime.utcnow().isoformat(),
+    }
     if existing:
-        print(f"✅ Tenant '{TENANT_ID}' ya existe — sin cambios")
+        await db.tenants.update_one({"tenant_id": TENANT_ID}, {"$set": tenant_doc})
+        print(f"✅ Tenant '{TENANT_ID}' actualizado")
     else:
-        tenant_doc = {
-            "tenant_id": TENANT_ID,
-            "name": "Automatik Media",
-            "plan": "enterprise",
-            "active": True,
-            "whatsapp_phone_number_id": PHONE_NUMBER_ID,
-            "template_id": "automatik",   # identificador de flujo
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-        }
+        tenant_doc["created_at"] = datetime.utcnow().isoformat()
         await db.tenants.insert_one(tenant_doc)
         print(f"✅ Tenant '{TENANT_ID}' creado")
 
-    # ── 2. BusinessProfile ─────────────────────────────────────────────
-    existing_profile = await db.business_profiles.find_one({"tenant_id": TENANT_ID})
+    # ── 2. Quitar phone_number_id de demo-inmobiliaria ─────────────────
+    demo = await db.tenants.find_one({"tenant_id": "demo-inmobiliaria"})
+    if demo and demo.get("whatsapp_phone_number_id") == PHONE_NUMBER_ID:
+        await db.tenants.update_one(
+            {"tenant_id": "demo-inmobiliaria"},
+            {"$set": {"whatsapp_phone_number_id": "", "updated_at": datetime.utcnow().isoformat()}}
+        )
+        print("✅ phone_number_id quitado de demo-inmobiliaria")
+    else:
+        print("ℹ️  demo-inmobiliaria no tenía ese phone_number_id (ok)")
+
+    # ── 3. BusinessProfile ─────────────────────────────────────────────
     profile_doc = {
         "tenant_id": TENANT_ID,
         "business_name": "Automatik Media",
         "business_description": (
             "Suite de herramientas IA para inmobiliarias: "
-            "InmoGen (creativos para Meta Ads), InmoBot (calificación de leads 24/7) "
-            "e InmoDesk (prospección B2B automatizada)."
+            "InmoGen (creativos Meta Ads), InmoBot (calificación leads 24/7), "
+            "InmoDesk (prospección B2B automática)."
         ),
         "industry": "Software SaaS — Inmobiliaria",
-        "phone": "5491153250877",          # WhatsApp de Marcelo (recibe notificaciones)
+        "phone": "5491153250877",           # WhatsApp personal Marcelo
         "email": "marcelo.dv@automatik-media.com",
         "website": "https://automatik-media.com",
         "bot_name": "Asistente de Automatik Media",
@@ -70,26 +86,40 @@ async def main():
         "business_hours": "Lun-Vie 9-18hs Argentina",
         "updated_at": datetime.utcnow().isoformat(),
     }
-
+    existing_profile = await db.business_profiles.find_one({"tenant_id": TENANT_ID})
     if existing_profile:
-        await db.business_profiles.update_one(
-            {"tenant_id": TENANT_ID}, {"$set": profile_doc}
-        )
+        await db.business_profiles.update_one({"tenant_id": TENANT_ID}, {"$set": profile_doc})
         print(f"✅ BusinessProfile '{TENANT_ID}' actualizado")
     else:
         await db.business_profiles.insert_one(profile_doc)
         print(f"✅ BusinessProfile '{TENANT_ID}' creado")
 
-    # ── 3. Usuario admin para el tenant (opcional) ─────────────────────
-    # El SuperAdmin (admin@inmobot.com) ya gestiona todo desde el dashboard.
-    # Si querés un usuario específico para este tenant:
-    # existing_user = await db.users.find_one({"email": "marcelo@automatik-media.com"})
-    # ...
+    # ── 4. Usuario admin del tenant ────────────────────────────────────
+    from auth import get_password_hash
+    existing_user = await db.agents.find_one({"email": ADMIN_EMAIL})
+    user_doc = {
+        "email": ADMIN_EMAIL,
+        "name": "Marcelo Del Valle",
+        "tenant_id": TENANT_ID,
+        "role": "admin",
+        "active": True,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    if existing_user:
+        await db.agents.update_one({"email": ADMIN_EMAIL}, {"$set": user_doc})
+        print(f"✅ Usuario '{ADMIN_EMAIL}' actualizado")
+    else:
+        user_doc["password"] = get_password_hash(ADMIN_PASSWORD)
+        user_doc["created_at"] = datetime.utcnow().isoformat()
+        await db.agents.insert_one(user_doc)
+        print(f"✅ Usuario '{ADMIN_EMAIL}' creado con contraseña: {ADMIN_PASSWORD}")
 
-    print("\n🚀 Setup completo. El bot de Automatik Media está listo.")
-    print(f"   Tenant ID:   {TENANT_ID}")
+    print("\n🚀 Setup completo.")
+    print(f"   Tenant:      {TENANT_ID}")
     print(f"   Phone ID:    {PHONE_NUMBER_ID}")
-    print(f"   Asesor:      +{profile_doc['phone']}")
+    print(f"   Admin:       {ADMIN_EMAIL}")
+    print(f"   Password:    {ADMIN_PASSWORD}")
+    print(f"\n   ⚠️  Cambiá la contraseña en producción desde el dashboard.")
     client.close()
 
 
