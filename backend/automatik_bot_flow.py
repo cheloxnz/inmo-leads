@@ -140,7 +140,17 @@ class AutomatikBotFlow:
         lead.flow_stage = FlowStage.NAME
 
     async def _handle_name(self, lead, message: str):
-        if "am_info" in message.lower():
+        msg_lower = message.lower()
+
+        # El usuario tocó "Sí, empecemos" → solo pedirle el nombre
+        if "am_start" in msg_lower:
+            self.wa.send_text_message(
+                lead.phone,
+                "¡Buenísimo! 🚀\n\n¿Cuál es tu nombre?",
+            )
+            return
+
+        if "am_info" in msg_lower:
             self.wa.send_text_message(
                 lead.phone,
                 "¡Claro! 🔥\n\n"
