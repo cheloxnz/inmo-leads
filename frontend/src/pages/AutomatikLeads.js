@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   Search, Filter, X, Phone, Calendar, TrendingUp,
   Users, BarChart2, Briefcase, DollarSign, MessageSquare,
-  ChevronRight, RefreshCw
+  ChevronRight, RefreshCw, AlertCircle, Lightbulb
 } from 'lucide-react';
 import '../styles/AutomatikDashboard.css';
 import '../styles/AutomatikLeads.css';
@@ -134,6 +134,15 @@ function LeadCard({ lead, onClick, selected }) {
           )}
         </div>
 
+        {/* Fila 3b: problem tags */}
+        {(answers.problem_tags?.length > 0) && (
+          <div className="al-problem-tags">
+            {answers.problem_tags.map((t, i) => (
+              <span key={i} className="al-problem-tag">⚠️ {t}</span>
+            ))}
+          </div>
+        )}
+
         {/* Fila 4: score bar + fecha */}
         <div className="al-card-row al-card-row--bottom">
           <div className="al-score-wrap">
@@ -206,6 +215,42 @@ function LeadDetail({ lead, onClose }) {
                          'Lead frío — handoff para atención manual'}
         </p>
       </div>
+
+      {/* Problema principal + tags + oportunidades */}
+      {(answers.main_problem || answers.problem_tags?.length > 0 || answers.opportunities?.length > 0) && (
+        <div className="al-detail-section al-problem-section">
+          <h4 className="al-detail-section-title">
+            <AlertCircle size={13} style={{ marginRight: 5 }} />
+            Problema detectado
+          </h4>
+
+          {answers.main_problem && (
+            <p className="al-problem-text">"{answers.main_problem}"</p>
+          )}
+
+          {answers.problem_tags?.length > 0 && (
+            <div className="al-problem-tags al-problem-tags--detail">
+              {answers.problem_tags.map((t, i) => (
+                <span key={i} className="al-problem-tag">⚠️ {t}</span>
+              ))}
+            </div>
+          )}
+
+          {answers.opportunities?.length > 0 && (
+            <div className="al-opportunities">
+              <span className="al-opp-label">
+                <Lightbulb size={12} style={{ marginRight: 4 }} />
+                Qué podemos ofrecerle:
+              </span>
+              <ul className="al-opp-list">
+                {answers.opportunities.map((o, i) => (
+                  <li key={i}>🎯 {o}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Respuestas del formulario */}
       <div className="al-detail-section">

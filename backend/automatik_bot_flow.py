@@ -85,6 +85,9 @@ class AutomatikBotFlow:
         elif stage == FlowStage.URGENCY:
             await self._handle_ads_invest(lead, message_text)
 
+        elif stage == FlowStage.APPOINTMENT_OFFER:
+            await self._handle_main_problem(lead, message_text)
+
         elif stage in (FlowStage.HANDOFF, FlowStage.CONSULTING):
             # Lead en handoff — Marcelo ya está hablando con él
             self.wa.send_text_message(
@@ -292,6 +295,28 @@ class AutomatikBotFlow:
                else "no")
         self._set_answer(lead, "ads_invest", ads)
 
+        # Última pregunta: mayor problema del negocio
+        first = lead.name.split()[0] if lead.name else ""
+        self.wa.send_text_message(
+            lead.phone,
+            f"Última pregunta, {first} 🙌\n\n"
+            f"¿Cuál es el *mayor problema* que tenés hoy en tu negocio?\n\n"
+            f"Por ejemplo: _\"mis leads no tienen seguimiento\"_, "
+            f"_\"no tengo presencia en redes\"_, _\"pierdo mucho tiempo cargando datos\"_...\n\n"
+            f"Contame en tus palabras 👇",
+        )
+        lead.flow_stage = FlowStage.APPOINTMENT_OFFER
+
+    async def _handle_main_problem(self, lead, message: str):
+        """Recibe el texto libre del mayor problema → analiza con LLM → guarda tags."""
+        problem_text = message.strip()
+        self._set_answer(lead, "main_problem", problem_text)
+
+        # Analizar con LLM para extraer tags de problema y oportunidades
+        tags, opportunities = await self._analyze_problem(problem_text)
+        self._set_answer(lead, "problem_tags", tags)
+        self._set_answer(lead, "opportunities", opportunities)
+
         # Marcar timestamp del scoring
         meta = lead.metadata or {}
         meta["scored_at"] = datetime.utcnow().isoformat()
@@ -314,6 +339,56 @@ class AutomatikBotFlow:
     # ──────────────────────────────────────────────────────────────────
     # Helpers
     # ──────────────────────────────────────────────────────────────────
+
+    async def _analyze_problem(self, problem_text: str):
+        """Usa GPT-4o-mini para extraer tags de problema y oportunidades comerciales."""
+        try:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+            system_prompt = (
+                "Sos un analista de ventas B2B para una empresa de herramientas IA para el sector inmobiliario. "
+                "Las herramientas que vendemos son:\n"
+                "- 🤖 InmoBot: bot WhatsApp que califica leads automáticamente 24/7\n"
+                "- 🎨 InmoGen: generador IA de creativos para Meta Ads en 2 minutos\n"
+                "- 📊 InmoDesk: CRM + prospección B2B automatizada\n\n"
+                "Dado el texto del prospecto, devolvé un JSON con:\n"
+                "{\n"
+                "  \"problem_tags\": [lista de 2 a 5 etiquetas cortas del problema, máx 4 palabras cada una],\n"
+                "  \"opportunities\": [lista de 1 a 3 herramientas/soluciones concretas que le servirían, máx 6 palabras cada una]\n"
+                "}\n\n"
+                "Ejemplos de problem_tags: \"Sin seguimiento de leads\", \"Carga manual de datos\", "
+                "\"Sin presencia en redes\", \"Publicidad ineficiente\", \"Sin CRM\", \"Sin web\", "
+                "\"Respuesta lenta a consultas\", \"No automatiza WhatsApp\"\n\n"
+                "Ejemplos de opportunities: \"InmoBot para seguimiento automático\", "
+                "\"InmoGen para creativos de ads\", \"InmoDesk como CRM central\"\n\n"
+                "Respondé SOLO el JSON, sin explicaciones."
+            )
+
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"El prospecto dijo: \"{problem_text}\""},
+                ],
+                temperature=0.3,
+                max_tokens=300,
+            )
+
+            import json
+            raw = response.choices[0].message.content.strip()
+            # Limpiar posibles bloques ```json
+            raw = re.sub(r"```json\s*|\s*```", "", raw).strip()
+            data = json.loads(raw)
+            tags = data.get("problem_tags", [])[:5]
+            opportunities = data.get("opportunities", [])[:3]
+            logger.info(f"[automatik] Problem analysis: tags={tags}, opp={opportunities}")
+            return tags, opportunities
+
+        except Exception as e:
+            logger.warning(f"[automatik] Problem analysis failed: {e}")
+            # Fallback: guardar texto crudo sin tags
+            return [], []
 
     def _set_answer(self, lead, key: str, value):
         meta = lead.metadata or {}
@@ -366,11 +441,18 @@ class AutomatikBotFlow:
         )
         plan_sugg = PLAN_SUGGESTIONS.get(status_str, "")
 
+        # Personalizar mensaje con oportunidades detectadas
+        opportunities = answers.get("opportunities", [])
+        opp_text = ""
+        if opportunities:
+            opp_list = "\n".join(f"• {o}" for o in opportunities)
+            opp_text = f"\n\nBasándome en lo que me contaste, estas herramientas podrían ayudarte:\n{opp_list}\n"
+
         # Mensaje al lead
         msg = (
             f"¡Excelente, {first}! 🔥\n\n"
             f"En base a lo que me contaste, hay una oportunidad concreta para "
-            f"automatizar tu {biz_label} con IA.\n\n"
+            f"automatizar tu {biz_label} con IA.{opp_text}\n"
             f"El siguiente paso es una llamada de 30 minutos con Marcelo (fundador de Automatik Media) "
             f"para ver exactamente qué herramientas se adaptan a tu situación.\n\n"
             f"👉 *Reservá tu llamada aquí:*\n{CAL_COM_LINK}\n\n"
@@ -434,6 +516,29 @@ class AutomatikBotFlow:
             else "⚠️ *Lead frío — se le ofreció el botón de hablar con asesor. Revisalo en el dashboard.*"
         )
 
+        # Tags del problema y oportunidades
+        problem_tags = answers.get("problem_tags", [])
+        opportunities = answers.get("opportunities", [])
+        main_problem = answers.get("main_problem", "")
+        problem_block = []
+        if main_problem:
+            problem_block.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*💬 Problema:*\n_{main_problem}_"},
+            })
+        if problem_tags:
+            tags_str = "  ".join(f"`{t}`" for t in problem_tags)
+            problem_block.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*🏷️ Tags detectados:*\n{tags_str}"},
+            })
+        if opportunities:
+            opp_str = "\n".join(f"• {o}" for o in opportunities)
+            problem_block.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*🎯 Oportunidades:*\n{opp_str}"},
+            })
+
         payload = {
             "text": f"{emoji} *Nuevo lead Automatik Media — {status_str.upper()}*",
             "blocks": [
@@ -458,6 +563,7 @@ class AutomatikBotFlow:
                     "type": "section",
                     "text": {"type": "mrkdwn", "text": action_text},
                 },
+                *problem_block,
                 {
                     "type": "actions",
                     "elements": [
