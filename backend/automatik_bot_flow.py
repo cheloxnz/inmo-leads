@@ -349,9 +349,9 @@ class AutomatikBotFlow:
             system_prompt = (
                 "Sos un analista de ventas B2B para una empresa de herramientas IA para el sector inmobiliario. "
                 "Las herramientas que vendemos son:\n"
-                "- 🤖 InmoBot: bot WhatsApp que califica leads automáticamente 24/7\n"
+                "- 🤖 InmoBot: bot de WhatsApp que califica leads 24/7 + dashboard de gestión de leads\n"
                 "- 🎨 InmoGen: generador IA de creativos para Meta Ads en 2 minutos\n"
-                "- 📊 InmoDesk: CRM + prospección B2B automatizada\n\n"
+                "- 📊 InmoDesk: sistema de búsqueda y prospección de leads B2B\n\n"
                 "Dado el texto del prospecto, devolvé un JSON con:\n"
                 "{\n"
                 "  \"problem_tags\": [lista de 2 a 5 etiquetas cortas del problema, máx 4 palabras cada una],\n"
@@ -441,18 +441,11 @@ class AutomatikBotFlow:
         )
         plan_sugg = PLAN_SUGGESTIONS.get(status_str, "")
 
-        # Personalizar mensaje con oportunidades detectadas
-        opportunities = answers.get("opportunities", [])
-        opp_text = ""
-        if opportunities:
-            opp_list = "\n".join(f"• {o}" for o in opportunities)
-            opp_text = f"\n\nBasándome en lo que me contaste, estas herramientas podrían ayudarte:\n{opp_list}\n"
-
         # Mensaje al lead
         msg = (
             f"¡Excelente, {first}! 🔥\n\n"
             f"En base a lo que me contaste, hay una oportunidad concreta para "
-            f"automatizar tu {biz_label} con IA.{opp_text}\n"
+            f"automatizar tu {biz_label} con IA.\n\n"
             f"El siguiente paso es una llamada de 30 minutos con Marcelo (fundador de Automatik Media) "
             f"para ver exactamente qué herramientas se adaptan a tu situación.\n\n"
             f"👉 *Reservá tu llamada aquí:*\n{CAL_COM_LINK}\n\n"
