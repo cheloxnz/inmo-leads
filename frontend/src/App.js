@@ -452,7 +452,7 @@ function AppContent() {
       <main className="main-content">
         <UpdateBanner />
         <AppHeader />
-        <OnboardingTour />
+        {!isSuperAdmin && <OnboardingTour />}
         <Routes>
           {/* Rutas SuperAdmin Automatik */}
           <Route path="/superadmin" element={
