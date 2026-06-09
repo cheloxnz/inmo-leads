@@ -256,6 +256,17 @@ async def register_payment(
 # Leads del Bot Automatik
 # ──────────────────────────────────────────────────────────────────────────────
 
+@router.delete("/leads/{lead_phone}")
+async def delete_automatik_lead(
+    lead_phone: str,
+    current_user: User = Depends(require_superadmin),
+):
+    result = await _db.leads.delete_one({"phone": lead_phone, "tenant_id": "automatik-media"})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Lead no encontrado")
+    return {"ok": True}
+
+
 @router.get("/leads")
 async def list_automatik_leads(
     status: str = Query(""),

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   Search, Filter, X, Phone, Calendar, TrendingUp,
   Users, BarChart2, Briefcase, DollarSign, MessageSquare,
-  ChevronRight, RefreshCw, AlertCircle, Lightbulb
+  ChevronRight, RefreshCw, AlertCircle, Lightbulb, Trash2
 } from 'lucide-react';
 import '../styles/AutomatikDashboard.css';
 import '../styles/AutomatikLeads.css';
@@ -169,7 +169,7 @@ function LeadCard({ lead, onClick, selected }) {
 
 // ── Panel de detalle ──────────────────────────────────────────────────────────
 
-function LeadDetail({ lead, onClose }) {
+function LeadDetail({ lead, onClose, onDelete }) {
   if (!lead) return null;
   const answers   = lead?.metadata?.automatik_answers || {};
   const score     = getScore(lead);
@@ -201,7 +201,21 @@ function LeadDetail({ lead, onClose }) {
           <h3 className="al-detail-name">{lead.name || '(sin nombre)'}</h3>
           <span className="al-meta"><Phone size={11} /> {lead.phone}</span>
         </div>
-        <button className="ak-btn ak-btn-ghost ak-btn-icon" onClick={onClose}><X size={15} /></button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="ak-btn ak-btn-sm"
+            style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
+            onClick={() => {
+              if (window.confirm(`¿Eliminás el lead de ${lead.name || lead.phone}? Esta acción no se puede deshacer.`)) {
+                onDelete(lead);
+              }
+            }}
+            title="Eliminar lead"
+          >
+            <Trash2 size={13} />
+          </button>
+          <button className="ak-btn ak-btn-ghost ak-btn-icon" onClick={onClose}><X size={15} /></button>
+        </div>
       </div>
 
       {/* Temperatura + score */}
@@ -324,6 +338,17 @@ export default function AutomatikLeads() {
   const [filterStatus, setFilterStatus] = useState('');
   const [selected, setSelected]     = useState(null);
 
+  const handleDeleteLead = async (lead) => {
+    try {
+      await axios.delete(`${API}/superadmin/clients/leads/${lead.phone}`);
+      toast.success(`Lead de ${lead.name || lead.phone} eliminado`);
+      setSelected(null);
+      setLeads(prev => prev.filter(l => l.phone !== lead.phone));
+    } catch {
+      toast.error('Error eliminando el lead');
+    }
+  };
+
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
@@ -432,7 +457,7 @@ export default function AutomatikLeads() {
         {/* Columna derecha: detalle */}
         <div className="al-detail-col">
           {selected ? (
-            <LeadDetail lead={selected} onClose={() => setSelected(null)} />
+            <LeadDetail lead={selected} onClose={() => setSelected(null)} onDelete={handleDeleteLead} />
           ) : (
             <div className="al-detail-placeholder">
               <MessageSquare size={40} style={{ opacity: 0.15, marginBottom: 12 }} />
