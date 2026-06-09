@@ -1383,6 +1383,7 @@ from routers.founder import router as founder_router
 from routers.bot_learning import router as bot_learning_router, init_router as init_bot_learning
 from routers.calendar import router as calendar_router, init_router as init_calendar
 from routers.bootstrap import router as bootstrap_router, init_router as init_bootstrap
+from routers.automatik_clients import router as automatik_clients_router
 
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
@@ -1397,6 +1398,7 @@ app.include_router(billing_router, prefix="/api")
 app.include_router(metrics_router, prefix="/api")
 app.include_router(widget_router, prefix="/api")
 app.include_router(superadmin_router, prefix="/api")
+app.include_router(automatik_clients_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
 app.include_router(uploads_router, prefix="/api")
 app.include_router(onboarding_router, prefix="/api")

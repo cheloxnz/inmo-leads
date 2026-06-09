@@ -10,6 +10,9 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Tenant ID del bot de Automatik Media
+AUTOMATIK_TENANT_ID = "automatik-media"
+
 
 def _enum_val(v):
     """Devuelve el valor del enum si es enum, o el string directamente."""
@@ -79,7 +82,23 @@ class BotFlowManager:
     async def process_message(self, lead: Lead, message_text: str, db) -> Lead:
         """Procesa mensaje según el estado del flujo"""
         self.db = db  # Guardamos ref para que sub-métodos (sync gcal, etc.) accedan
-        
+
+        # ──────────────────────────────────────────────────────────────
+        # DISPATCH: Tenant Automatik Media → flujo B2B propio
+        # ──────────────────────────────────────────────────────────────
+        if getattr(lead, "tenant_id", None) == AUTOMATIK_TENANT_ID:
+            from automatik_bot_flow import AutomatikBotFlow
+            automatik_flow = AutomatikBotFlow(wa_service=self.wa, db=db)
+            lead.conversation_history.append({
+                "from": "customer",
+                "text": message_text,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            await automatik_flow.process(lead, message_text)
+            lead.last_message_at = datetime.utcnow()
+            await self.save_lead(lead, db)
+            return lead
+
         # Detectar urgencia en el mensaje
         if self.detect_urgency(message_text):
             lead.is_urgent = True

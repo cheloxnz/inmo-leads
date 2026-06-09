@@ -23,6 +23,8 @@ import InmobiliariaLanding from './pages/InmobiliariaLanding';
 import DynamicLanding from './pages/DynamicLanding';
 import { getTenantFromSubdomain } from './utils/subdomain';
 import SuperAdminPanel from './pages/SuperAdminPanel';
+import AutomatikDashboard from './pages/AutomatikDashboard';
+import ClientesPage from './pages/ClientesPage';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -35,7 +37,7 @@ import MarketingEffectiveness from './pages/MarketingEffectiveness';
 import Changelog from './pages/Changelog';
 import UpdateBanner from './components/UpdateBanner';
 import OnboardingTour from './components/OnboardingTour';
-import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package, BarChart2 } from 'lucide-react';
+import { Moon, Sun, ChevronLeft, ChevronRight, Key, Building2, MessageSquare, Settings, Package, BarChart2, LayoutDashboard, Users, DollarSign, Monitor } from 'lucide-react';
 import '@/App.css';
 
 // Usar variable de entorno si está definida, sino fallback al mismo origen
@@ -120,18 +122,82 @@ function Navigation() {
       </button>
 
       <div className="nav-links">
-        {isSuperAdmin && (
-          <Link
-            to="/superadmin"
-            className={`nav-link sa-nav-link ${isActive('/superadmin') ? 'active' : ''}`}
-            data-testid="nav-superadmin"
-            title="Panel SuperAdmin"
-          >
-            <span className="icon"><Building2 size={16} /></span>
-            {!isCollapsed && <span>SuperAdmin</span>}
-          </Link>
-        )}
-        {isAdmin ? (
+        {/* ── Menú SuperAdmin (Automatik Media) ── */}
+        {isSuperAdmin ? (
+          <>
+            <Link
+              to="/superadmin"
+              className={`nav-link ${isActive('/superadmin') ? 'active' : ''}`}
+              data-testid="nav-ak-dashboard"
+              title="Dashboard Automatik"
+            >
+              <span className="icon"><LayoutDashboard size={16} /></span>
+              {!isCollapsed && <span>Dashboard</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/clientes"
+              className={`nav-link ${isActive('/superadmin/clientes') ? 'active' : ''}`}
+              data-testid="nav-ak-clients"
+              title="Clientes"
+            >
+              <span className="icon"><Users size={16} /></span>
+              {!isCollapsed && <span>Clientes</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/pagos"
+              className={`nav-link ${isActive('/superadmin/pagos') ? 'active' : ''}`}
+              data-testid="nav-ak-payments"
+              title="Pagos"
+            >
+              <span className="icon"><DollarSign size={16} /></span>
+              {!isCollapsed && <span>Pagos</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/plataformas"
+              className={`nav-link ${isActive('/superadmin/plataformas') ? 'active' : ''}`}
+              data-testid="nav-ak-platforms"
+              title="Plataformas"
+            >
+              <span className="icon"><Monitor size={16} /></span>
+              {!isCollapsed && <span>Plataformas</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/leads"
+              className={`nav-link ${isActive('/superadmin/leads') ? 'active' : ''}`}
+              data-testid="nav-ak-leads"
+              title="Leads del Bot"
+            >
+              <span className="icon">🤖</span>
+              {!isCollapsed && <span>Leads del Bot</span>}
+            </Link>
+
+            <div className="nav-divider" />
+
+            <Link
+              to="/config"
+              className={`nav-link ${isActive('/config') ? 'active' : ''}`}
+              data-testid="nav-ak-config"
+              title="Configuración"
+            >
+              <span className="icon"><Settings size={16} /></span>
+              {!isCollapsed && <span>Configuración</span>}
+            </Link>
+
+            <Link
+              to="/auditoria"
+              className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
+              data-testid="nav-audit"
+              title="Auditoría"
+            >
+              <span className="icon">📜</span>
+              {!isCollapsed && <span>Auditoría</span>}
+            </Link>
+          </>
+        ) : isAdmin ? (
           <>
             <Link
               to="/"
@@ -212,18 +278,6 @@ function Navigation() {
               <span className="icon">🏆</span>
               {!isCollapsed && <span>Marketing</span>}
             </Link>
-
-            {isSuperAdmin && (
-              <Link
-                to="/auditoria"
-                className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
-                data-testid="nav-audit"
-                title="Historial de Auditoría"
-              >
-                <span className="icon">📜</span>
-                {!isCollapsed && <span>Auditoría</span>}
-              </Link>
-            )}
           </>
         ) : (
           <>
@@ -259,7 +313,7 @@ function Navigation() {
           </>
         )}
 
-        {isAdmin && (
+        {isAdmin && !isSuperAdmin && (
           <Link
             to="/flujo"
             className={`nav-link ${isActive('/flujo') ? 'active' : ''}`}
@@ -271,7 +325,7 @@ function Navigation() {
           </Link>
         )}
 
-        {isAdmin && (
+        {isAdmin && !isSuperAdmin && (
           <Link
             to="/config"
             className={`nav-link ${isActive('/config') ? 'active' : ''}`}
@@ -400,10 +454,30 @@ function AppContent() {
         <AppHeader />
         <OnboardingTour />
         <Routes>
-          {/* Ruta SuperAdmin */}
+          {/* Rutas SuperAdmin Automatik */}
           <Route path="/superadmin" element={
             <ProtectedRoute adminOnly>
+              <AutomatikDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/clientes" element={
+            <ProtectedRoute adminOnly>
+              <ClientesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/pagos" element={
+            <ProtectedRoute adminOnly>
+              <ClientesPage initialTab="pagos" />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/plataformas" element={
+            <ProtectedRoute adminOnly>
               <SuperAdminPanel />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/leads" element={
+            <ProtectedRoute adminOnly>
+              <Leads filterByTenant="automatik-media" />
             </ProtectedRoute>
           } />
           {/* Rutas Admin */}
