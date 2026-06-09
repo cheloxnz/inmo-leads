@@ -109,7 +109,7 @@ async def main():
         await db.agents.update_one({"email": ADMIN_EMAIL}, {"$set": user_doc})
         print(f"✅ Usuario '{ADMIN_EMAIL}' actualizado")
     else:
-        user_doc["password"] = get_password_hash(ADMIN_PASSWORD)
+        user_doc["password_hash"] = get_password_hash(ADMIN_PASSWORD)
         user_doc["created_at"] = datetime.utcnow().isoformat()
         await db.agents.insert_one(user_doc)
         print(f"✅ Usuario '{ADMIN_EMAIL}' creado con contraseña: {ADMIN_PASSWORD}")
