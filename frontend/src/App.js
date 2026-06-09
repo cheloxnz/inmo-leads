@@ -26,6 +26,7 @@ import SuperAdminPanel from './pages/SuperAdminPanel';
 import AutomatikDashboard from './pages/AutomatikDashboard';
 import ClientesPage from './pages/ClientesPage';
 import PagosPage from './pages/PagosPage';
+import AutomatikLeads from './pages/AutomatikLeads';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -478,7 +479,7 @@ function AppContent() {
           } />
           <Route path="/superadmin/leads" element={
             <ProtectedRoute adminOnly>
-              <Leads filterByTenant="automatik-media" />
+              <AutomatikLeads />
             </ProtectedRoute>
           } />
           {/* Rutas Admin */}

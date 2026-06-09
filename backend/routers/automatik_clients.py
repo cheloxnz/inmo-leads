@@ -242,6 +242,32 @@ async def register_payment(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Leads del Bot Automatik
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/leads")
+async def list_automatik_leads(
+    status: str = Query(""),
+    search: str = Query(""),
+    limit: int = Query(200),
+    current_user: User = Depends(require_superadmin),
+):
+    """Devuelve leads del tenant automatik-media con sus respuestas B2B."""
+    query: dict = {"tenant_id": "automatik-media"}
+    if status:
+        query["status"] = status
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"phone": {"$regex": search, "$options": "i"}},
+        ]
+    leads = []
+    async for doc in _db.leads.find(query, {"_id": 0}).sort("created_at", -1).limit(limit):
+        leads.append(doc)
+    return leads
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Dashboard KPIs
 # ──────────────────────────────────────────────────────────────────────────────
 
