@@ -189,15 +189,6 @@ function Navigation() {
               {!isCollapsed && <span>Configuración</span>}
             </Link>
 
-            <Link
-              to="/auditoria"
-              className={`nav-link ${isActive('/auditoria') ? 'active' : ''}`}
-              data-testid="nav-audit"
-              title="Auditoría"
-            >
-              <span className="icon">📜</span>
-              {!isCollapsed && <span>Auditoría</span>}
-            </Link>
           </>
         ) : isAdmin ? (
           <>

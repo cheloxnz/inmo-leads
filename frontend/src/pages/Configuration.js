@@ -14,8 +14,10 @@ import BusinessProfileSection from '../components/BusinessProfileSection';
 import BotLearningPanel from '../components/BotLearningPanel';
 import CoachingOpportunitiesPanel from '../components/CoachingOpportunitiesPanel';
 import GoogleCalendarSection from '../components/GoogleCalendarSection';
+import { useAuth } from '../context/AuthContext';
 
 export default function Configuration() {
+  const { isSuperAdmin } = useAuth();
   const [config, setConfig] = useState(null);
   const [welcomeButtons, setWelcomeButtons] = useState([
     { id: 'opt_1', title: '' },
@@ -431,9 +433,11 @@ export default function Configuration() {
         </Button>
       </div>
 
-      <div style={{ marginTop: 24 }}>
-        <BrandingPanel />
-      </div>
+      {!isSuperAdmin && (
+        <div style={{ marginTop: 24 }}>
+          <BrandingPanel />
+        </div>
+      )}
     </div>
   );
 }
