@@ -123,14 +123,15 @@ class AutomatikBotFlow:
 
     async def _handle_welcome(self, lead, message: str):
         response = (
-            "¡Hola! 👋 Soy el asistente de *Automatik Media*.\n\n"
-            "Voy a hacerte unas preguntas rápidas para entender tu situación "
-            "y ver cómo podemos ayudarte a hacer crecer tu inmobiliaria con IA. "
-            "Solo toma 2 minutitos. ¿Empezamos?"
+            "¡Hola! 👋 Vi que te interesó la *Suite IA de Automatik Media*.\n\n"
+            "Antes de mostrarte cómo funciona, quiero entender tu negocio "
+            "para ver qué tanto impacto podés tener. Son solo 6 preguntas, "
+            "te lleva 2 minutos.\n\n"
+            "¿Empezamos?"
         )
         buttons = [
-            {"type": "reply", "reply": {"id": "am_start", "title": "¡Sí, empecemos! 🚀"}},
-            {"type": "reply", "reply": {"id": "am_info", "title": "Primero quiero info"}},
+            {"type": "reply", "reply": {"id": "am_start", "title": "Sí, empecemos 🚀"}},
+            {"type": "reply", "reply": {"id": "am_info",  "title": "Primero quiero info"}},
         ]
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
         lead.flow_stage = FlowStage.NAME
