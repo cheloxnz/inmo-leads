@@ -157,12 +157,17 @@ class AutomatikBotFlow:
             )
             return
 
-        lead.name = " ".join(w.capitalize() for w in name.split())
-        first = lead.name.split()[0]
+        # Limpiar prefijos como "si," "sí," "me llamo" antes de capitalizar
+        import re as _re
+        name_clean = _re.sub(r"^(si[,.]?\s*|sí[,.]?\s*|me llamo\s*|soy\s*)", "", name, flags=_re.IGNORECASE).strip()
+        if len(name_clean) < 2:
+            name_clean = name  # fallback si quedó vacío
+        lead.name = " ".join(w.capitalize() for w in name_clean.split())
+        first = lead.name.split()[0].rstrip(",.")
         response = f"¡Buenísimo, {first}! 😊\n\n¿Cómo describirías tu negocio?"
         buttons = [
-            {"type": "reply", "reply": {"id": "biz_inmo",   "title": "🏢 Inmobiliaria propia"}},
-            {"type": "reply", "reply": {"id": "biz_asesor", "title": "👤 Asesor independiente"}},
+            {"type": "reply", "reply": {"id": "biz_inmo",   "title": "🏢 Inmobiliaria"}},
+            {"type": "reply", "reply": {"id": "biz_asesor", "title": "👤 Asesor"}},
             {"type": "reply", "reply": {"id": "biz_dev",    "title": "🏗️ Desarrolladora"}},
         ]
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
@@ -223,7 +228,7 @@ class AutomatikBotFlow:
         response = "¿Usás actualmente alguna herramienta digital para gestionar tus leads o clientes?"
         buttons = [
             {"type": "reply", "reply": {"id": "tools_si",     "title": "✅ Sí, tengo CRM"}},
-            {"type": "reply", "reply": {"id": "tools_basico", "title": "📋 Algo básico (hojas)"}},
+            {"type": "reply", "reply": {"id": "tools_basico", "title": "📋 Algo básico"}},
             {"type": "reply", "reply": {"id": "tools_no",     "title": "❌ No uso nada"}},
         ]
         self.wa.send_interactive_buttons(lead.phone, response, buttons)
