@@ -527,6 +527,21 @@ async def handle_incoming_message(message: dict, tenant_id: str = "", tenant: di
             return
 
         if message_text:
+            # ── Dispatch Automatik Media (B2B qualification flow) ──────
+            if tenant_id == "automatik-media":
+                from automatik_bot_flow import AutomatikBotFlow
+                ak_flow = AutomatikBotFlow(wa_service=active_wa, db=db)
+                lead.conversation_history.append({
+                    "role": "user",
+                    "content": message_text,
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+                await ak_flow.process(lead, message_text)
+                lead.last_message_at = datetime.utcnow()
+                await bot_flow.save_lead(lead, db)
+                return {"status": "ok"}
+            # ──────────────────────────────────────────────────────────
+
             # Determine which flow engine to use based on tenant template
             use_generic = True
             if tenant:
