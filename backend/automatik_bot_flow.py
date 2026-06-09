@@ -165,29 +165,64 @@ class AutomatikBotFlow:
         lead.name = " ".join(w.capitalize() for w in name_clean.split())
         first = lead.name.split()[0].rstrip(",.")
         response = f"¡Buenísimo, {first}! 😊\n\n¿Cómo describirías tu negocio?"
-        buttons = [
-            {"type": "reply", "reply": {"id": "biz_inmo",   "title": "🏢 Inmobiliaria"}},
-            {"type": "reply", "reply": {"id": "biz_asesor", "title": "👤 Asesor"}},
-            {"type": "reply", "reply": {"id": "biz_dev",    "title": "🏗️ Desarrolladora"}},
-        ]
-        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        # Lista (soporta 4+ opciones, botones tienen máx 3)
+        sections = [{
+            "title": "Tipo de negocio",
+            "rows": [
+                {"id": "biz_inmo",   "title": "🏢 Inmobiliaria",   "description": "Inmobiliaria propia con cartera"},
+                {"id": "biz_asesor", "title": "👤 Asesor",          "description": "Asesor o broker independiente"},
+                {"id": "biz_dev",    "title": "🏗️ Desarrolladora",  "description": "Empresa de desarrollo inmobiliario"},
+                {"id": "biz_otro",   "title": "✏️ Otro",             "description": "Contame brevemente qué hacés"},
+            ],
+        }]
+        self.wa.send_list_message(lead.phone, response, "Ver opciones", sections)
         lead.flow_stage = FlowStage.INTENT
 
     async def _handle_biz_type(self, lead, message: str):
         msg = message.lower()
-        biz = ("inmobiliaria" if "biz_inmo" in msg or "inmobiliaria" in msg
-               else "desarrolladora" if "biz_dev" in msg or "desarrolladora" in msg or "desarrollo" in msg
-               else "asesor")
-        self._set_answer(lead, "biz_type", biz)
 
-        response = "¿Cuántas personas hay en tu equipo? (asesores + administración)"
-        buttons = [
-            {"type": "reply", "reply": {"id": "team_solo", "title": "Solo yo"}},
-            {"type": "reply", "reply": {"id": "team_2_5",  "title": "2 a 5 personas"}},
-            {"type": "reply", "reply": {"id": "team_6_15", "title": "6 a 15 personas"}},
-            {"type": "reply", "reply": {"id": "team_mas",  "title": "Más de 15"}},
-        ]
-        self.wa.send_interactive_buttons(lead.phone, response, buttons)
+        # Si eligió "Otro" y aún no tenemos la descripción libre, pedirla
+        if "biz_otro" in msg:
+            self.wa.send_text_message(
+                lead.phone,
+                "¡Genial! Contame en pocas palabras a qué se dedica tu negocio. 📝\n\n"
+                "Ej: *\"Agencia de alquileres temporarios\"* o *\"Franquicia de RE/MAX\"*",
+            )
+            # Guardamos que está esperando la descripción libre
+            meta = lead.metadata or {}
+            meta["_awaiting_biz_description"] = True
+            lead.metadata = meta
+            return
+
+        # Si viene la descripción libre (no es una opción del menú)
+        meta = lead.metadata or {}
+        if meta.get("_awaiting_biz_description"):
+            # Guardar la descripción textual como biz_type
+            self._set_answer(lead, "biz_type", f"otro: {message.strip()[:80]}")
+            meta.pop("_awaiting_biz_description", None)
+            lead.metadata = meta
+        else:
+            biz = ("inmobiliaria" if "biz_inmo" in msg or "inmobiliaria" in msg
+                   else "desarrolladora" if "biz_dev" in msg or "desarrolladora" in msg or "desarrollo" in msg
+                   else "asesor")
+            self._set_answer(lead, "biz_type", biz)
+
+        # Lista para tamaño de equipo (4 opciones → usa list_message)
+        sections = [{
+            "title": "Tamaño del equipo",
+            "rows": [
+                {"id": "team_solo", "title": "Solo yo",         "description": "Trabajo de manera independiente"},
+                {"id": "team_2_5",  "title": "2 a 5 personas",  "description": "Equipo pequeño"},
+                {"id": "team_6_15", "title": "6 a 15 personas", "description": "Equipo mediano"},
+                {"id": "team_mas",  "title": "Más de 15",       "description": "Empresa grande"},
+            ],
+        }]
+        self.wa.send_list_message(
+            lead.phone,
+            "¿Cuántas personas hay en tu equipo? (asesores + administración)",
+            "Ver opciones",
+            sections,
+        )
         lead.flow_stage = FlowStage.ZONE
 
     async def _handle_team_size(self, lead, message: str):
@@ -294,7 +329,8 @@ class AutomatikBotFlow:
     def _score(self, answers: dict):
         score = 0
         biz = answers.get("biz_type", "asesor")
-        score += {"inmobiliaria": 3, "desarrolladora": 2, "asesor": 1}.get(biz, 1)
+        biz_key = biz if biz in ("inmobiliaria", "desarrolladora", "asesor") else "otro"
+        score += {"inmobiliaria": 3, "desarrolladora": 2, "asesor": 1, "otro": 2}.get(biz_key, 1)
 
         team = answers.get("team_size", "solo_yo")
         score += {"solo_yo": 0, "2_5": 2, "6_15": 3, "mas_15": 4}.get(team, 0)
@@ -382,7 +418,12 @@ class AutomatikBotFlow:
     async def _notify_slack(self, lead, score: int, status_str: str, answers: dict):
         """Envía notificación al canal Slack de Automatik Media."""
         emoji = {"hot": "🔥", "warm": "🌡️", "cold": "❄️"}.get(status_str, "📋")
-        biz_labels   = {"inmobiliaria": "Inmobiliaria propia", "desarrolladora": "Desarrolladora", "asesor": "Asesor independiente"}
+        biz_raw = answers.get('biz_type', '')
+        biz_labels_map = {"inmobiliaria": "Inmobiliaria propia", "desarrolladora": "Desarrolladora", "asesor": "Asesor independiente"}
+        biz_labels = {k: v for k, v in biz_labels_map.items()}
+        # Si es "otro: descripción", mostrar la descripción directamente
+        if biz_raw.startswith("otro:"):
+            biz_labels[biz_raw] = f"Otro — {biz_raw[5:].strip()}"
         team_labels  = {"solo_yo": "Solo él/ella", "2_5": "2-5 personas", "6_15": "6-15 personas", "mas_15": "Más de 15"}
         tools_labels = {"tiene_crm": "Usa CRM/herramientas", "basico": "Algo básico", "nada": "No usa nada"}
         ads_labels   = {"invierte": "Ya invierte en ads", "quiere_empezar": "Quiere empezar", "no": "No invierte"}
