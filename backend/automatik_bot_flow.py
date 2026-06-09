@@ -200,9 +200,10 @@ class AutomatikBotFlow:
         # Si viene la descripción libre (no es una opción del menú)
         meta = lead.metadata or {}
         if meta.get("_awaiting_biz_description"):
-            # Guardar la descripción textual como biz_type
+            # Guardar la descripción textual como biz_type + marcar flujo "otro"
             self._set_answer(lead, "biz_type", f"otro: {message.strip()[:80]}")
             meta.pop("_awaiting_biz_description", None)
+            meta["_otro_flow"] = True
             lead.metadata = meta
         else:
             biz = ("inmobiliaria" if "biz_inmo" in msg or "inmobiliaria" in msg
@@ -211,6 +212,12 @@ class AutomatikBotFlow:
             self._set_answer(lead, "biz_type", biz)
 
         # Lista para tamaño de equipo (4 opciones → usa list_message)
+        is_otro = (lead.metadata or {}).get("_otro_flow", False)
+        team_question = (
+            "¿Cuántas personas trabajan en tu negocio?"
+            if is_otro else
+            "¿Cuántas personas hay en tu equipo? (asesores + administración)"
+        )
         sections = [{
             "title": "Tamaño del equipo",
             "rows": [
@@ -220,12 +227,7 @@ class AutomatikBotFlow:
                 {"id": "team_mas",  "title": "Más de 15",       "description": "Empresa grande"},
             ],
         }]
-        self.wa.send_list_message(
-            lead.phone,
-            "¿Cuántas personas hay en tu equipo? (asesores + administración)",
-            "Ver opciones",
-            sections,
-        )
+        self.wa.send_list_message(lead.phone, team_question, "Ver opciones", sections)
         lead.flow_stage = FlowStage.ZONE
 
     async def _handle_team_size(self, lead, message: str):
@@ -237,40 +239,107 @@ class AutomatikBotFlow:
         self._set_answer(lead, "team_size", team)
 
         first = lead.name.split()[0] if lead.name else ""
-        self.wa.send_text_message(
-            lead.phone,
-            f"Perfecto {first}. ¿Cuántos leads nuevos recibís por mes aproximadamente?\n"
-            f"(de redes, portales, boca a boca, etc.)\n\n"
-            f"Podés poner un número aproximado, ej: *50* o *200*",
-        )
+        is_otro = (lead.metadata or {}).get("_otro_flow", False)
+
+        if is_otro:
+            # Flujo genérico: pregunta sobre automatizaciones actuales
+            sections = [{
+                "title": "Automatizaciones",
+                "rows": [
+                    {"id": "auto_wa",  "title": "🤖 Bot de WhatsApp",    "description": "Usás un bot o respuesta automática"},
+                    {"id": "auto_crm", "title": "📊 CRM o software",     "description": "Usás algún sistema de gestión"},
+                    {"id": "auto_rs",  "title": "📱 Redes sociales",      "description": "Agendador o herramienta de redes"},
+                    {"id": "auto_no",  "title": "❌ No tengo nada",       "description": "Todo manual por ahora"},
+                ],
+            }]
+            self.wa.send_list_message(
+                lead.phone,
+                f"Entendido, {first}! 💪\n\n¿Tenés alguna automatización en tu negocio hoy?\n"
+                f"(WhatsApp, CRM, redes sociales, etc.)",
+                "Ver opciones",
+                sections,
+            )
+        else:
+            # Flujo inmobiliario: leads por mes
+            self.wa.send_text_message(
+                lead.phone,
+                f"Perfecto {first}. ¿Cuántos leads nuevos recibís por mes aproximadamente?\n"
+                f"(de redes, portales, boca a boca, etc.)\n\n"
+                f"Podés poner un número aproximado, ej: *50* o *200*",
+            )
         lead.flow_stage = FlowStage.BUDGET
 
     async def _handle_monthly_leads(self, lead, message: str):
-        numbers = re.findall(r"\d+", message)
-        monthly_leads = int(numbers[0]) if numbers else 0
-        self._set_answer(lead, "monthly_leads", monthly_leads)
+        is_otro = (lead.metadata or {}).get("_otro_flow", False)
 
-        self.wa.send_text_message(
-            lead.phone,
-            f"Entendido, {monthly_leads} leads por mes. 📊\n\n"
-            f"Y de esos, ¿cuántos terminan en una operación cerrada por mes?\n\n"
-            f"Ej: *5* o *20*",
-        )
+        if is_otro:
+            # En flujo "otro", este paso recibe la respuesta de automatizaciones
+            msg = message.lower()
+            if "auto_wa" in msg:
+                auto = "bot_whatsapp"
+            elif "auto_crm" in msg:
+                auto = "crm_software"
+            elif "auto_rs" in msg:
+                auto = "redes_sociales"
+            else:
+                auto = "ninguna"
+            self._set_answer(lead, "current_automation", auto)
+
+            # Siguiente: ¿cómo conseguís clientes?
+            self.wa.send_text_message(
+                lead.phone,
+                "¿Cómo conseguís clientes hoy? 🤔\n\n"
+                "Contame en pocas palabras: publicidad, boca a boca, redes, "
+                "llamadas en frío, referidos...\n\n"
+                "No hace falta que sea largo, con 1 o 2 frases está perfecto 👇",
+            )
+        else:
+            # Flujo inmobiliario: cantidad de leads/mes
+            numbers = re.findall(r"\d+", message)
+            monthly_leads = int(numbers[0]) if numbers else 0
+            self._set_answer(lead, "monthly_leads", monthly_leads)
+
+            self.wa.send_text_message(
+                lead.phone,
+                f"Entendido, {monthly_leads} leads por mes. 📊\n\n"
+                f"Y de esos, ¿cuántos terminan en una operación cerrada por mes?\n\n"
+                f"Ej: *5* o *20*",
+            )
         lead.flow_stage = FlowStage.PROPERTY_TYPE
 
     async def _handle_monthly_closes(self, lead, message: str):
-        numbers = re.findall(r"\d+", message)
-        closes = int(numbers[0]) if numbers else 0
-        self._set_answer(lead, "monthly_closes", closes)
+        is_otro = (lead.metadata or {}).get("_otro_flow", False)
 
-        response = "¿Usás actualmente alguna herramienta digital para gestionar tus leads o clientes?"
-        buttons = [
-            {"type": "reply", "reply": {"id": "tools_si",     "title": "✅ Sí, tengo CRM"}},
-            {"type": "reply", "reply": {"id": "tools_basico", "title": "📋 Algo básico"}},
-            {"type": "reply", "reply": {"id": "tools_no",     "title": "❌ No uso nada"}},
-        ]
-        self.wa.send_interactive_buttons(lead.phone, response, buttons)
-        lead.flow_stage = FlowStage.MUST_HAVE
+        if is_otro:
+            # En flujo "otro", este paso recibe la respuesta de "cómo conseguís clientes"
+            self._set_answer(lead, "client_acquisition", message.strip()[:200])
+
+            # Ir directo a la pregunta del mayor problema (salteamos MUST_HAVE y URGENCY)
+            first = lead.name.split()[0] if lead.name else ""
+            self.wa.send_text_message(
+                lead.phone,
+                f"Última pregunta, {first} 🙌\n\n"
+                f"¿Cuál es el *mayor problema* que tenés hoy en tu negocio?\n\n"
+                f"Por ejemplo: _\"no tengo presencia en redes\"_, "
+                f"_\"pierdo clientes por falta de seguimiento\"_, "
+                f"_\"no sé cómo conseguir más clientes\"_...\n\n"
+                f"Contame en tus palabras 👇",
+            )
+            lead.flow_stage = FlowStage.APPOINTMENT_OFFER
+        else:
+            # Flujo inmobiliario: cierres por mes
+            numbers = re.findall(r"\d+", message)
+            closes = int(numbers[0]) if numbers else 0
+            self._set_answer(lead, "monthly_closes", closes)
+
+            response = "¿Usás actualmente alguna herramienta digital para gestionar tus leads o clientes?"
+            buttons = [
+                {"type": "reply", "reply": {"id": "tools_si",     "title": "✅ Sí, tengo CRM"}},
+                {"type": "reply", "reply": {"id": "tools_basico", "title": "📋 Algo básico"}},
+                {"type": "reply", "reply": {"id": "tools_no",     "title": "❌ No uso nada"}},
+            ]
+            self.wa.send_interactive_buttons(lead.phone, response, buttons)
+            lead.flow_stage = FlowStage.MUST_HAVE
 
     async def _handle_tools(self, lead, message: str):
         msg = message.lower()
@@ -410,6 +479,7 @@ class AutomatikBotFlow:
         team = answers.get("team_size", "solo_yo")
         score += {"solo_yo": 0, "2_5": 2, "6_15": 3, "mas_15": 4}.get(team, 0)
 
+        # Flujo inmobiliario
         leads = answers.get("monthly_leads", 0)
         score += 3 if leads >= 100 else 2 if leads >= 20 else 1 if leads >= 5 else 0
 
@@ -421,6 +491,15 @@ class AutomatikBotFlow:
 
         ads = answers.get("ads_invest", "no")
         score += {"invierte": 3, "quiere_empezar": 2, "no": 0}.get(ads, 0)
+
+        # Flujo "otro" — puntos por automatización (reemplaza leads/closes/tools/ads)
+        auto = answers.get("current_automation", "")
+        if auto:
+            # Sin automatización = más oportunidad de venta
+            score += {"ninguna": 4, "redes_sociales": 2, "bot_whatsapp": 1, "crm_software": 1}.get(auto, 2)
+            # Si tiene client_acquisition y describió el problema → lead activo = +1
+            if answers.get("client_acquisition"):
+                score += 1
 
         if score >= 11:
             return score, LeadStatus.HOT
@@ -496,9 +575,11 @@ class AutomatikBotFlow:
         biz_raw = answers.get('biz_type', '')
         biz_labels_map = {"inmobiliaria": "Inmobiliaria propia", "desarrolladora": "Desarrolladora", "asesor": "Asesor independiente"}
         biz_labels = {k: v for k, v in biz_labels_map.items()}
-        # Si es "otro: descripción", mostrar la descripción directamente
         if biz_raw.startswith("otro:"):
             biz_labels[biz_raw] = f"Otro — {biz_raw[5:].strip()}"
+
+        auto_labels = {"bot_whatsapp": "Bot de WhatsApp", "crm_software": "CRM/Software", "redes_sociales": "Redes sociales", "ninguna": "Sin automatización"}
+        is_otro = biz_raw.startswith("otro:")
         team_labels  = {"solo_yo": "Solo él/ella", "2_5": "2-5 personas", "6_15": "6-15 personas", "mas_15": "Más de 15"}
         tools_labels = {"tiene_crm": "Usa CRM/herramientas", "basico": "Algo básico", "nada": "No usa nada"}
         ads_labels   = {"invierte": "Ya invierte en ads", "quiere_empezar": "Quiere empezar", "no": "No invierte"}
@@ -544,12 +625,18 @@ class AutomatikBotFlow:
                     "fields": [
                         {"type": "mrkdwn", "text": f"*Nombre:*\n{lead.name or 'Sin nombre'}"},
                         {"type": "mrkdwn", "text": f"*Teléfono:*\n+{lead.phone}"},
-                        {"type": "mrkdwn", "text": f"*Negocio:*\n{biz_labels.get(answers.get('biz_type',''), '-')}"},
+                        {"type": "mrkdwn", "text": f"*Negocio:*\n{biz_labels.get(answers.get('biz_type',''), answers.get('biz_type','-'))}"},
                         {"type": "mrkdwn", "text": f"*Equipo:*\n{team_labels.get(answers.get('team_size',''), '-')}"},
-                        {"type": "mrkdwn", "text": f"*Leads/mes:*\n{answers.get('monthly_leads', '-')}"},
-                        {"type": "mrkdwn", "text": f"*Cierres/mes:*\n{answers.get('monthly_closes', '-')}"},
-                        {"type": "mrkdwn", "text": f"*Herramientas:*\n{tools_labels.get(answers.get('current_tools',''), '-')}"},
-                        {"type": "mrkdwn", "text": f"*Ads:*\n{ads_labels.get(answers.get('ads_invest',''), '-')}"},
+                        *([] if is_otro else [
+                            {"type": "mrkdwn", "text": f"*Leads/mes:*\n{answers.get('monthly_leads', '-')}"},
+                            {"type": "mrkdwn", "text": f"*Cierres/mes:*\n{answers.get('monthly_closes', '-')}"},
+                            {"type": "mrkdwn", "text": f"*Herramientas:*\n{tools_labels.get(answers.get('current_tools',''), '-')}"},
+                            {"type": "mrkdwn", "text": f"*Ads:*\n{ads_labels.get(answers.get('ads_invest',''), '-')}"},
+                        ]),
+                        *([] if not is_otro else [
+                            {"type": "mrkdwn", "text": f"*Automatización:*\n{auto_labels.get(answers.get('current_automation',''), '-')}"},
+                            {"type": "mrkdwn", "text": f"*Cómo consigue clientes:*\n{answers.get('client_acquisition', '-')}"},
+                        ]),
                     ],
                 },
                 {

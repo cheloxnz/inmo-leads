@@ -16,6 +16,7 @@ const BIZ_LABEL   = { inmobiliaria: 'Inmobiliaria', asesor: 'Asesor', desarrolla
 const BIZ_COLOR   = { inmobiliaria: '#6366f1', asesor: '#8b5cf6', desarrolladora: '#06b6d4' };
 const TOOLS_LABEL = { nada: 'Sin herramientas', basico: 'Básico (Excel/WA)', crm: 'CRM activo' };
 const ADS_LABEL   = { invierte: 'Invierte en ads', quiere: 'Quiere invertir', no: 'No invierte' };
+const AUTO_LABEL  = { bot_whatsapp: 'Bot de WhatsApp', crm_software: 'CRM / Software', redes_sociales: 'Redes sociales', ninguna: 'Sin automatización' };
 const ADS_COLOR   = { invierte: '#10b981', quiere: '#f59e0b', no: '#9ca3af' };
 
 const STATUS_META = {
@@ -175,13 +176,22 @@ function LeadDetail({ lead, onClose }) {
   const statusKey = getStatusFromScore(lead);
   const sm        = STATUS_META[statusKey] || STATUS_META.new;
 
+  const isOtro = (answers.biz_type || '').startsWith('otro:');
   const rows = [
     { icon: <Briefcase size={14} />, label: 'Tipo de negocio',   val: BIZ_LABEL[answers.biz_type] || answers.biz_type },
     { icon: <Users size={14} />,     label: 'Tamaño del equipo', val: answers.team_size },
-    { icon: <TrendingUp size={14} />,label: 'Leads / mes',       val: answers.monthly_leads },
-    { icon: <BarChart2 size={14} />, label: 'Cierres / mes',     val: answers.monthly_closes },
-    { icon: <MessageSquare size={14}/>,label:'Herramientas actuales', val: TOOLS_LABEL[answers.current_tools] || answers.current_tools },
-    { icon: <DollarSign size={14} />,label: 'Inversión en ads',  val: ADS_LABEL[answers.ads_invest] || answers.ads_invest },
+    // Flujo inmobiliario
+    ...(!isOtro ? [
+      { icon: <TrendingUp size={14} />,  label: 'Leads / mes',           val: answers.monthly_leads },
+      { icon: <BarChart2 size={14} />,   label: 'Cierres / mes',         val: answers.monthly_closes },
+      { icon: <MessageSquare size={14}/>,label: 'Herramientas actuales', val: TOOLS_LABEL[answers.current_tools] || answers.current_tools },
+      { icon: <DollarSign size={14} />,  label: 'Inversión en ads',      val: ADS_LABEL[answers.ads_invest] || answers.ads_invest },
+    ] : []),
+    // Flujo "otro"
+    ...(isOtro ? [
+      { icon: <MessageSquare size={14}/>, label: 'Automatización actual',  val: AUTO_LABEL[answers.current_automation] || answers.current_automation },
+      { icon: <TrendingUp size={14} />,   label: 'Cómo consigue clientes', val: answers.client_acquisition },
+    ] : []),
   ];
 
   return (
