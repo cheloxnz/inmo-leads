@@ -192,6 +192,17 @@ async def list_payments(
     return payments
 
 
+@router.delete("/payments/{payment_id}")
+async def delete_payment(
+    payment_id: str,
+    current_user: User = Depends(require_superadmin),
+):
+    result = await _db.automatik_payments.delete_one({"payment_id": payment_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Pago no encontrado")
+    return {"ok": True}
+
+
 @router.post("/payments")
 async def register_payment(
     body: PaymentCreate,

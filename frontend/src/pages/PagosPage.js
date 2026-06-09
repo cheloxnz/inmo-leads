@@ -4,7 +4,7 @@ import { API } from '../App';
 import { toast } from 'sonner';
 import {
   Search, Plus, Download, FileText, X, Save, Filter,
-  DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle
+  DollarSign, TrendingUp, Clock, CheckCircle, Trash2
 } from 'lucide-react';
 import '../styles/AutomatikDashboard.css';
 
@@ -252,6 +252,17 @@ export default function PagosPage() {
     }
   };
 
+  const handleDelete = async (p) => {
+    if (!window.confirm(`¿Eliminar el pago de ${p.company_name} por ${p.currency} ${p.amount}?`)) return;
+    try {
+      await axios.delete(`${API}/superadmin/clients/payments/${p.payment_id}`);
+      toast.success('Pago eliminado');
+      fetchPayments();
+    } catch {
+      toast.error('Error al eliminar el pago');
+    }
+  };
+
   const activeFilters = [filterStatus, filterMethod, filterPeriod].filter(Boolean).length;
 
   return (
@@ -438,6 +449,14 @@ export default function PagosPage() {
                         onClick={() => printInvoice(p)}
                       >
                         <FileText size={14} />
+                      </button>
+                      <button
+                        className="ak-btn ak-btn-ghost ak-btn-sm"
+                        title="Eliminar pago"
+                        style={{ color: '#ef4444' }}
+                        onClick={() => handleDelete(p)}
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
