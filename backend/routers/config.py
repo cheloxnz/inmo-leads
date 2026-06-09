@@ -10,6 +10,17 @@ router = APIRouter(tags=["config"])
 logger = logging.getLogger(__name__)
 _db = get_db()
 
+SUPERADMIN_TENANT = "automatik-media"
+
+
+def _resolve_tenant_id(user: User) -> str:
+    """Resuelve el tenant_id real para el usuario.
+    El superadmin usa __superadmin__ como tenant_id virtual,
+    pero sus operaciones de config corresponden a automatik-media.
+    """
+    tid = getattr(user, "tenant_id", "") or ""
+    return SUPERADMIN_TENANT if tid == "__superadmin__" else tid
+
 
 # ============================================
 # Bot Config (general)
@@ -18,10 +29,10 @@ _db = get_db()
 @router.get("/config")
 async def get_config(current_user: User = Depends(get_current_user)):
     """Obtiene configuración del bot (por tenant)"""
-    tf = tenant_filter(current_user)
-    config = await _db.bot_config.find_one(tf, {"_id": 0})
+    tid = _resolve_tenant_id(current_user)
+    config = await _db.bot_config.find_one({"tenant_id": tid}, {"_id": 0})
     if not config:
-        config = BotConfig(tenant_id=current_user.tenant_id).model_dump()
+        config = BotConfig(tenant_id=tid).model_dump()
         config["updated_at"] = config["updated_at"].isoformat()
         await _db.bot_config.insert_one(config)
     return config
@@ -30,11 +41,12 @@ async def get_config(current_user: User = Depends(get_current_user)):
 @router.put("/config")
 async def update_config(config: BotConfig, current_user: User = Depends(require_admin)):
     """Actualiza configuración del bot (por tenant)"""
+    tid = _resolve_tenant_id(current_user)
     config_dict = config.model_dump()
-    config_dict["tenant_id"] = current_user.tenant_id
+    config_dict["tenant_id"] = tid
     config_dict["updated_at"] = datetime.utcnow().isoformat()
     await _db.bot_config.update_one(
-        {"tenant_id": current_user.tenant_id},
+        {"tenant_id": tid},
         {"$set": config_dict},
         upsert=True,
     )
@@ -49,8 +61,9 @@ async def update_config(config: BotConfig, current_user: User = Depends(require_
 async def get_whatsapp_config(current_user: User = Depends(require_admin)):
     """Admin: Obtiene config de WhatsApp del tenant"""
     import os
+    tid = _resolve_tenant_id(current_user)
     tenant = await _db.tenants.find_one(
-        {"tenant_id": current_user.tenant_id}, {"_id": 0}
+        {"tenant_id": tid}, {"_id": 0}
     )
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
@@ -94,14 +107,15 @@ async def update_whatsapp_config(
             update_fields[key] = config[key]
     if not update_fields:
         raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+    tid = _resolve_tenant_id(current_user)
     update_fields["updated_at"] = datetime.utcnow().isoformat()
     await _db.tenants.update_one(
-        {"tenant_id": current_user.tenant_id},
+        {"tenant_id": tid},
         {"$set": update_fields},
     )
 
     # Auto-test de conexión post-save
-    test_result = await _run_whatsapp_check(current_user.tenant_id)
+    test_result = await _run_whatsapp_check(tid)
     return {
         "message": "Configuracion de WhatsApp actualizada",
         "test": test_result,
@@ -321,7 +335,7 @@ async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
     Persiste el resultado en `tenants.whatsapp_last_check` para que el
     SuperAdmin pueda ver el estado de cada tenant en su listado.
     """
-    return await _run_whatsapp_check(current_user.tenant_id)
+    return await _run_whatsapp_check(_resolve_tenant_id(current_user))
 
 
 # ============================================
@@ -331,9 +345,8 @@ async def test_whatsapp_connection(current_user: User = Depends(require_admin)):
 @router.get("/config/ai")
 async def get_ai_config(current_user: User = Depends(require_admin)):
     """Admin: Obtiene config de IA del tenant"""
-    tenant = await _db.tenants.find_one(
-        {"tenant_id": current_user.tenant_id}, {"_id": 0}
-    )
+    tid = _resolve_tenant_id(current_user)
+    tenant = await _db.tenants.find_one({"tenant_id": tid}, {"_id": 0})
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
     return {
@@ -350,6 +363,7 @@ async def get_ai_config(current_user: User = Depends(require_admin)):
 @router.put("/config/ai")
 async def update_ai_config(body: dict, current_user: User = Depends(require_admin)):
     """Admin: Configura key propia de OpenAI (opcional)"""
+    tid = _resolve_tenant_id(current_user)
     update = {}
     if "openai_api_key" in body:
         update["openai_api_key"] = body["openai_api_key"]
@@ -357,7 +371,7 @@ async def update_ai_config(body: dict, current_user: User = Depends(require_admi
         raise HTTPException(status_code=400, detail="No hay campos para actualizar")
     update["updated_at"] = datetime.utcnow().isoformat()
     await _db.tenants.update_one(
-        {"tenant_id": current_user.tenant_id},
+        {"tenant_id": tid},
         {"$set": update},
     )
     return {"message": "Configuracion de IA actualizada"}

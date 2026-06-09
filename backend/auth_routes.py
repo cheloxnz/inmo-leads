@@ -12,6 +12,13 @@ from auth import verify_password, get_password_hash, create_access_token, decode
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+SUPERADMIN_TENANT = "automatik-media"
+
+def _resolve_tid(user) -> str:
+    """Mapea __superadmin__ → automatik-media para operaciones de tenant."""
+    tid = getattr(user, "tenant_id", "") or ""
+    return SUPERADMIN_TENANT if tid == "__superadmin__" else tid
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pathlib import Path
@@ -491,8 +498,9 @@ async def get_my_branding(
     """Tenant admin: lee la branding de su propio tenant"""
     if not current_user.tenant_id:
         raise HTTPException(status_code=400, detail="Sin tenant")
+    tid = _resolve_tid(current_user)
     tenant = await db.tenants.find_one(
-        {"tenant_id": current_user.tenant_id},
+        {"tenant_id": tid},
         {"_id": 0}
     )
     if not tenant:
@@ -548,9 +556,10 @@ async def update_my_branding(
     if not safe:
         raise HTTPException(status_code=400, detail="Sin campos validos")
 
+    tid = _resolve_tid(current_user)
     safe["updated_at"] = datetime.utcnow().isoformat()
     result = await db.tenants.update_one(
-        {"tenant_id": current_user.tenant_id},
+        {"tenant_id": tid},
         {"$set": safe}
     )
     if result.matched_count == 0:
