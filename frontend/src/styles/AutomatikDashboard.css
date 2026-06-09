@@ -687,3 +687,52 @@
 [data-theme='dark'] .ak-upcoming-row { border-color: #374151; }
 [data-theme='dark'] .ak-kpi-sub,
 [data-theme='dark'] .ak-kpi-label { color: #6b7280; }
+
+/* ── Alias classes (single-dash variants for new pages) ── */
+.ak-btn-primary { background: #6366f1; color: #fff; }
+.ak-btn-primary:hover { background: #4f46e5; }
+.ak-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.ak-btn-ghost { background: #f3f4f6; color: #374151; }
+.ak-btn-ghost:hover { background: #e5e7eb; }
+.ak-btn-icon { padding: 7px; }
+.ak-btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.ak-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  transition: border 0.15s;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.ak-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.ak-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.ak-kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ak-form-full { grid-column: 1 / -1; }
+
+/* Dark mode for alias classes */
+[data-theme='dark'] .ak-btn-ghost { background: #374151; color: #f3f4f6; }
+[data-theme='dark'] .ak-btn-ghost:hover { background: #4b5563; }
+[data-theme='dark'] .ak-input { background: #111827; border-color: #374151; color: #f9fafb; }
+[data-theme='dark'] .ak-label { color: #d1d5db; }

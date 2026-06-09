@@ -25,6 +25,7 @@ import { getTenantFromSubdomain } from './utils/subdomain';
 import SuperAdminPanel from './pages/SuperAdminPanel';
 import AutomatikDashboard from './pages/AutomatikDashboard';
 import ClientesPage from './pages/ClientesPage';
+import PagosPage from './pages/PagosPage';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -467,7 +468,7 @@ function AppContent() {
           } />
           <Route path="/superadmin/pagos" element={
             <ProtectedRoute adminOnly>
-              <ClientesPage initialTab="pagos" />
+              <PagosPage />
             </ProtectedRoute>
           } />
           <Route path="/superadmin/plataformas" element={

@@ -168,12 +168,24 @@ async def delete_client(
 @router.get("/payments/all")
 async def list_payments(
     client_id: str = Query(""),
-    limit: int = Query(100),
+    status: str = Query(""),
+    method: str = Query(""),
+    period: str = Query(""),          # formato YYYY-MM
+    search: str = Query(""),          # busca por company_name
+    limit: int = Query(500),
     current_user: User = Depends(require_superadmin),
 ):
     query = {}
     if client_id:
         query["client_id"] = client_id
+    if status:
+        query["status"] = status
+    if method:
+        query["method"] = method
+    if period:
+        query["period"] = period
+    if search:
+        query["company_name"] = {"$regex": search, "$options": "i"}
     payments = []
     async for doc in _db.automatik_payments.find(query).sort("payment_date", -1).limit(limit):
         payments.append(_clean(doc))
