@@ -28,6 +28,7 @@ import ClientesPage from './pages/ClientesPage';
 import PagosPage from './pages/PagosPage';
 import AutomatikLeads from './pages/AutomatikLeads';
 import GastosPage from './pages/GastosPage';
+import CRMPage from './pages/CRMPage';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -176,6 +177,16 @@ function Navigation() {
             >
               <span className="icon">🤖</span>
               {!isCollapsed && <span>Leads del Bot</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/crm"
+              className={`nav-link ${isActive('/superadmin/crm') ? 'active' : ''}`}
+              data-testid="nav-ak-crm"
+              title="CRM Ventas"
+            >
+              <span className="icon">🎯</span>
+              {!isCollapsed && <span>CRM Ventas</span>}
             </Link>
 
             <Link
@@ -482,6 +493,11 @@ function AppContent() {
           <Route path="/superadmin/leads" element={
             <ProtectedRoute adminOnly>
               <AutomatikLeads />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/crm" element={
+            <ProtectedRoute adminOnly>
+              <CRMPage />
             </ProtectedRoute>
           } />
           <Route path="/superadmin/gastos" element={

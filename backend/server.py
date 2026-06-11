@@ -1400,6 +1400,69 @@ from routers.calendar import router as calendar_router, init_router as init_cale
 from routers.bootstrap import router as bootstrap_router, init_router as init_bootstrap
 from routers.automatik_clients import router as automatik_clients_router
 
+# ── Cal.com webhook → auto-crea prospecto en CRM ─────────────────────────────
+@api_router.post("/webhooks/calcom", tags=["webhooks"])
+async def calcom_webhook(request: Request):
+    """Cal.com dispara este endpoint cuando alguien agenda una demo."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": False}
+
+    trigger = payload.get("triggerEvent", "")
+    if trigger not in ("BOOKING_CREATED", "BOOKING_RESCHEDULED"):
+        return {"ok": True, "skipped": True}
+
+    booking = payload.get("payload", {})
+    attendees = booking.get("attendees", [])
+    attendee = attendees[0] if attendees else {}
+
+    nombre = attendee.get("name", "Sin nombre")
+    email = attendee.get("email", "")
+    start_time = booking.get("startTime", "")
+    fecha_demo = start_time[:10] if start_time else None
+    metadata = booking.get("metadata", {}) or {}
+    whatsapp = metadata.get("whatsapp", "") or metadata.get("phone", "")
+    inmobiliaria = metadata.get("inmobiliaria", "") or metadata.get("company", "")
+    canal = metadata.get("canal", "organico")
+    plan = metadata.get("plan", "")
+
+    # Evitar duplicados por email+fecha_demo
+    existing = await db.automatik_crm.find_one({"email": email, "fecha_demo": fecha_demo}) if email else None
+    if existing:
+        return {"ok": True, "duplicate": True}
+
+    import uuid as _uuid
+    from datetime import datetime as _dt
+    now = _dt.utcnow().isoformat()
+    doc = {
+        "prospect_id": str(_uuid.uuid4()),
+        "nombre": nombre,
+        "inmobiliaria": inmobiliaria,
+        "pais": "AR",
+        "canal": canal,
+        "whatsapp": whatsapp,
+        "email": email,
+        "fecha_entrada": now[:10],
+        "etapa": "demo_agendada",
+        "plan": plan,
+        "fecha_demo": fecha_demo,
+        "fecha_propuesta": None,
+        "fecha_cierre": None,
+        "mrr": None,
+        "motivo_perdida": None,
+        "notas": f"Agendado via Cal.com — {booking.get('title', '')}",
+        "proxima_accion": f"Demo el {fecha_demo}",
+        "followup_activo": False,
+        "lead_phone": None,
+        "created_at": now,
+        "updated_at": now,
+        "source": "calcom",
+    }
+    await db.automatik_crm.insert_one(doc)
+    doc.pop("_id", None)
+    return {"ok": True, "prospect_id": doc["prospect_id"]}
+
 app.include_router(api_router)
 app.include_router(auth_router, prefix="/api")
 app.include_router(catalog_router, prefix="/api")

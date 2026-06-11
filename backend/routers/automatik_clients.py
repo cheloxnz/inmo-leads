@@ -415,6 +415,140 @@ async def replicate_recurrent(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# CRM Prospects
+# ──────────────────────────────────────────────────────────────────────────────
+
+CRM_STAGES = ["prospecto", "demo_agendada", "demo_realizada", "propuesta_enviada", "cerrado", "perdido"]
+
+class CRMProspectCreate(BaseModel):
+    nombre: str
+    inmobiliaria: Optional[str] = None
+    pais: str = "AR"
+    canal: str = "organico"          # meta_ads / inmodesk / organico / referido
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    fecha_entrada: Optional[str] = None
+    etapa: str = "prospecto"
+    plan: Optional[str] = None       # starter / pro / scale / enterprise
+    fecha_demo: Optional[str] = None
+    fecha_propuesta: Optional[str] = None
+    fecha_cierre: Optional[str] = None
+    mrr: Optional[float] = None
+    motivo_perdida: Optional[str] = None
+    notas: Optional[str] = None
+    proxima_accion: Optional[str] = None
+    followup_activo: bool = False
+    lead_phone: Optional[str] = None  # vinculo con lead del bot
+
+class CRMProspectUpdate(BaseModel):
+    nombre: Optional[str] = None
+    inmobiliaria: Optional[str] = None
+    pais: Optional[str] = None
+    canal: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    fecha_entrada: Optional[str] = None
+    etapa: Optional[str] = None
+    plan: Optional[str] = None
+    fecha_demo: Optional[str] = None
+    fecha_propuesta: Optional[str] = None
+    fecha_cierre: Optional[str] = None
+    mrr: Optional[float] = None
+    motivo_perdida: Optional[str] = None
+    notas: Optional[str] = None
+    proxima_accion: Optional[str] = None
+    followup_activo: Optional[bool] = None
+    lead_phone: Optional[str] = None
+
+@router.get("/crm")
+async def list_crm_prospects(
+    etapa: str = Query(""),
+    pais: str = Query(""),
+    canal: str = Query(""),
+    search: str = Query(""),
+    current_user: User = Depends(require_superadmin),
+):
+    query: dict = {}
+    if etapa: query["etapa"] = etapa
+    if pais: query["pais"] = pais
+    if canal: query["canal"] = canal
+    if search:
+        query["$or"] = [
+            {"nombre": {"$regex": search, "$options": "i"}},
+            {"inmobiliaria": {"$regex": search, "$options": "i"}},
+            {"whatsapp": {"$regex": search, "$options": "i"}},
+        ]
+    prospects = []
+    async for doc in _db.automatik_crm.find(query).sort("created_at", -1):
+        prospects.append(_clean(doc))
+    return prospects
+
+@router.post("/crm")
+async def create_crm_prospect(
+    body: CRMProspectCreate,
+    current_user: User = Depends(require_superadmin),
+):
+    now = datetime.utcnow().isoformat()
+    prospect_id = str(uuid.uuid4())
+    doc = {
+        "prospect_id": prospect_id,
+        **body.dict(),
+        "fecha_entrada": body.fecha_entrada or date.today().isoformat(),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await _db.automatik_crm.insert_one(doc)
+    return _clean(doc)
+
+@router.put("/crm/{prospect_id}")
+async def update_crm_prospect(
+    prospect_id: str,
+    body: CRMProspectUpdate,
+    current_user: User = Depends(require_superadmin),
+):
+    existing = await _db.automatik_crm.find_one({"prospect_id": prospect_id})
+    if not existing:
+        raise HTTPException(404, "Prospecto no encontrado")
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    updates["updated_at"] = datetime.utcnow().isoformat()
+
+    # Auto-fecha cuando cambia etapa
+    etapa = updates.get("etapa", existing.get("etapa"))
+    if updates.get("etapa") == "demo_realizada" and not existing.get("fecha_demo"):
+        updates.setdefault("fecha_demo", date.today().isoformat())
+    if updates.get("etapa") == "propuesta_enviada" and not existing.get("fecha_propuesta"):
+        updates.setdefault("fecha_propuesta", date.today().isoformat())
+    if updates.get("etapa") in ("cerrado", "perdido") and not existing.get("fecha_cierre"):
+        updates.setdefault("fecha_cierre", date.today().isoformat())
+
+    await _db.automatik_crm.update_one({"prospect_id": prospect_id}, {"$set": updates})
+
+    # Disparar n8n si pasa a "demo_realizada"
+    if updates.get("etapa") == "demo_realizada":
+        import httpx as _httpx, os as _os
+        n8n_url = _os.environ.get("N8N_FOLLOWUP_WEBHOOK", "")
+        if n8n_url:
+            updated_doc = {**existing, **updates}
+            try:
+                async with _httpx.AsyncClient(timeout=5) as client:
+                    await client.post(n8n_url, json={"prospect": _clean(updated_doc)})
+            except Exception:
+                pass  # no bloquear si n8n falla
+
+    updated = await _db.automatik_crm.find_one({"prospect_id": prospect_id})
+    return _clean(updated)
+
+@router.delete("/crm/{prospect_id}")
+async def delete_crm_prospect(
+    prospect_id: str,
+    current_user: User = Depends(require_superadmin),
+):
+    result = await _db.automatik_crm.delete_one({"prospect_id": prospect_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Prospecto no encontrado")
+    return {"ok": True}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Dashboard KPIs
 # ──────────────────────────────────────────────────────────────────────────────
 
