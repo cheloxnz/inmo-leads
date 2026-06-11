@@ -290,6 +290,131 @@ async def list_automatik_leads(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Gastos
+# ──────────────────────────────────────────────────────────────────────────────
+
+EXPENSE_CATEGORIES = ["ia", "herramientas", "ads", "infraestructura", "equipo", "otro"]
+
+
+class ExpenseCreate(BaseModel):
+    name: str
+    category: str = "otro"
+    amount: float
+    currency: str = "USD"
+    period: Optional[str] = None       # YYYY-MM, default mes actual
+    date: Optional[str] = None
+    recurrent: bool = False            # se replica automáticamente cada mes
+    notes: Optional[str] = None
+
+
+class ExpenseUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    period: Optional[str] = None
+    date: Optional[str] = None
+    recurrent: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+@router.get("/expenses")
+async def list_expenses(
+    period: str = Query(""),
+    category: str = Query(""),
+    current_user: User = Depends(require_superadmin),
+):
+    query: dict = {}
+    if period:
+        query["period"] = period
+    if category:
+        query["category"] = category
+    expenses = []
+    async for doc in _db.automatik_expenses.find(query).sort("date", -1):
+        expenses.append(_clean(doc))
+    return expenses
+
+
+@router.post("/expenses")
+async def create_expense(
+    body: ExpenseCreate,
+    current_user: User = Depends(require_superadmin),
+):
+    now = datetime.utcnow().isoformat()
+    today = date.today()
+    expense_id = str(uuid.uuid4())
+    doc = {
+        "expense_id": expense_id,
+        "name": body.name,
+        "category": body.category,
+        "amount": body.amount,
+        "currency": body.currency,
+        "period": body.period or today.strftime("%Y-%m"),
+        "date": body.date or today.isoformat(),
+        "recurrent": body.recurrent,
+        "notes": body.notes,
+        "created_at": now,
+    }
+    await _db.automatik_expenses.insert_one(doc)
+    return _clean(doc)
+
+
+@router.put("/expenses/{expense_id}")
+async def update_expense(
+    expense_id: str,
+    body: ExpenseUpdate,
+    current_user: User = Depends(require_superadmin),
+):
+    existing = await _db.automatik_expenses.find_one({"expense_id": expense_id})
+    if not existing:
+        raise HTTPException(404, "Gasto no encontrado")
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    await _db.automatik_expenses.update_one({"expense_id": expense_id}, {"$set": updates})
+    updated = await _db.automatik_expenses.find_one({"expense_id": expense_id})
+    return _clean(updated)
+
+
+@router.delete("/expenses/{expense_id}")
+async def delete_expense(
+    expense_id: str,
+    current_user: User = Depends(require_superadmin),
+):
+    result = await _db.automatik_expenses.delete_one({"expense_id": expense_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Gasto no encontrado")
+    return {"ok": True}
+
+
+@router.post("/expenses/replicate-recurrent")
+async def replicate_recurrent(
+    target_period: str = Query(...),   # YYYY-MM al que copiar
+    current_user: User = Depends(require_superadmin),
+):
+    """Copia los gastos recurrentes del mes anterior al período indicado."""
+    # mes anterior
+    year, month = map(int, target_period.split("-"))
+    prev_month = month - 1 or 12
+    prev_year = year if month > 1 else year - 1
+    source_period = f"{prev_year}-{prev_month:02d}"
+
+    copied = 0
+    async for doc in _db.automatik_expenses.find({"period": source_period, "recurrent": True}):
+        existing = await _db.automatik_expenses.find_one(
+            {"name": doc["name"], "period": target_period, "recurrent": True}
+        )
+        if existing:
+            continue
+        new_doc = {k: v for k, v in doc.items() if k != "_id"}
+        new_doc["expense_id"] = str(uuid.uuid4())
+        new_doc["period"] = target_period
+        new_doc["date"] = f"{target_period}-01"
+        new_doc["created_at"] = datetime.utcnow().isoformat()
+        await _db.automatik_expenses.insert_one(new_doc)
+        copied += 1
+    return {"copied": copied, "source": source_period, "target": target_period}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Dashboard KPIs
 # ──────────────────────────────────────────────────────────────────────────────
 

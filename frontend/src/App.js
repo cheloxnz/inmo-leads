@@ -27,6 +27,7 @@ import AutomatikDashboard from './pages/AutomatikDashboard';
 import ClientesPage from './pages/ClientesPage';
 import PagosPage from './pages/PagosPage';
 import AutomatikLeads from './pages/AutomatikLeads';
+import GastosPage from './pages/GastosPage';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -175,6 +176,16 @@ function Navigation() {
             >
               <span className="icon">🤖</span>
               {!isCollapsed && <span>Leads del Bot</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/gastos"
+              className={`nav-link ${isActive('/superadmin/gastos') ? 'active' : ''}`}
+              data-testid="nav-ak-gastos"
+              title="Gastos"
+            >
+              <span className="icon">💸</span>
+              {!isCollapsed && <span>Gastos</span>}
             </Link>
 
             <div className="nav-divider" />
@@ -471,6 +482,11 @@ function AppContent() {
           <Route path="/superadmin/leads" element={
             <ProtectedRoute adminOnly>
               <AutomatikLeads />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/gastos" element={
+            <ProtectedRoute adminOnly>
+              <GastosPage />
             </ProtectedRoute>
           } />
           {/* Rutas Admin */}
