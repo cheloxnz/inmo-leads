@@ -1400,6 +1400,74 @@ from routers.calendar import router as calendar_router, init_router as init_cale
 from routers.bootstrap import router as bootstrap_router, init_router as init_bootstrap
 from routers.automatik_clients import router as automatik_clients_router
 
+# ── n8n → InmoDesk prospects webhook (no auth, API key) ──────────────────────
+@api_router.post("/webhooks/inmobot-prospect", tags=["webhooks"])
+async def inmobot_prospect_webhook(request: Request):
+    """n8n escribe prospectos aquí en lugar de Google Sheets."""
+    import os as _os, re as _re, uuid as _uuid
+    from datetime import datetime as _dt
+
+    # Validar API key opcional
+    api_key = request.headers.get("x-api-key", "")
+    expected = _os.environ.get("INMOBOT_WEBHOOK_KEY", "")
+    if expected and api_key != expected:
+        return {"ok": False, "error": "unauthorized"}
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": False, "error": "invalid json"}
+
+    # Aceptar lista o objeto único
+    items = payload if isinstance(payload, list) else [payload]
+    saved, skipped = 0, 0
+
+    def norm(s): return _re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+    for item in items:
+        empresa = (item.get("empresa") or item.get("Empresa") or "").strip()
+        web     = (item.get("web")     or item.get("Web")     or "").strip()
+        email   = (item.get("email")   or item.get("Email")   or "").strip()
+        if not empresa:
+            skipped += 1
+            continue
+
+        dk = norm(empresa) or norm(web) or norm(email)
+        if dk and await db.inmobot_prospects.find_one({"_dedup_key": dk}):
+            skipped += 1
+            continue
+
+        now = _dt.utcnow().isoformat()
+        doc = {
+            "prospect_id": str(_uuid.uuid4()),
+            "empresa":      empresa,
+            "web":          web,
+            "email":        email,
+            "telefono":     item.get("telefono") or item.get("Teléfono") or "",
+            "ciudad":       item.get("ciudad")   or item.get("Ciudad")   or "",
+            "sector":       item.get("sector")   or item.get("Sector")   or "",
+            "puntuacion":   item.get("puntuacion") or item.get("Puntuación") or item.get("puntuacion_google"),
+            "resenas":      item.get("resenas")  or item.get("Reseñas"),
+            "estado":       item.get("estado")   or "Pendiente",
+            "notas_ia":     item.get("notas_ia") or item.get("Notas IA") or item.get("oportunidad") or "",
+            "etiqueta":     item.get("etiqueta") or item.get("Etiqueta") or "",
+            "probabilidad": item.get("probabilidad") or "",
+            "tipo_solucion":item.get("tipo_solucion") or item.get("TIPO_SOLUCIÓN") or "",
+            "score_ia":     item.get("score_ia") or item.get("SCORE") or item.get("score"),
+            "fecha_envio":  None,
+            "draft_id":     None,
+            "proxima_accion": "",
+            "notas":        item.get("notas") or "",
+            "source":       "n8n",
+            "_dedup_key":   dk,
+            "created_at":   now,
+            "updated_at":   now,
+        }
+        await db.inmobot_prospects.insert_one(doc)
+        saved += 1
+
+    return {"ok": True, "saved": saved, "skipped": skipped}
+
 # ── Cal.com webhook → auto-crea prospecto en CRM ─────────────────────────────
 @api_router.post("/webhooks/calcom", tags=["webhooks"])
 async def calcom_webhook(request: Request):

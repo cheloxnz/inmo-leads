@@ -29,6 +29,7 @@ import PagosPage from './pages/PagosPage';
 import AutomatikLeads from './pages/AutomatikLeads';
 import GastosPage from './pages/GastosPage';
 import CRMPage from './pages/CRMPage';
+import ProspectosPage from './pages/ProspectosPage';
 import AuditLog from './pages/AuditLog';
 import FlowBuilder from './components/FlowBuilder';
 import CatalogPage from './pages/CatalogPage';
@@ -177,6 +178,16 @@ function Navigation() {
             >
               <span className="icon">🤖</span>
               {!isCollapsed && <span>Leads del Bot</span>}
+            </Link>
+
+            <Link
+              to="/superadmin/prospectos"
+              className={`nav-link ${isActive('/superadmin/prospectos') ? 'active' : ''}`}
+              data-testid="nav-ak-prospectos"
+              title="Prospectos InmoDesk"
+            >
+              <span className="icon">🔍</span>
+              {!isCollapsed && <span>Prospectos</span>}
             </Link>
 
             <Link
@@ -493,6 +504,11 @@ function AppContent() {
           <Route path="/superadmin/leads" element={
             <ProtectedRoute adminOnly>
               <AutomatikLeads />
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/prospectos" element={
+            <ProtectedRoute adminOnly>
+              <ProspectosPage />
             </ProtectedRoute>
           } />
           <Route path="/superadmin/crm" element={

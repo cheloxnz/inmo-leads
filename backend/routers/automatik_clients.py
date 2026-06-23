@@ -290,6 +290,148 @@ async def list_automatik_leads(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# InmoDesk Prospects
+# ──────────────────────────────────────────────────────────────────────────────
+
+PROSPECT_STATES = [
+    "Pendiente", "Volver a Contactar", "✏️ Borrador", "✅ Aprobado",
+    "📨 Enviado", "Contactado", "Esperando Respuesta", "En Negociación",
+    "Reunión Agendada", "Cliente", "No Interesado", "Cerrado Ganado", "Cerrado Perdido",
+]
+
+class ProspectCreate(BaseModel):
+    empresa: str
+    web: Optional[str] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    ciudad: Optional[str] = None
+    sector: Optional[str] = None
+    puntuacion: Optional[float] = None
+    resenas: Optional[int] = None
+    estado: str = "Pendiente"
+    notas_ia: Optional[str] = None
+    etiqueta: Optional[str] = None
+    probabilidad: Optional[str] = None
+    tipo_solucion: Optional[str] = None
+    score_ia: Optional[int] = None          # 1-5
+    fecha_envio: Optional[str] = None
+    draft_id: Optional[str] = None
+    proxima_accion: Optional[str] = None
+    notas: Optional[str] = None
+    source: str = "manual"                  # manual | n8n | apify
+
+class ProspectUpdate(BaseModel):
+    empresa: Optional[str] = None
+    web: Optional[str] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    ciudad: Optional[str] = None
+    sector: Optional[str] = None
+    puntuacion: Optional[float] = None
+    resenas: Optional[int] = None
+    estado: Optional[str] = None
+    notas_ia: Optional[str] = None
+    etiqueta: Optional[str] = None
+    probabilidad: Optional[str] = None
+    tipo_solucion: Optional[str] = None
+    score_ia: Optional[int] = None
+    fecha_envio: Optional[str] = None
+    draft_id: Optional[str] = None
+    proxima_accion: Optional[str] = None
+    notas: Optional[str] = None
+
+def _dedup_key(empresa: str, web: str = "", email: str = "") -> str:
+    import re
+    def norm(s): return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+    return norm(empresa) or norm(web) or norm(email)
+
+@router.get("/prospects")
+async def list_prospects(
+    estado: str = Query(""),
+    ciudad: str = Query(""),
+    search: str = Query(""),
+    score_min: int = Query(0),
+    limit: int = Query(500),
+    current_user: User = Depends(require_superadmin),
+):
+    query: dict = {}
+    if estado:
+        query["estado"] = estado
+    if ciudad:
+        query["ciudad"] = {"$regex": ciudad, "$options": "i"}
+    if score_min:
+        query["score_ia"] = {"$gte": score_min}
+    if search:
+        query["$or"] = [
+            {"empresa": {"$regex": search, "$options": "i"}},
+            {"email":   {"$regex": search, "$options": "i"}},
+            {"ciudad":  {"$regex": search, "$options": "i"}},
+        ]
+    prospects = []
+    async for doc in _db.inmobot_prospects.find(query).sort("created_at", -1).limit(limit):
+        prospects.append(_clean(doc))
+    return prospects
+
+@router.post("/prospects")
+async def create_prospect(
+    body: ProspectCreate,
+    current_user: User = Depends(require_superadmin),
+):
+    now = datetime.utcnow().isoformat()
+    # Dedup por empresa+web+email
+    dk = _dedup_key(body.empresa, body.web or "", body.email or "")
+    existing = await _db.inmobot_prospects.find_one({"_dedup_key": dk}) if dk else None
+    if existing:
+        raise HTTPException(409, "Prospecto duplicado")
+    prospect_id = str(uuid.uuid4())
+    doc = {
+        "prospect_id": prospect_id,
+        **body.dict(),
+        "_dedup_key": dk,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await _db.inmobot_prospects.insert_one(doc)
+    return _clean(doc)
+
+@router.put("/prospects/{prospect_id}")
+async def update_prospect(
+    prospect_id: str,
+    body: ProspectUpdate,
+    current_user: User = Depends(require_superadmin),
+):
+    existing = await _db.inmobot_prospects.find_one({"prospect_id": prospect_id})
+    if not existing:
+        raise HTTPException(404, "Prospecto no encontrado")
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    updates["updated_at"] = datetime.utcnow().isoformat()
+    if updates.get("estado") in ("📨 Enviado", "Contactado") and not existing.get("fecha_envio"):
+        updates.setdefault("fecha_envio", date.today().isoformat())
+    await _db.inmobot_prospects.update_one({"prospect_id": prospect_id}, {"$set": updates})
+    updated = await _db.inmobot_prospects.find_one({"prospect_id": prospect_id})
+    return _clean(updated)
+
+@router.delete("/prospects/{prospect_id}")
+async def delete_prospect(
+    prospect_id: str,
+    current_user: User = Depends(require_superadmin),
+):
+    result = await _db.inmobot_prospects.delete_one({"prospect_id": prospect_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Prospecto no encontrado")
+    return {"ok": True}
+
+@router.get("/prospects/stats")
+async def prospect_stats(current_user: User = Depends(require_superadmin)):
+    total = await _db.inmobot_prospects.count_documents({})
+    pendientes = await _db.inmobot_prospects.count_documents({"estado": "Pendiente"})
+    enviados = await _db.inmobot_prospects.count_documents({"estado": {"$in": ["📨 Enviado", "Contactado"]}})
+    negociacion = await _db.inmobot_prospects.count_documents({"estado": {"$in": ["En Negociación", "Reunión Agendada"]}})
+    clientes = await _db.inmobot_prospects.count_documents({"estado": {"$in": ["Cliente", "Cerrado Ganado"]}})
+    return {"total": total, "pendientes": pendientes, "enviados": enviados, "negociacion": negociacion, "clientes": clientes}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Gastos
 # ──────────────────────────────────────────────────────────────────────────────
 
